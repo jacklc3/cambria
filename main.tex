@@ -14,7 +14,7 @@
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{listings}
-\lstset{ 
+\lstset{
   backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
 %  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
 %  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
@@ -65,6 +65,8 @@
  {cr}{$c_r$}{1}
  {k1}{$k_1$}{1}
  {kp}{$k_p$}{1}
+ {t1}{$t_1$}{1}
+ {tn}{$t_n$}{1}
  {cop}{$c_{op}$}{2}
  {leadsto}{$\leadsto$}{2}
  {mapsto}{$\mapsto$}{2}
@@ -264,6 +266,25 @@ For substitution, the type signatures would become:
 \end{align*}
 \end{example}
 
+\subsubsection{Commuting with Let-Expressions}
+
+We expect the operational semantics of the interaction with operation calls and let expressions in classical effect handlers to be the following.
+\begin{lstlisting}
+  let x = op(v; c) in e leadsto op(v; let x = c in e)
+\end{lstlisting}
+However in handlers of parameterised algebraic theories there can be multiple or no continuations. Generalising the operational semantics (for, say, the substitution example) would give the following.
+\begin{lstlisting}
+  let x = sub[]((); [a]c, c') in e leadsto sub[]((); [a]let x = c in e, let x = c' in e)
+  let x = var[a]((); -) in e leadsto var[a]((); -)
+\end{lstlisting}
+This second example looks partivularly suspicious because if \lstinline{x} is not free in \lstinline{e} then we seem to be equating \lstinline{var[a]((); -)} to all expressions and thus the
+type system would be unsound. However, this is not the case because control is never given back to the delimited continuation when the \lstinline{var} operator is called. It is similar to the
+case with exceptions where one would expect
+\begin{lstlisting}
+  let x = fail() in e leadsto fail()
+\end{lstlisting}
+even if \lstinline{x} is not free in \lstinline{e}.
+
 \subsection{Handlers}
 
 Motivated by the presheaf semantics of the parameterised algebraic theories, we can think of the return type of a handler as a type that is dependant on a \emph{context} of parameters (i.e. a map from context to set). We first start with some examples to get a feel for how this should work.
@@ -286,7 +307,7 @@ and the $\var$ operator to inject the parameter (which we assume exists within o
 \begin{lstlisting}
     var[a](();) = inr a
 \end{lstlisting}
-However, for the $\sub$ operator, the continuation $k$ returns a value in a context extended by an additional parameter, or in $R + (\Delta + 1)$. So in this case if our value comes from the $R$ or $\Delta$ component, we may simply return the result, otherwise, we call $k'$ for a new value in $R+\Delta$. This results in the following code.
+However, for the $\sub$ operator, the continuation $k$ returns a value in a context extended by an additional parameter, that is a value in $R + (\Delta + 1)$. So in this case if our value comes from the $R$ or $\Delta$ component, we may simply return the result, otherwise, we call $k'$ for a new value in $R+\Delta$. This results in the following code.
 \begin{lstlisting}
     sub[]((); k, k') = case k () of
                             inl x        = inl x
@@ -313,6 +334,13 @@ There are a few elegant aspects of this approach:
     \item It prevents the fresh parameter names from escaping their continuation context. In particular, we cannot simply return \lstinline{(v',s'')} in the handler for the \lstinline{new} operator because it is of type $R\times (\Delta+1\to S)$, while the handler expects a return type of $R\times (\Delta \to S)$. So we are forced to restrict the function from the fresh parameter before returning it. Even though the function could not be called with the fresh parameter because it is an abstract instance no longer in scope, this formally guarantees that.
     \item For closed terms (which are the terms we expect from regular programs), the parameter context would be empty ($\Delta \cong 0$). This nicely restricts how the return type of the handler can be used. For example, in the substitution case, the result would be $R + \Delta = R + 0 \cong R$ giving only a result type. In the local binary state case, the return type would be $(0 \to S) \to R \times (0 \to S) \cong R$ because $0$ is initial.
 \end{itemize}
+However, we have brushed past an issue with this solution. That is, what do the coarity parameters refer to in the operators. For instance, say we have the following line of code.
+\begin{lstlisting}
+    sub(... sub(var[a](()), t1), ...), tn)
+\end{lstlisting}
+What does the \lstinline{a} refer to here? By the inductive construction of $\Delta$, we would expect it to be of the form \lstinline{inl ( ... inl (inr ()) ... )}, but attempting to reference the
+right substitution by the number of \lstinline{inl}s in the parameter name in the is not conducive to good coding practices. Hence the goal is to extend the type system to give names to each of the context parameters so that
+they can be easily referenced within the program. I am still in the process of finding a good way to format this so I have not typeset it yet.
 
 \subsubsection{Introducing new Parameters}
 
@@ -337,11 +365,6 @@ Again we follow from the type system given in \cite{kammar_no_2017}. The new han
     \noLine
     \UnaryInfC{$\Delta, \vec{a} \mid \Gamma, x:A', k_1: B_1 \to [\vec{b}_1]B!\Sigma', \dots, k_p:B_p \to [\vec{b}_p]B!\Sigma' \vdash c_{op} : B!\Sigma'$}
     \UnaryInfC{$\Delta \mid \Gamma \vdash (op[\vec{a}](x; [\vec{b}_1]k_1, \dots , [\vec{b}_p]k_p) \mapsto c_{op}); H : A!\Sigma \cup \{op\} \Rightarrow B!\Sigma'$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta, \vec{a} \mid \Gamma \vdash t : A!\Sigma$}
-    \UnaryInfC{$\Delta \mid \Gamma \vdash t : [\vec{a}]A!\Sigma$}
 \end{prooftree}
 
 \printbibliography
