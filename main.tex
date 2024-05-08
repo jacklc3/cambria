@@ -441,9 +441,10 @@ Again we follow from the type system given in \cite{kammar_no_2017}. We use nota
 \begin{prooftree}
     \AxiomC{$\left[\op : (|\vec{a}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_p|,B_p)\right] \in \Sigma$}
     \AxiomC{$\Gamma \vdash v: A'$}
+    \AxiomC{$\Gamma \vdash \vec{a}: \PCtx$}
     \noLine
-    \BinaryInfC{$\Gamma,y_1:B_1, \vec{a}:\PCtx \vdash c_1 : A\pbr{\vec{b}_1}!\Sigma \quad \cdots \quad \Gamma,y_p:B_p,\vec{a}:\PCtx \vdash c_p : A\pbr{\vec{b}_p}!\Sigma$}
-    \UnaryInfC{$\Gamma, \vec{a}:\PCtx \vdash (op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_p]y_p.c_p): A!\Sigma$}
+    \TrinaryInfC{$\Gamma,y_1:B_1, \vec{b}_1: \PCtx \vdash c_1 : A!\Sigma \quad \cdots \quad \Gamma,y_p:B_p, \vec{b}_p: \PCtx \vdash c_p : A!\Sigma$}
+    \UnaryInfC{$\Gamma\vdash (op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_p]y_p.c_p): A!\Sigma$}
 \end{prooftree}
 
 And for handling the parameters we have:
