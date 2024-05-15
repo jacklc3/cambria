@@ -53,11 +53,13 @@
  {a1}{$a_1$}{2}
  {a2}{$a_2$}{2}
  {vecc}{$\vec{c}$}{1}
+ {vecq}{$\vec{q}$}{1}
  {vecd1}{$\vec{d}_1$}{2}
  {vecdp}{$\vec{d}_p$}{2}
  {veca}{$\vec{a}$}{1}
  {vecb1}{$\vec{b}_1$}{1}
  {vecbp}{$\vec{b}_p$}{1}
+ {vecbi}{$\vec{b}_i$}{1}
  {y1}{$y_1$}{1}
  {yp}{$y_p$}{1}
  {c1}{$c_1$}{1}
@@ -70,14 +72,21 @@
  {b_1}{$b_1$}{1}
  {u_1}{$u_1$}{1}
  {b_m}{$b_m$}{1}
+ {b_i}{$b_i$}{1}
  {u_m}{$u_m$}{1}
- {cop}{$c_{op}$}{2}
+ {cop}{$c_{\op}$}{2}
+ {c_r}{$c_r$}{2}
  {leadsto}{$\leadsto$}{2}
  {mapsto}{$\mapsto$}{2}
  {lambda}{$\lambda$}{1}
  {...}{$\dots$}{1}
  {==}{$\equiv$}{1}
  {_a}{$_a$}{1}
+ {c_1}{$c_1$}{1}
+ {c_2}{$c_2$}{1}
+ {op}{$\op$}{1}
+ {c_op}{$c_\op$}{1}
+ {c_i}{$c_i$}{1}
 }
 
 \newcommand{\mlstinline}[1]{\mbox{\lstinline|#1|}}
@@ -363,7 +372,7 @@ A handler in the named setting for the theory of substitution is
     H = handler {
         return x            = return (inl x)
         var[a](();)         = return (inr a)
-        sub[]((); [a]k, k') = case k () of
+        sub[]((); k, k') = case k a () of
                                 inl x  = return (inl x)
                                 inr a' = handle a' with
                                             param a    = k' ()
@@ -372,7 +381,7 @@ A handler in the named setting for the theory of substitution is
 \end{lstlisting}
 \end{example}
 
-\begin{example}
+\begin{example} \label{ex:named_sub}
 A handler in the named setting for the theory of local state is
 \begin{lstlisting}
     H = handler {
@@ -381,10 +390,13 @@ A handler in the named setting for the theory of local state is
         set[a](v; k)   = return lambdas.k () (lambdab.handle b with
                                                 param a   = v
                                                 return b' = s (weaken_a b'))
-        new[](v; [a]k) = return lambdas.let (x,s') = k () (lambdab.handle b with
+        new[](v; k) = return lambdas.let (x,s') = k a () (lambdab.handle b with
                                                             param a   = v
                                                             return b' = s b')
                                     in (x, lambdab.s' (weaken_a b))
+        eq[a,b]((); k, k') = return handle a with
+                                        param b   = k ()
+                                        default _ = k' ()
     }
 \end{lstlisting}
 \end{example}
@@ -419,7 +431,7 @@ We use the syntactic sugar of $\Bool$ for $\Unit + \Unit$ and \lstinline{true} a
     \end{split}
 \end{equation*}
 \begin{equation*}
-    (A!\Sigma) \langle a \rangle = A\langle a \rangle!\Sigma
+    (A!\Sigma) \langle a \rangle = A\langle a \rangle!\Sigma \qquad (\Gamma, x:\cC)\langle a \rangle = \Gamma\langle a \rangle, x: \cC \langle a \rangle
 \end{equation*}
 
 Again we follow from the type system given in \cite{kammar_no_2017}. We use notation $\vec{a}:A$ in the variable typing context to mean $a_1:A, \dots, a_n:A$, where $|\vec{a}| = n$. The new handler typing terms can be given by:
@@ -434,8 +446,8 @@ Again we follow from the type system given in \cite{kammar_no_2017}. We use nota
     \AxiomC{$\op : (|\vec{a}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_p|,B_p)$}
     \AxiomC{$\Gamma \vdash H : A!\Sigma \Rightarrow \cC$}
     \noLine
-    \BinaryInfC{$\Gamma, x:A', \vec{a} : \PCtx, k_1: B_1 \to \cC\pbr{\vec{b}_1}, \dots, k_p:B_p \to \cC\pbr{\vec{b}_p} \vdash c_{\op} : \cC$}
-    \UnaryInfC{$\Gamma \vdash (\op[\vec{a}](x; [\vec{b}_1]k_1, \dots , [\vec{b}_p]k_p) \mapsto c_{\op}); H : A!\Sigma \cup \{op\} \Rightarrow \cC$}
+    \BinaryInfC{$\Gamma, x:A', \vec{a} : \PCtx, k_1: B_1 \to (\PCtx,\vec{b}_1)^{|\vec{b}_1|}\to \cC\pbr{\vec{b}_1}, \dots, k_p: B_p \to (\PCtx,\vec{b}_p)^{|\vec{b}_p|}\to \cC\pbr{\vec{b}_p} \vdash c_{\op} : \cC$}
+    \UnaryInfC{$\Gamma \vdash (\op[\vec{a}](x; k_1, \dots , k_p) \mapsto c_{\op}); H : A!\Sigma \cup \{op\} \Rightarrow \cC$}
 \end{prooftree}
 
 \begin{prooftree}
@@ -444,7 +456,7 @@ Again we follow from the type system given in \cite{kammar_no_2017}. We use nota
     \AxiomC{$\Gamma \vdash \vec{a}: \PCtx$}
     \noLine
     \TrinaryInfC{$\Gamma,y_1:B_1, \vec{b}_1: \PCtx \vdash c_1 : A!\Sigma \quad \cdots \quad \Gamma,y_p:B_p, \vec{b}_p: \PCtx \vdash c_p : A!\Sigma$}
-    \UnaryInfC{$\Gamma\vdash (op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_p]y_p.c_p): A!\Sigma$}
+    \UnaryInfC{$\Gamma\vdash \op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_p]y_p.c_p): A!\Sigma$}
 \end{prooftree}
 
 And for handling the parameters we have:
@@ -460,6 +472,106 @@ And for handling the parameters we have:
     \AxiomC{$\Gamma \vdash u_1 : \cC \quad \cdots \quad \Gamma\vdash u_m: \cC$}
     \TrinaryInfC{$\Gamma\vdash$ \lstinline|handle a with \{ param b_1 = u_1; ... ; param b_m = u_m; return a' = t \}| $: \cC$}
 \end{prooftree}
+
+\subsection{Small-Step Semantics}
+
+\begin{prooftree}
+    \AxiomC{\lstinline{c_1 leadsto c_1'}}
+    \UnaryInfC{\lstinline{do x <- c_1 in c_2 leadsto do x <- c_1' in c_2}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{do x <- return v in c leadsto c[v/x]}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{do x <- op(v; [vecb1]y1.c1,...,[vecbp]yp.cp) in c leadsto op(v; [vecb1]y1.do x <- c1 in c,...,[vecbp]yp.do x <- cp in c)}}
+\end{prooftree}
+
+For \lstinline|h = handler { return x mapsto c_r, ..., op[vecq](v; k_1,..., kn) mapsto c_op, ...}|, we have:
+
+\begin{prooftree}
+    \AxiomC{\lstinline{c leadsto c'}}
+    \UnaryInfC{\lstinline{with h handle c leadsto with h handle c'}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{with h handle return v leadsto c_r[v/x]}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{with h handle op[veca](v; [vecb1]y1.c1,..., [vecbp]yp.cp) leadsto c_op[v/x, veca/vecq, lambdavecb1y.with h handle c1/k1,..., lambdavecbpyp.with h handle cp/kp]}}
+\end{prooftree}
+
+For $\op \notin h$, we have:
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{with h handle op[veca](v; [vecb1]y1.c1,..., [vecbp]yp.cp) leadsto op[veca](v; [vecb1]y1.with h handle c1,..., [vecbp]yp.with h handle cp)}}
+\end{prooftree}
+
+\begin{theorem}[Type Preservation]
+    If $\Gamma \vdash c : A!\Sigma$ and $c \leadsto c'$, then $\Gamma \vdash c': A!\Sigma$.
+\end{theorem}
+
+\begin{proof}
+We prove type preservation by induction. The majority of the induction steps are straightforward. We focus on the crucial element, which is handling an operation that is within the handler.
+
+Assume that the reduct is well-typed and invert its type derivation:
+\begin{prooftree}
+    \AxiomC{$\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
+    \AxiomC{$\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_p]y_p.c_p) : B!\Sigma'$}
+    \BinaryInfC{$\Gamma \vdash$ \lstinline{with h handle op(v; [vecb1]y1.c1,..., [vecbp]yp.cp)} $: A!\Sigma$}
+\end{prooftree}
+Given the structure of $\op\in h$, the handler typing derivation leads to for some $h' \subset h$ and $\op\notin h'$:
+\begin{prooftree}
+    \AxiomC{$\op : (|\vec{q}|, A') \hookrightarrow (|\vec{r}_1|, B_1; \dots; |\vec{r}_p|,B_p)$}
+    \AxiomC{$\Gamma \vdash h' : B!\Sigma' \Rightarrow A!\Sigma$}
+    \noLine
+    \BinaryInfC{$\Gamma, x:A', \vec{q} : \PCtx, k_1: B_1 \to (\PCtx,\vec{r}_1)^{|\vec{r}_1|}\to (A!\Sigma)\pbr{\vec{r}_1}, \dots, k_p: B_p \to (\PCtx,\vec{r}_p)^{|\vec{r}_p|} \to (A!\Sigma)\pbr{\vec{r}_p} \vdash c_{\op} : A!\Sigma$}
+    \UnaryInfC{$\vdots$}
+    \UnaryInfC{$\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
+\end{prooftree}
+On the other side, we have:
+\begin{prooftree}
+    \AxiomC{$\left[\op : (|\vec{a}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_p|,B_p)\right] \in \Sigma$}
+    \AxiomC{$\Gamma \vdash v: A'$}
+    \AxiomC{$\Gamma \vdash \vec{a}: \PCtx$}
+    \noLine
+    \TrinaryInfC{$\left[\Gamma,y_i:B_i, \vec{b}_i: \PCtx \vdash c_i : B!\Sigma'\right]_{1\leq i\leq p}$}
+    \UnaryInfC{$\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_p]y_p.c_p) : B!\Sigma'$}
+\end{prooftree}
+We can weaken the parameter context in the continuation judgements and handler to derive:
+\begin{prooftree}
+    \AxiomC{$\Gamma, y_i: B_i, \vec{b}_i: \PCtx \vdash c_i : B!\Sigma'$}
+    \UnaryInfC{$\Gamma, y_i: B_i, \vec{b}_i: \PCtx \vdash$ \lstinline{with h handle c_i} $: A!\Sigma$}
+    \UnaryInfC{$\Gamma, y_i: B_i \vdash$ \lstinline{lambdavecbi.with h handle c_i} $: \PCtx
+    \to A!\Sigma$}
+    \UnaryInfC{$\Gamma, y_i: B_i \vdash$ \lstinline{lambdavecbi.with h handle c_i} $: (\PCtx,\vec{r}_i)^{|\vec{b_i}|}\to (A!\Sigma)\langle\vec{r}_i\rangle$}
+    \UnaryInfC{$\Gamma \vdash$ \lstinline{lambdayi.lambdavecbi.with h handle c_i} $: B_i\to (\PCtx,\vec{r}_i)^{|\vec{b_i}|}\to (A!\Sigma)\langle\vec{r}_i\rangle$}
+\end{prooftree}
+The third deduction comes from the fact that we may weaken the parameter context on the right-hand side of a type derivation because all variables on the left-hand side can be soundly interpreted in the larger parameter context. So using all of the above, we can finally conclude:
+\begin{prooftree}
+    \AxiomC{$\vdots$}
+    \UnaryInfC{$\Gamma \vdash$ \lstinline|c_op[v/x, veca/vecq, lambdavecb1y.with h handle c1/k1,..., lambdavecbpyp.with h handle cp/kp]| $:A!\Sigma$}
+\end{prooftree}
+as required.
+\end{proof}
+
+\section{Reasoning with Equations}
+
+We may prove the equations hold in our handlers using equational reasoning. We begin with examples from the theory of substitution.
+
+\begin{example}
+Consider the handler $H$ from Example \ref{ex:named_sub}. The following is a proof that the handler satisfies the equation
+\[x: 0 \mid - \vdash \sub(a.\var(a), k) = k.\]
+We have:
+
+\end{example}
 
 \printbibliography
 
