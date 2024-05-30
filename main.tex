@@ -89,6 +89,8 @@
  {c_op}{$c_\op$}{1}
  {c_i}{$c_i$}{1}
  {nu}{$\nu$}{1}
+ {psi_n}{$\psi_n$}{1}
+ {psi_i}{$\psi_i$}{1}
 }
 
 \newcommand{\mlstinline}[1]{\mbox{\lstinline|#1|}}
@@ -411,106 +413,133 @@ One could see how the parameter handler could also be adapted when the parameter
 The type and effect system closely follows that of~\cite{pretnar_introduction_2015}. We have an extra parameter type that captures the current parameter context. 
 \begin{align*}
     A, B &::= \PCtx \mid \Unit \mid A + B \mid A \times B \mid A \to \cC \mid \cC \Rightarrow \cD \\
-    \cC, \cD &::= A\cdot n!\Sigma \\
+    \cC, \cD &::= A\star n!\Sigma \\
     \Sigma &::= \{\op_1,\dots,\op_n\}
 \end{align*}
-where $n\in\mathbb{N}$ represents the number of free parameters used in the computation. We use the syntactic sugar of $\Bool$ for $\Unit + \Unit$ and \lstinline{true} and \lstinline{false} for the two instances \lstinline{inl ()} and \lstinline{inr ()} of the type $\Bool$, respectively. This type system captures the presheaf semantics of the parameterised algebraic theories because a value type can be considered a functor over variable $\PCtx$, i.e. $F: \PCtx \mapsto R + \PCtx$. In the case of presheaves over $\Fin^{op}$, the type $\PCtx$ would represent a set of parameters in context. To account for parameter context extension, on top of function abstraction, we introduce a restriction operator as in \cite{pitts_structural_2011} which converts a free parameter to a parameter bounded in an extended context.
+where $n\in\mathbb{N}$ represents the number of times we extend the parameter context within the typed term. We use the syntactic sugar of $\Bool$ for $\Unit + \Unit$ and \lstinline{true} and \lstinline{false} for the two instances \lstinline{inl ()} and \lstinline{inr ()} of the type $\Bool$, respectively. This type system captures the presheaf semantics of the parameterised algebraic theories because a value type can be considered a functor over variable $\PCtx$, i.e. $F: \PCtx \mapsto R + \PCtx$. In the case of presheaves over $\Fin^{op}$, the type $\PCtx$ would represent a set of parameters in context.
+
+\if false
+To account for parameter context extension, on top of function abstraction, we introduce a restriction operator as in \cite{pitts_structural_2011} which converts a free parameter to a parameter bounded in an extended context.
 \begin{prooftree}
     \AxiomC{$\Gamma, a:\PCtx \vdash t : A!\Sigma$}
     \UnaryInfC{$\Gamma \vdash \lambda a.t : \PCtx \to A!\Sigma$}
     \UnaryInfC{$\Gamma \vdash \nu(\lambda a.t) : A!\Sigma$}
 \end{prooftree}
-
-%%%%%%%%%%%%%%%%%%%%
-\if false
-\begin{equation*}
-    \begin{split}
-        \PCtx\langle a \rangle &= \PCtx,a \\
-        \Unit\langle a \rangle &= \Unit 
-    \end{split}
-    \qquad
-    \begin{split}
-        (A+B)\langle a \rangle &= A\langle a \rangle + B\langle a \rangle \\
-        (A\times B)\langle a \rangle &= A\langle a \rangle \times B\langle a \rangle
-    \end{split}
-    \qquad
-    \begin{split}
-        (A\to \cC)\langle a \rangle &= A\langle a \rangle \to \cC\langle a \rangle \\
-        (\cC \Rightarrow \cD)\langle a \rangle &= \cC\langle a \rangle \Rightarrow \cD\langle a \rangle
-    \end{split}
-\end{equation*}
-\begin{equation*}
-    (A!\Sigma) \langle a \rangle = A\langle a \rangle!\Sigma \qquad (\Gamma, x:\cC)\langle a \rangle = \Gamma\langle a \rangle, x: \cC \langle a \rangle
-\end{equation*}
 \fi
-%%%%%%%%%%%%%%%%%%%%%%%%
 
 Again we follow from the type system given in \cite{kammar_no_2017}. We use notation $\vec{a}:A$ in the variable typing context to mean $a_1:A, \dots, a_n:A$, where $|\vec{a}| = n$. The new handler typing terms can be given by:
 
 \begin{prooftree}
-    \AxiomC{$\Gamma, x:A \vdash c_r : B!\Sigma'$}
+    \AxiomC{$\Delta \vdash a$}
+    \UnaryInfC{$\Delta\mid \Gamma\vdash a : \PCtx \star 0$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Delta \mid \Gamma, x:A \vdash c_r : B!\Sigma'\star n$}
     \AxiomC{$\Sigma \subseteq \Sigma'$}
-    \BinaryInfC{$\Gamma \vdash$ \lstinline|handler \{ return x mapsto cr \} | $: A!\Sigma \Rightarrow B!\Sigma'$}
+    \BinaryInfC{$\Delta \mid \Gamma \vdash$ \lstinline|handler \{ return x mapsto cr \} | $: A!\Sigma \Rightarrow B!\Sigma' \star n$}
 \end{prooftree}
 
 \begin{prooftree}
-    \AxiomC{$\op : (|\vec{p}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)$}
-    \AxiomC{$\Gamma \vdash H : A!\Sigma \Rightarrow B!\Sigma'$}
+    \AxiomC{$\op : (|\vec{p}|, A') \hookrightarrow (m_1, B_1; \dots; m_l,B_l)$}
+    \AxiomC{$\Delta\mid \Gamma \vdash H : A!\Sigma \Rightarrow B!\Sigma'\star n$}
     \noLine
-    \BinaryInfC{$\Gamma, x:A', \vec{p} : \PCtx, k_1: B_1 \to \PCtx^{|\vec{b}_1|} \to B!\Sigma', \dots, k_l: B_l \to \PCtx^{|\vec{b}_l|} \to B!\Sigma' \vdash c_{\op} : B!\Sigma'$}
-    \UnaryInfC{$\Gamma \vdash (\op[\vec{p}](x; k_1, \dots , k_l) \mapsto c_{\op}); H : A!\Sigma \cup \{op\} \Rightarrow B!\Sigma'$}
+    \BinaryInfC{$\Delta \mid \Gamma, x:A', \vec{p} : \PCtx, k_1: (B_1 \to B!\Sigma')\star m_1, \dots, k_l: B_l \to B\star m_l!\Sigma' \vdash c_{\op} : B!\Sigma'\star n$}
+    \UnaryInfC{$\Gamma \vdash (\op[\vec{p}](x; k_1, \dots , k_l) \mapsto c_{\op}); H : A!\Sigma \cup \{op\} \Rightarrow B!\Sigma'\star n$}
 \end{prooftree}
 
 \begin{prooftree}
-    \AxiomC{$\left[\op : (|\vec{a}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)\right] \in \Sigma$}
-    \AxiomC{$\Gamma \vdash v: A'$}
-    \AxiomC{$\Gamma \vdash \vec{a}: \PCtx$}
+    \AxiomC{$[\op : (|\vec{a}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)] \in \Sigma$}
+    \AxiomC{$\Delta\mid\Gamma \vdash v: A'$}
+    \AxiomC{$\Delta \vdash \vec{a}$}
     \noLine
-    \TrinaryInfC{$\Gamma,y_1:B_1, \vec{b}_1: \PCtx \vdash c_1 : A!\Sigma \quad \cdots \quad \Gamma,y_l:B_l, \vec{b}_l: \PCtx \vdash c_l : A!\Sigma$}
-    \UnaryInfC{$\Gamma\vdash \op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_l]y_l.c_l): A!\Sigma$}
+    \TrinaryInfC{$\Delta, \vec{b}_1\mid\Gamma,y_1:B_1 \vdash c_1 : A!\Sigma \quad \cdots \quad \Delta, \vec{b}_l\mid \Gamma,y_l:B_l \vdash c_l : A!\Sigma$}
+    \UnaryInfC{$\Delta\mid\Gamma\vdash \op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_l]y_l.c_l): A!\Sigma$}
 \end{prooftree}
-
-And for handling the parameters we have:
 
 \begin{prooftree}
-    \AxiomC{$\Gamma, b_1:\PCtx,\dots,b_m:\PCtx \vdash a: \PCtx$}
-    \AxiomC{$\Gamma,a':\PCtx\vdash t: \cC$}
-    \AxiomC{$\Gamma \vdash u_1 : \cC \quad \cdots \quad \Gamma\vdash u_m: \cC$}
-    \TrinaryInfC{$\Gamma\vdash$ \lstinline|handle a with \{ param b_1 = u_1; ... ; param b_m = u_m; return a' = t \}| $: \cC$}
+    \AxiomC{$\Delta,\vec{b}\mid\Gamma \vdash t : A\star n$}
+    \UnaryInfC{$\Delta\mid\Gamma \vdash \nu \vec{b}.t : A\star n+|\vec{b}|$}
 \end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Delta,\mid\Gamma \vdash t : A$}
+    \UnaryInfC{$\Delta\mid\Gamma \vdash return t : A\star 0!\Sigma$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Delta\mid\Gamma \vdash a : \PCtx\star n+1!\Sigma$}
+    \AxiomC{$\Delta\mid\Gamma, b:\PCtx \vdash u : A\star n!\Sigma$}
+    \AxiomC{$\Delta\mid\Gamma \vdash t : A\star n!\Sigma$}
+    \TrinaryInfC{$\Delta \mid \Gamma \vdash$ \lstinline|strengthen a with t in b -> u| $: A\star n!\Sigma$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Delta\mid\Gamma \vdash a : \PCtx\star n$}
+    \UnaryInfC{$\Delta \mid \Gamma \vdash$ \lstinline|weaken a| $: \PCtx\star n+1$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$\Delta,\vec{b}\mid\Gamma \vdash t : A$}
+    \UnaryInfC{$\Delta\mid\Gamma \vdash \nu \vec{b}.t : A\star |\vec{b}|$}
+\end{prooftree}
+
+
 
 \subsection{Small-Step Semantics}
 
+In the small-step semantics, we augment the terms with a natural number to indicate the number of free parameters. Given any term $t$, we initiate the operational semantics with $(t,0)$.
+
 \begin{prooftree}
-    \AxiomC{\lstinline{c_1 leadsto c_1'}}
-    \UnaryInfC{\lstinline{do x <- c_1 in c_2 leadsto do x <- c_1' in c_2}}
+    \AxiomC{\lstinline{(c_1,n) leadsto (c_1',n')}}
+    \UnaryInfC{\lstinline{(do x <- c_1 in c_2, n) leadsto (do x <- c_1' in c_2, n')}}
 \end{prooftree}
 
 \begin{prooftree}
     \AxiomC{}
-    \UnaryInfC{\lstinline{do x <- return v in c leadsto c[v/x]}}
+    \UnaryInfC{\lstinline{(do x <- return v in c, n) leadsto (c[v/x], n)}}
 \end{prooftree}
 
 \begin{prooftree}
     \AxiomC{}
-    \UnaryInfC{\lstinline{do x <- op(v; [vecb1]y1.c1,...,[vecbl]y_l.cl) in c leadsto op(v; [vecb1]y1.do x <- c1 in c,...,[vecbl]y_l.do x <- cl in c)}}
+    \UnaryInfC{\lstinline{(do x <- op(v; [vecb1]y1.c1,...,[vecbl]y_l.cl) in c, n) leadsto (op(v; [vecb1]y1.do x <- c1 in c,...,[vecbl]y_l.do x <- cl in c), n)}}
 \end{prooftree}
 
 For \lstinline|h = handler { return x mapsto c_r, ..., op[vecq](v; k1,..., kl) mapsto c_op, ...}|, we have:
 
 \begin{prooftree}
-    \AxiomC{\lstinline{c leadsto c'}}
-    \UnaryInfC{\lstinline{with h handle c leadsto with h handle c'}}
+    \AxiomC{\lstinline{(c, n) leadsto (c', n')}}
+    \UnaryInfC{\lstinline{(with h handle c, m) leadsto (with h handle c', m - n + n')}}
 \end{prooftree}
 
 \begin{prooftree}
     \AxiomC{}
-    \UnaryInfC{\lstinline{with h handle return v leadsto c_r[v/x]}}
+    \UnaryInfC{\lstinline{(with h handle return v, n) leadsto (c_r[v/x], n)}}
 \end{prooftree}
 
 \begin{prooftree}
     \AxiomC{}
-    \UnaryInfC{\lstinline{with h handle op[veca](v; [vecb1]y1.c1,..., [vecbl]y_l.cl) leadsto c_op[v/x, veca/vecq, lambday1f.f(nuvecb1.with h handle c1)/k1,..., lambday_lf.f(nuvecbl.with h handle cl)/kl]}}
+    \UnaryInfC{$(\nu a_1\dots a_m.t, n) \leadsto (t[\psi(n+1)/a_1,\dots,\psi(m+n)/a_m], m+n)$}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{(weaken a, n) leadsto (a, n + 1)}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$i = n+1$}
+    \UnaryInfC{\lstinline{(strengthen psi(i) with t in b -> u, n+1) leadsto (t, n)}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{$i < n+1$}
+    \UnaryInfC{\lstinline{(strengthen psi(i) with t in b -> u, n + 1) leadsto (u[b/psi_i], n)}}
+\end{prooftree}
+
+\begin{prooftree}
+    \AxiomC{}
+    \UnaryInfC{\lstinline{with h handle op[veca](v; [vecb1]y1.c1,..., [vecbl]y_l.cl) leadsto c_op[v/x, veca/vecq, lambday1.with h handle nuvecb1.c1)/k1,..., lambday_l.with h handle nuvecbl.cl)/kl]}}
 \end{prooftree}
 
 For $\op \notin h$, we have:
@@ -529,40 +558,40 @@ We prove type preservation by induction. The majority of the induction steps are
 
 Assume that the reduct is well-typed and invert its type derivation:
 \begin{prooftree}
-    \AxiomC{$\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
-    \AxiomC{$\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_l]y_l.c_l) : B!\Sigma'$}
-    \BinaryInfC{$\Gamma \vdash$ \lstinline{with h handle op(v; [vecb1]y1.c1,..., [vecbl]y_l.cl)} $: A!\Sigma$}
+    \AxiomC{$\Delta\mid\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
+    \AxiomC{$\Delta\mid\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_l]y_l.c_l) : B!\Sigma'$}
+    \BinaryInfC{$\Delta\mid\Gamma \vdash$ \lstinline{with h handle op(v; [vecb1]y1.c1,..., [vecbl]y_l.cl)} $: A!\Sigma$}
 \end{prooftree}
 Given the structure of $\op\in h$, the handler typing derivation leads to for some $h' \subset h$ and $\op\notin h'$:
 \begin{prooftree}
     \AxiomC{$\op : (|\vec{q}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)$}
-    \AxiomC{$\Gamma \vdash h' : B!\Sigma' \Rightarrow A!\Sigma$}
+    \AxiomC{$\Delta\mid\Gamma \vdash h' : B!\Sigma' \Rightarrow A!\Sigma$}
     \noLine
-    \BinaryInfC{$\Gamma, x:A', \vec{p} : \PCtx, k_1: B_1 \to (\forall\vec{b}_1. A \to A!\Sigma) \to A!\Sigma, \dots, k_l: B_l \to (\forall\vec{b}_l.A \to A!\Sigma) \to A!\Sigma \vdash c_{\op} : A!\Sigma$}
+    \BinaryInfC{$\Delta\mid\Gamma, x:A', \vec{p} : \PCtx, k_1: B_1 \to A\star|\vec{b}_1|!\Sigma, \dots, k_l: B_l \to A\star|\vec{b}_l|!\Sigma \vdash c_{\op} : A!\Sigma$}
     \UnaryInfC{$\vdots$}
     \UnaryInfC{$\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
 \end{prooftree}
 On the other side, we have:
 \begin{prooftree}
     \AxiomC{$\left[\op : (|\vec{a}|, A') \hookrightarrow (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)\right] \in \Sigma$}
-    \AxiomC{$\Gamma \vdash v: A'$}
-    \AxiomC{$\Gamma \vdash \vec{a}: \PCtx$}
+    \AxiomC{$\Delta\mid\Gamma \vdash v: A'$}
+    \AxiomC{$\Delta \vdash \vec{a}$}
     \noLine
-    \TrinaryInfC{$\left[\Gamma,y_i:B_i, \vec{b}_i: \PCtx \vdash c_i : B!\Sigma'\right]_{1\leq i\leq p}$}
+    \TrinaryInfC{$\left[\Delta,\vec{b}_i\mid\Gamma,y_i:B_i \vdash c_i : B!\Sigma'\right]_{1\leq i\leq p}$}
     \UnaryInfC{$\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_l]y_l.c_l) : B!\Sigma'$}
 \end{prooftree}
-For each $1\leq i\leq l$, we can weaken the parameter context in the continuation judgements and handler to derive:
+From $\Delta\vdash \vec{a}$ we can deduce $\Delta\mid\Gamma\vdash \vec{a} :\PCtx$. Additionally, for each $1\leq i\leq l$, we can weaken the parameter context in the continuation judgements and handler to derive:
 \begin{prooftree}
-    \AxiomC{$\Gamma, y_i: B_i, \vec{b}_i: \PCtx, f:\nu \vec{b}_i.A\to A!\Sigma \vdash c_i : B!\Sigma'$}
-    \UnaryInfC{$\Gamma, y_i: B_i, \vec{b}_i: \PCtx, f:\nu \vec{b}_i.A\to A!\Sigma \vdash$ \lstinline{with h handle c_i} $: A!\Sigma$}
-    \UnaryInfC{$\Gamma, y_i: B_i, f:\nu \vec{b}_i.A\to A!\Sigma \vdash$ \lstinline{nuvecbi.with h handle c_i} $: \forall \vec{b}_i.A!\Sigma$}
-    \UnaryInfC{$\Gamma, y_i: B_i, f:\nu \vec{b}_i.A\to A!\Sigma \vdash$ \lstinline{f (nuvecbi.with h handle c_i)} $: A!\Sigma$}
-    \UnaryInfC{$\Gamma \vdash$ \lstinline{lambday_if.f (nuvecbi.with h handle c_i)} $: B_i \to (\forall \vec{b}_i.A \to A!\Sigma) \to A!\Sigma$}
+    \AxiomC{$\Delta,\vec{b}_i\mid\Gamma,y_i,:B_i\vdash c_i:A!\Sigma$}
+    \UnaryInfC{$\Delta\mid\Gamma,y_i,:B_i\vdash \nu\vec{b}_i.c_i:A\star|\vec{b}_i|!\Sigma$}
+    \UnaryInfC{$\Delta\mid\Gamma,y_i,:B_i\vdash \nu\vec{b}_i.c_i:A\star|\vec{b}_i|!\Sigma$}
+    \UnaryInfC{$\Delta\mid\Gamma,y_i,:B_i\vdash$ \lstinline{with h handle} $\nu\vec{b}_i.c_i : A\star|\vec{b}_i|!\Sigma$}
+    \UnaryInfC{$\Delta\mid\Gamma\vdash$ \lstinline{lambday_i.with h handle} $\nu\vec{b}_i.c_i : B_i\to A\star|\vec{b}_i|!\Sigma$}
 \end{prooftree}
-We note that we have used a lot of syntactic sugar in this type deduction for brevity. That is, the true final term should be \lstinline{lambday_i.return (lambdaf.do z <- nuvecbi.with h handle c_i in f z)}. Moreover, the final type should be $B_i \to ((\forall \vec{b}_i.A \to A!\Sigma) \to A!\Sigma)!\emptyset$ but given we are returning a value in a context of no effect operations we omit it for brevity. So using all of the above, we can finally conclude:
+So using all of the above, we can finally conclude:
 \begin{prooftree}
     \AxiomC{$\vdots$}
-    \UnaryInfC{$\Gamma \vdash$ \lstinline|c_op[v/x, veca/vecq, lambday1f.f (nuvecb1.with h handle c_1)/k1,..., lambday_lf.f (nuvecbl.with h handle cl)/kl]| $:A!\Sigma$}
+    \UnaryInfC{$\Gamma \vdash$ \lstinline|c_op[v/x, veca/vecq, lambday1.with h handle nuvecb1.c_1/k1,..., lambday_l.with h handle nuvecbl.cl/kl]| $:A!\Sigma$}
 \end{prooftree}
 as required.
 \end{proof}
