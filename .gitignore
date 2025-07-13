@@ -9,3 +9,4 @@
 *.pdf
 *.run.xml
 *.synctex.gz
+implementation/dist-newstyle/*

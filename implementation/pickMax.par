@@ -1,0 +1,14 @@
+with handler {
+    return x -> return x,
+    decide(v; k) ->
+        do xt <- k true in
+        do xf <- k false in
+        do m1 <- max xt in
+        do m2 <- m1 xf in
+        return m2
+} handle (
+    do b1 <- decide () in
+    do b2 <- decide () in
+    do x1 <- (if b1 then (return 15) else (return 30)) in
+    do x2 <- (if b2 then (return 5) else (return 10)) in
+    return (x1 - x2))
