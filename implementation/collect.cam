@@ -2,11 +2,10 @@ with handler {
     return x -> return (x, ""),
     print(s; k) -> do x <- k () in
         do r1 <- fst x in
-        do r2 <- snd x in
-        do r3 <- join s in
-        do r4 <- r3 r2 in
-        return (r1, r4)
+        do r2 <- join s (snd x) in
+        return (r1, r2)
 } handle (
     do x <- #print("A"; y.return y) in
     do y <- #print("B"; y.return y) in
-    #print("C"; y.return y))
+    #print("C"; y.return y)
+)
