@@ -42,8 +42,8 @@ instance Eq Value where
 
 data Computation
     = CReturn Value
-    | COp OpName Value VarName Computation -- op(v; y, c)
-    | CSeq VarName Computation Computation -- do x <- c1 in c2
+    | COp OpName Value VarName Computation
+    | CSeq VarName Computation Computation
     | CIf Value Computation Computation
     | CApp Value Value
     | CHandle Handler Computation
