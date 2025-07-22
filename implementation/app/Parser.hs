@@ -8,7 +8,7 @@ import Text.Megaparsec.Char
 import Control.Monad.Combinators.Expr
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Void (Void)
-import Data.Text (Text, pack)
+import Data.Text (Text, pack, unpack)
 import Data.List (foldl', find)
 
 type Parser = Parsec Void Text
@@ -49,9 +49,13 @@ desugarBin f c1           c2           = CSeq "_1" c1 (CSeq "_2" c2 (f (VVar "_1
 
 operatorTable :: [[Operator Parser Computation]]
 operatorTable =
-    [ [ InfixL (return (desugarBin CApp)) ] -- Function application
-    , [ InfixL (symbol ";" >> return (\c1 c2 -> CSeq "_" c1 c2)) ] -- Sequencing
-    ]
+    [ [ InfixL (return (desugarBin CApp)) ] ] -- Function application
+    ++
+    map (map expandBin) [["++"], ["*"], ["+", "-"]]
+    ++
+    [ [ InfixL (symbol ";" >> return (\c1 c2 -> CSeq "_" c1 c2)) ] ] -- Sequencing
+  where
+    expandBin op = InfixL (symbol op >> return (desugarBin (\v1 v2 -> CSeq "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2))))
 
 pComputation :: Parser Computation
 pComputation = makeExprParser pTerm operatorTable

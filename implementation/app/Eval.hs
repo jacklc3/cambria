@@ -93,8 +93,8 @@ initialEnv = Map.fromList [
     ("+", primBinOpInt (\x y -> VInt (x + y))),
     ("-", primBinOpInt (\x y -> VInt (x + y))),
     ("*", primBinOpInt (\x y -> VInt (x * y))),
+    ("++", primBinOpStr (\x y -> VString (x ++ y))),
     ("max", primBinOpInt (\x y -> VInt (max x y))),
-    ("join", primBinOpStr (\x y -> VString (x ++ y)) "join"),
     ("fst", VContinuation (\(VPair x _) -> CReturn x)),
     ("snd", VContinuation (\(VPair _ x) -> CReturn x)) ]
 
@@ -106,10 +106,10 @@ primBinOpInt op = VContinuation handle_x
     handle_y x (VInt y) = CReturn (op x y)
     handle_y _ _        = error "Type error: second argument to primitive was not an integer."
 
-primBinOpStr :: (String -> String -> Value) -> String -> Value
-primBinOpStr op str = VContinuation handle_x
+primBinOpStr :: (String -> String -> Value) -> Value
+primBinOpStr op = VContinuation handle_x
   where
     handle_x (VString x)   = CReturn (VContinuation (handle_y x))
     handle_x _             = error "Type error: first argument was not a string."
     handle_y x (VString y) = CReturn (op x y)
-    handle_y v v'          = error ("Type error: second argument of " ++ str ++ " was not a string: " ++ show v ++ show v')
+    handle_y v v'          = error ("Type error: second argument was not a string: " ++ show v ++ show v')
