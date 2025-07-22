@@ -61,18 +61,21 @@ pComputation :: Parser Computation
 pComputation = makeExprParser pTerm operatorTable
 
 pReturn :: Parser Computation
-pReturn = CReturn <$> (symbol "return" *> pValue)
+pReturn = do
+  symbol "return"
+  c <- pComputation
+  return $ CSeq "_ret" c (CReturn (VVar "_ret"))
 
 pTerm :: Parser Computation
 pTerm = choice
-    [ try $ parens pComputation
+    [ try pPair
+    , try $ parens pComputation
     , try pIf
     , try pDo
     , try pWith
     , try pFun
     , pOp
     , try pReturn
-    , try pPair
     , CReturn <$> pValue
     ]
 
@@ -102,11 +105,11 @@ pString :: Parser Value
 pString = VString <$> (char '"' *> manyTill L.charLiteral (char '"'))
 
 pPair :: Parser Computation
-pPair = try (symbol "return") *> (parens $ do
+pPair = parens $ do
   c1 <- pComputation
   symbol ","
   c2 <- pComputation
-  return $ desugarBin (\v1 v2 -> CReturn (VPair v1 v2)) c1 c2)
+  return $ desugarBin (\v1 v2 -> CReturn (VPair v1 v2)) c1 c2
 
 pHandler :: Parser Value
 pHandler = VHandler <$> (symbol "handler" *> braces pHandlerBody)

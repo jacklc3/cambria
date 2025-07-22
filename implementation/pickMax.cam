@@ -2,7 +2,7 @@ with handler {
     return x -> return x,
     decide(v; k) -> max (k true) (k false)
 } handle (
-    do x1 <- (if #decide () then (return 15) else (return 30)) in
-    do x2 <- (if #decide () then (return 5) else (return 10)) in
-    return (x1 + x2)
+    do x1 <- (if #decide () then 15 else 30) in
+    do x2 <- (if #decide () then 5 else 10) in
+    do r <- (x1 - x2) in return r
 )
