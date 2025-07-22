@@ -9,7 +9,7 @@ import Control.Monad.Combinators.Expr
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Void (Void)
 import Data.Text (Text, pack)
-import Data.List (foldl', foldl1')
+import Data.List (foldl', find)
 
 type Parser = Parsec Void Text
 
@@ -31,7 +31,7 @@ braces = between (symbol "{") (symbol "}")
 reservedWords :: [String]
 reservedWords =
   [ "true", "false", "fun", "handler", "return", "do", "in",
-    "if", "then", "else", "with", "handle", "_"
+    "if", "then", "else", "with", "handle"
   ]
 
 pIdentifier :: Parser String
@@ -41,15 +41,15 @@ pIdentifier = (lexeme . try) $ do
     then fail $ "keyword " ++ show name ++ " cannot be an identifier"
     else return name
 
-desugar2 :: (Value -> Value -> Computation) -> Computation -> Computation -> Computation
-desugar2 f (CReturn v1) (CReturn v2) = f v1 v2
-desugar2 f (CReturn v1) c2           = CSeq "_a" c2 (f v1 (VVar "_a"))
-desugar2 f c1           (CReturn v2) = CSeq "_f" c1 (f (VVar "_f") v2)
-desugar2 f c1           c2           = CSeq "_f" c1 (CSeq "_a" c2 (f (VVar "_f") (VVar "_a")))
+desugarBin :: (Value -> Value -> Computation) -> Computation -> Computation -> Computation
+desugarBin f (CReturn v1) (CReturn v2) = f v1 v2
+desugarBin f (CReturn v1) c2           = CSeq "_2" c2 (f v1 (VVar "_2"))
+desugarBin f c1           (CReturn v2) = CSeq "_1" c1 (f (VVar "_1") v2)
+desugarBin f c1           c2           = CSeq "_1" c1 (CSeq "_2" c2 (f (VVar "_1") (VVar "_2")))
 
 operatorTable :: [[Operator Parser Computation]]
 operatorTable =
-    [ [ InfixL (return (desugar2 CApp)) ] -- Function application
+    [ [ InfixL (return (desugarBin CApp)) ] -- Function application
     , [ InfixL (symbol ";" >> return (\c1 c2 -> CSeq "_" c1 c2)) ] -- Sequencing
     ]
 
@@ -68,7 +68,7 @@ pTerm = choice
     , try pFun
     , pOp
     , try pReturn
-    , try pPairComp
+    , try pPair
     , CReturn <$> pValue
     ]
 
@@ -97,12 +97,12 @@ pInteger = VInt <$> lexeme L.decimal
 pString :: Parser Value
 pString = VString <$> (char '"' *> manyTill L.charLiteral (char '"'))
 
-pPairComp :: Parser Computation
-pPairComp = symbol "return" *> (parens $ do
+pPair :: Parser Computation
+pPair = try (symbol "return") *> (parens $ do
   c1 <- pComputation
   symbol ","
   c2 <- pComputation
-  return $ desugar2 (\v1 v2 -> CReturn (VPair v1 v2)) c1 c2)
+  return $ desugarBin (\v1 v2 -> CReturn (VPair v1 v2)) c1 c2)
 
 pHandler :: Parser Value
 pHandler = VHandler <$> (symbol "handler" *> braces pHandlerBody)
@@ -110,15 +110,15 @@ pHandler = VHandler <$> (symbol "handler" *> braces pHandlerBody)
 pHandlerBody :: Parser Handler
 pHandlerBody = do
   clauses <- sepBy (pReturnClause <|> pOpClause) (symbol ",")
-  let retClause = extractReturn clauses
-      opClauses = foldl' extractOps [] clauses
-  return $ Handler retClause opClauses
+  let opClauses = foldl' extractOps [] clauses
+  case find isLeft clauses of
+    Just (Left retClause) -> return $ Handler retClause opClauses
+    Nothing               -> fail $ "no return in handler"
   where
-    extractReturn ((Left ret):_) = ret
-    extractReturn (_:xs)         = extractReturn xs
-    extractReturn []             = error "No return in handler"
-    extractOps acc (Right op)    = op : acc
-    extractOps acc _             = acc
+    isLeft (Left _) = True
+    isLeft _        = False
+    extractOps acc (Right op) = op : acc
+    extractOps acc _          = acc
 
 pReturnClause :: Parser (Either (VarName, Computation) (OpName, VarName, VarName, Computation))
 pReturnClause = Left <$> (symbol "return" *> pClauseBody)
