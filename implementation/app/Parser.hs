@@ -13,34 +13,27 @@ import Data.List (foldl', foldl1')
 
 type Parser = Parsec Void Text
 
--- Space consumer: skips spaces, tabs, newlines
 sc :: Parser ()
 sc = L.space space1 empty empty
 
--- Lexeme: a parser that consumes trailing whitespace.
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme sc
 
--- Symbol: parses a literal string and consumes trailing whitespace.
 symbol :: Text -> Parser Text
 symbol = L.symbol sc
 
--- Parens: parses something enclosed in parentheses.
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
--- Braces: parses something enclosed in braces.
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
--- A list of reserved words that cannot be used as identifiers.
 reservedWords :: [String]
 reservedWords =
   [ "true", "false", "fun", "handler", "return", "do", "in",
-    "if", "then", "else", "with", "handle"
+    "if", "then", "else", "with", "handle", "_"
   ]
 
--- Identifier parser: parses a valid identifier, ensuring it's not a reserved word.
 pIdentifier :: Parser String
 pIdentifier = (lexeme . try) $ do
   name <- (:) <$> letterChar <*> many alphaNumChar
@@ -48,19 +41,20 @@ pIdentifier = (lexeme . try) $ do
     then fail $ "keyword " ++ show name ++ " cannot be an identifier"
     else return name
 
-pComputation :: Parser Computation
-pComputation = makeExprParser pTerm operatorTable
+desugar2 :: (Value -> Value -> Computation) -> Computation -> Computation -> Computation
+desugar2 f (CReturn v1) (CReturn v2) = f v1 v2
+desugar2 f (CReturn v1) c2           = CSeq "_a" c2 (f v1 (VVar "_a"))
+desugar2 f c1           (CReturn v2) = CSeq "_f" c1 (f (VVar "_f") v2)
+desugar2 f c1           c2           = CSeq "_f" c1 (CSeq "_a" c2 (f (VVar "_f") (VVar "_a")))
 
 operatorTable :: [[Operator Parser Computation]]
 operatorTable =
-    [ [ InfixL (return desugarApply) ] -- Function application
+    [ [ InfixL (return (desugar2 CApp)) ] -- Function application
     , [ InfixL (symbol ";" >> return (\c1 c2 -> CSeq "_" c1 c2)) ] -- Sequencing
     ]
 
-desugarApply :: Computation -> Computation -> Computation
-desugarApply (CReturn v1) c2 = CSeq "_a" c2 (CApp v1 (VVar "_a"))
-desugarApply c1 (CReturn v2) = CSeq "_f" c1 (CApp (VVar "_f") v2)
-desugarApply c1 c2           = CSeq "_f" c1 (CSeq "_a" c2 (CApp (VVar "_f") (VVar "_a")))
+pComputation :: Parser Computation
+pComputation = makeExprParser pTerm operatorTable
 
 pReturn :: Parser Computation
 pReturn = CReturn <$> (symbol "return" *> pValue)
@@ -74,6 +68,7 @@ pTerm = choice
     , try pFun
     , pOp
     , try pReturn
+    , try pPairComp
     , CReturn <$> pValue
     ]
 
@@ -83,7 +78,6 @@ pValue = choice
     , pBool
     , pInteger
     , pString
-    , pPair
     , pHandler
     , pVar
     ]
@@ -103,12 +97,12 @@ pInteger = VInt <$> lexeme L.decimal
 pString :: Parser Value
 pString = VString <$> (char '"' *> manyTill L.charLiteral (char '"'))
 
-pPair :: Parser Value
-pPair = parens $ do
-  v1 <- pValue
+pPairComp :: Parser Computation
+pPairComp = symbol "return" *> (parens $ do
+  c1 <- pComputation
   symbol ","
-  v2 <- pValue
-  return $ VPair v1 v2
+  c2 <- pComputation
+  return $ desugar2 (\v1 v2 -> CReturn (VPair v1 v2)) c1 c2)
 
 pHandler :: Parser Value
 pHandler = VHandler <$> (symbol "handler" *> braces pHandlerBody)
@@ -182,30 +176,20 @@ pFun = do
 
 pIf :: Parser Computation
 pIf = do
-    symbol "if"
-    cb <- pComputation
-    symbol "then"
-    c1 <- pComputation
-    symbol "else"
-    c2 <- pComputation
-    return $ CSeq "_b" cb (CIf (VVar "_b") c1 c2)
+  symbol "if"
+  cb <- pComputation
+  symbol "then"
+  c1 <- pComputation
+  symbol "else"
+  c2 <- pComputation
+  return $ CSeq "_b" cb (CIf (VVar "_b") c1 c2)
 
 pOp :: Parser Computation
 pOp = do
-    symbol "#"
-    op <- pIdentifier
-    parens (try (pOpComplex op) <|> pOpSimple op)
-  where
-    pOpSimple op = do
-      c <- pComputation
-      return $ CSeq "_p" c (COp op (VVar "_p") "_y" (CReturn (VVar "_y")))
-    pOpComplex op = do
-      c_p <- pTerm
-      symbol ";"
-      y <- pIdentifier
-      symbol "."
-      c_k <- pComputation
-      return $ CSeq "_p" c_p (COp op (VVar "_p") y c_k)
+  symbol "#"
+  op <- pIdentifier
+  c <- pTerm
+  return $ CSeq "_p" c (COp op (VVar "_p"))
 
 pProgram :: Parser Computation
 pProgram = between sc eof pComputation

@@ -47,8 +47,8 @@ eval env (CSeq var c1 c2) =
     Impure op v k -> Impure op v (\res -> CSeq var (k res) c2)
     err@(RuntimeError _) -> err
 
-eval env (COp op v y c) =
-    Impure op (evalValue env v) (\res -> CSeq y (CReturn res) c)
+eval env (COp op v) =
+    Impure op (evalValue env v) CReturn
 
 eval env (CHandle handler comp) =
     evalHandler env handler comp

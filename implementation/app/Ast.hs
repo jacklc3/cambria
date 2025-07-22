@@ -42,19 +42,19 @@ instance Eq Value where
 
 data Computation
     = CReturn Value
-    | COp OpName Value VarName Computation
+    | COp OpName Value
     | CSeq VarName Computation Computation
     | CIf Value Computation Computation
     | CApp Value Value
     | CHandle Handler Computation
 
 instance Show Computation where
-    show (CReturn v)      = "return " ++ show v
-    show (COp op v y c)   = op ++ "(" ++ show v ++ "; " ++ y ++ ", " ++ show c ++ ")"
-    show (CSeq x c1 c2)   = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
-    show (CIf v c1 c2)    = "if " ++ show v ++ " then " ++ show c1 ++ " else " ++ show c2
-    show (CApp v1 v2)     = show v1 ++ " " ++ show v2
-    show (CHandle h c)    = "with " ++ show h ++ " handle " ++ show c
+    show (CReturn v)    = "return " ++ show v
+    show (COp op v)     = op ++ "(" ++ show v ++ ")"
+    show (CSeq x c1 c2) = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
+    show (CIf v c1 c2)  = "if " ++ show v ++ " then " ++ show c1 ++ " else " ++ show c2
+    show (CApp v1 v2)   = show v1 ++ " " ++ show v2
+    show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
 
 data Handler = Handler {
     hReturnClause :: (VarName, Computation),
