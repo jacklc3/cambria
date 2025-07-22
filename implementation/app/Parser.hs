@@ -51,11 +51,12 @@ operatorTable :: [[Operator Parser Computation]]
 operatorTable =
     [ [ InfixL (return (desugarBin CApp)) ] ] -- Function application
     ++
-    map (map expandBin) [["++"], ["*"], ["+", "-"]]
+    map (map expandInfixL) [["++"], ["*"], ["+", "-"]]
     ++
     [ [ InfixL (symbol ";" >> return (\c1 c2 -> CSeq "_" c1 c2)) ] ] -- Sequencing
   where
-    expandBin op = InfixL (symbol op >> return (desugarBin (\v1 v2 -> CSeq "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2))))
+    expandInfixL op = InfixL (symbol op >> return (desugarBin (sequenceInfixL op)))
+    sequenceInfixL op v1 v2 = CSeq "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2)
 
 pComputation :: Parser Computation
 pComputation = makeExprParser pTerm operatorTable
