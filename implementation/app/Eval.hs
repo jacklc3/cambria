@@ -91,7 +91,7 @@ findOpClause name = foldl' go Nothing
 initialEnv :: Env
 initialEnv = Map.fromList [
     ("+", primBinOpInt (\x y -> VInt (x + y))),
-    ("-", primBinOpInt (\x y -> VInt (x + y))),
+    ("-", primBinOpInt (\x y -> VInt (x - y))),
     ("*", primBinOpInt (\x y -> VInt (x * y))),
     ("++", primBinOpStr (\x y -> VString (x ++ y))),
     ("max", primBinOpInt (\x y -> VInt (max x y))),

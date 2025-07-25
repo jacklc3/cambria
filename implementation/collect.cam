@@ -1,7 +1,7 @@
 with handler {
-    return x -> return (x, ""),
-    print(s; k) -> do x <- k () in
-        return (fst x, s ++ (snd x))
+  return x -> return (x, ""),
+  print(s; k) -> do x <- k () in
+    return (fst x, s ++ (snd x))
 } handle (
-    do x <- #print "A" in #print ("B"); #print ("C")
+  #print "A"; #print "B"; #print "C"
 )

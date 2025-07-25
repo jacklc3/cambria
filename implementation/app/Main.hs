@@ -18,6 +18,8 @@ main = do
       case parseProgram filename content of
         Left bundle -> putStr (errorBundlePretty bundle)
         Right ast -> do
+          putStrLn "Parsed code!"
+          putStrLn (show ast)
           let result = run initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"
