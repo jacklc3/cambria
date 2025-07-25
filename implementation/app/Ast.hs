@@ -19,6 +19,7 @@ data Value
     | VHandler Handler
       -- Runtime-only values
     | VContinuation (Value -> Computation) Env
+    | VClosure VarName Computation Env
 
 instance Show Value where
     show (VInt i)            = show i
@@ -31,6 +32,7 @@ instance Show Value where
     -- show (VRecFun _ f x c) = "(rec fun " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
     show (VHandler _)        = "<handler>"
     show (VContinuation _ _) = "<continuation>"
+    show (VClosure _ _)      = "<closure>"
 
 instance Eq Value where
     (VInt i1) == (VInt i2) = i1 == i2

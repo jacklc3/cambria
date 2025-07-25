@@ -7,21 +7,22 @@ import qualified Data.Map as Map
 
 data EvalResult
     = Pure Value
-    | Impure OpName Value (Value -> Computation)
+    | Impure OpName Value (Value -> Computation) Env
     | RuntimeError String
 
 instance Show EvalResult where
-    show (Pure v) = "Pure " ++ show v
-    show (Impure op v _) = "Impure " ++ op ++ " " ++ show v
-    show (RuntimeError s) = "Error: " ++ s
+    show (Pure v)          = "Pure " ++ show v
+    show (Impure op v _ _) = "Impure " ++ op ++ " " ++ show v
+    show (RuntimeError s)  = "Error: " ++ s
 
 eval :: Env -> Computation -> EvalResult
 eval env (CReturn val) = Pure (evalValue env val)
 
 eval env (CApp funVal argVal) =
   case evalValue env funVal of
-    VFun paramName body ->
-      let newEnv = Map.insert paramName (evalValue env argVal) env
+    VFun _ _ -> RuntimeError $ "We applied a function - this should be a closure"
+    VClosure var body cEnv ->
+      let newEnv = Map.insert var (evalValue env argVal) cEnv
       in eval newEnv body
     {-
     VRecFun recEnv fName xName body ->
@@ -30,7 +31,7 @@ eval env (CApp funVal argVal) =
           newEnv = Map.insert xName evaluatedArg (Map.insert fName recClosure recEnv)
       in eval newEnv body
     -}
-    VContinuation k k_env -> eval k_env (k (evalValue env argVal))
+    VContinuation k kEnv -> eval kEnv (k (evalValue env argVal))
     _ -> RuntimeError $ "Cannot apply non-function: " ++ show funVal
 
 eval env (CIf cond c1 c2) =
@@ -42,11 +43,11 @@ eval env (CIf cond c1 c2) =
 eval env (CSeq var c1 c2) =
   case eval env c1 of
     Pure val -> eval (Map.insert var val env) c2
-    Impure op v k -> Impure op v (\res -> CSeq var (k res) c2)
+    Impure op v k opEnv -> Impure op v (\res -> CSeq var (k res) c2) opEnv
     err@(RuntimeError _) -> err
 
 eval env (COp op v) =
-    Impure op (evalValue env v) CReturn
+    Impure op (evalValue env v) CReturn env
 
 eval env (CHandle handler comp) =
     evalHandler env handler comp
@@ -57,6 +58,7 @@ evalValue env (VVar name) =
     Just val -> evalValue env val
     Nothing -> error $ "Unbound variable: " ++ name
 evalValue env (VPair v1 v2) = VPair (evalValue env v1) (evalValue env v2)
+evalValue env (VFun var c) = VClosure var c env
 evalValue _ val = val
 
 evalHandler :: Env -> Handler -> Computation -> EvalResult
@@ -65,18 +67,18 @@ evalHandler env handler comp =
     Pure val -> let (var, retBody) = hReturnClause handler
                 in eval (Map.insert var val env) retBody
 
-    Impure opName opVal opCont ->
+    Impure opName opVal opCont opEnv ->
       case findOpClause opName (hOpClauses handler) of
         Just (paramName, contName, clauseBody) ->
           let
             handledContinuation = VContinuation (\resultVal ->
-              CHandle handler (opCont resultVal)) env
+              CHandle handler (opCont resultVal)) opEnv
             handlerEnv = Map.insert paramName opVal
                        $ Map.insert contName handledContinuation env
           in eval handlerEnv clauseBody
         Nothing ->
           Impure opName opVal (\resultVal ->
-            CHandle handler (opCont resultVal))
+            CHandle handler (opCont resultVal)) opEnv
 
     err@(RuntimeError _) -> err
 
