@@ -3,6 +3,7 @@ module Ast where
 import Data.Map (Map)
 import Data.List (intersperse)
 
+type Env = Map VarName Value
 type VarName = String
 type OpName  = String
 
@@ -17,19 +18,19 @@ data Value
     -- | VRecFun (Map VarName Value) VarName VarName Computation -- rec fun f x -> body
     | VHandler Handler
       -- Runtime-only values
-    | VContinuation (Value -> Computation)
+    | VContinuation (Value -> Computation) Env
 
 instance Show Value where
-    show (VInt i)          = show i
-    show (VBool b)         = show b
-    show (VString s)       = show s
-    show VUnit             = "()"
-    show (VPair v1 v2)     = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
-    show (VVar v)          = "Var:" ++  v
-    show (VFun x c)        = "(fun " ++ x ++ " -> " ++ show c ++ ")"
+    show (VInt i)            = show i
+    show (VBool b)           = show b
+    show (VString s)         = show s
+    show VUnit               = "()"
+    show (VPair v1 v2)       = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
+    show (VVar v)            = "Var:" ++  v
+    show (VFun x c)          = "(fun " ++ x ++ " -> " ++ show c ++ ")"
     -- show (VRecFun _ f x c) = "(rec fun " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
-    show (VHandler _)      = "<handler>"
-    show (VContinuation _) = "<continuation>"
+    show (VHandler _)        = "<handler>"
+    show (VContinuation _ _) = "<continuation>"
 
 instance Eq Value where
     (VInt i1) == (VInt i2) = i1 == i2

@@ -5,8 +5,6 @@ import Data.Map (Map)
 import Data.List (foldl')
 import qualified Data.Map as Map
 
-type Env = Map VarName Value
-
 data EvalResult
     = Pure Value
     | Impure OpName Value (Value -> Computation)
@@ -32,7 +30,7 @@ eval env (CApp funVal argVal) =
           newEnv = Map.insert xName evaluatedArg (Map.insert fName recClosure recEnv)
       in eval newEnv body
     -}
-    VContinuation k -> eval env (k (evalValue env argVal))
+    VContinuation k k_env -> eval k_env (k (evalValue env argVal))
     _ -> RuntimeError $ "Cannot apply non-function: " ++ show funVal
 
 eval env (CIf cond c1 c2) =
@@ -72,7 +70,7 @@ evalHandler env handler comp =
         Just (paramName, contName, clauseBody) ->
           let
             handledContinuation = VContinuation (\resultVal ->
-              CHandle handler (opCont resultVal))
+              CHandle handler (opCont resultVal)) env
             handlerEnv = Map.insert paramName opVal
                        $ Map.insert contName handledContinuation env
           in eval handlerEnv clauseBody
@@ -95,21 +93,21 @@ initialEnv = Map.fromList [
     ("*", primBinOpInt (\x y -> VInt (x * y))),
     ("++", primBinOpStr (\x y -> VString (x ++ y))),
     ("max", primBinOpInt (\x y -> VInt (max x y))),
-    ("fst", VContinuation (\(VPair x _) -> CReturn x)),
-    ("snd", VContinuation (\(VPair _ x) -> CReturn x)) ]
+    ("fst", VContinuation (\(VPair x _) -> CReturn x) Map.empty),
+    ("snd", VContinuation (\(VPair _ x) -> CReturn x) Map.empty) ]
 
 primBinOpInt :: (Integer -> Integer -> Value) -> Value
-primBinOpInt op = VContinuation handle_x
+primBinOpInt op = VContinuation handle_x Map.empty
   where
-    handle_x (VInt x) = CReturn (VContinuation (handle_y x))
+    handle_x (VInt x) = CReturn (VContinuation (handle_y x) Map.empty)
     handle_x _        = error "Type error: first argument to primitive was not an integer."
     handle_y x (VInt y) = CReturn (op x y)
     handle_y _ _        = error "Type error: second argument to primitive was not an integer."
 
 primBinOpStr :: (String -> String -> Value) -> Value
-primBinOpStr op = VContinuation handle_x
+primBinOpStr op = VContinuation handle_x Map.empty
   where
-    handle_x (VString x)   = CReturn (VContinuation (handle_y x))
+    handle_x (VString x)   = CReturn (VContinuation (handle_y x) Map.empty)
     handle_x _             = error "Type error: first argument was not a string."
     handle_y x (VString y) = CReturn (op x y)
     handle_y v v'          = error ("Type error: second argument was not a string: " ++ show v ++ show v')
