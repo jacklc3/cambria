@@ -1,7 +1,10 @@
 module Ast where
 
+import Gensym
 import Data.Map (Map)
 import Data.List (intersperse)
+
+type M a = SymbolGen Parameter a
 
 type VarName = String
 type OpName  = String
@@ -18,8 +21,8 @@ data Value
   | VFun VarName Computation
   -- | VRecFun (Map VarName Value) VarName VarName Computation -- rec fun f x -> body
   | VHandler Handler
-    -- Runtime-only values - maybe they can be combined
-  | VContinuation (Value -> Computation) Env
+    -- Runtime-only values
+  | VContinuation (Value -> M Computation) Env
   | VClosure VarName Computation Env
   | VParameter Parameter
 
@@ -29,13 +32,13 @@ instance Show Value where
   show (VString s)         = show s
   show VUnit               = "()"
   show (VPair v1 v2)       = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
-  show (VVar v)            = "Var:" ++  v
+  show (VVar v)            = v
   show (VFun x c)          = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   -- show (VRecFun _ f x c) = "(rec fun " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VHandler _)        = "<handler>"
   show (VContinuation _ _) = "<continuation>"
   show (VClosure _ _ _)    = "<closure>"
-  show (VParameter p)      = "Param:" ++ show p
+  show (VParameter p)      = "<p" ++ show p ++ ">"
 
 instance Eq Value where
   (VInt i1) == (VInt i2) = i1 == i2
