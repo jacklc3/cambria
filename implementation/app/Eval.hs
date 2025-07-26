@@ -5,24 +5,24 @@ import Data.Map (Map)
 import Data.List (foldl', find)
 import qualified Data.Map as Map
 
-data EvalResult
+data Result
     = Pure Value
     | Impure OpName Value (Value -> M Computation) Env
     | RuntimeError String
 
-instance Show EvalResult where
+instance Show Result where
     show (Pure v)          = "Pure " ++ show v
     show (Impure op v _ _) = "Impure " ++ op ++ " " ++ show v
     show (RuntimeError s)  = "Error: " ++ s
 
-eval :: Env -> Computation -> M EvalResult
-eval env (CReturn val) = return $ Pure (evalValue env val)
+eval :: Env -> Computation -> M Result
+eval env (CReturn v) = return $ Pure (evalValue env v)
 
 eval env (CApp funVal argVal) =
   case evalValue env funVal of
-    VClosure var body cEnv ->
-      let newEnv = Map.insert var (evalValue env argVal) cEnv
-      in eval newEnv body
+    VClosure x c cEnv ->
+      let newEnv = Map.insert x (evalValue env argVal) cEnv
+      in eval newEnv c
     {-
     VRecFun recEnv fName xName body ->
       let evaluatedArg = evalValue env argVal
@@ -41,7 +41,7 @@ eval env (CIf cond c1 c2) =
 
 eval env (CSeq var c1 c2) =
   eval env c1 >>= (\r -> case r of
-    Pure val -> eval (Map.insert var val env) c2
+    Pure v -> eval (Map.insert var v env) c2
     Impure op v k opEnv -> return $ Impure op v (\res ->
       k res >>= (\r -> return $ CSeq var r c2)) opEnv
     err@(RuntimeError _) -> return $ err
@@ -52,19 +52,20 @@ eval env (COp op v) =
 
 eval env (CHandle h c) = evalHandle env h c
 
-evalHandle :: Env -> Handler -> Computation -> M EvalResult
+evalHandle :: Env -> Handler -> Computation -> M Result
 evalHandle env h c =
   eval env c >>= (\r ->
     case r of
-      Pure val -> let (var, retBody) = hReturnClause h
-                  in eval (Map.insert var val env) retBody
+      Pure v -> let (x, c') = hReturnClause h
+                in c' >>= (\r -> eval (Map.insert x v env) r)
       Impure op v cont opEnv ->
         case findOpClause op (hOpClauses h) of
-          Just (x, k, b) ->
-            let hCont = VContinuation (\v' -> cont v' >>= (\r -> return $ CHandle h r)) opEnv
-                hEnv = foldl' (flip (uncurry Map.insert)) env [(x, v), (k, hCont)]
-            in  eval hEnv b
-          Nothing -> return $ Impure op v (\v' -> cont v' >>= (\r -> return $ CHandle h r)) opEnv
+          Just (x, k, c') ->
+            let hCont = VContinuation deepHandle opEnv
+                hEnv = Map.insert x v $ Map.insert k hCont env
+            in  c' >>= (\r -> eval hEnv r)
+          Nothing -> return $ Impure op v deepHandle opEnv
+        where deepHandle v' = cont v' >>= (\r -> return $ CHandle h r)
       err@(RuntimeError _) -> return err)
   where
     findOpClause op cs = case find (\(op', _, _, _) -> op == op') cs of
@@ -74,11 +75,11 @@ evalHandle env h c =
 evalValue :: Env -> Value -> Value
 evalValue env (VVar name) =
   case Map.lookup name env of
-    Just val -> evalValue env val
+    Just v -> evalValue env v
     Nothing -> error $ "Unbound variable: " ++ name
 evalValue env (VPair v1 v2) = VPair (evalValue env v1) (evalValue env v2)
-evalValue env (VFun var c) = VClosure var c env
-evalValue _ val = val
+evalValue env (VFun x c) = VClosure x c env
+evalValue _ v = v
 
 initialEnv :: Env
 initialEnv = Map.fromList [

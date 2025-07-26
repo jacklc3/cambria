@@ -66,13 +66,13 @@ instance Show Computation where
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
 
 data Handler = Handler {
-  hReturnClause :: (VarName, Computation),
-  hOpClauses    :: [(OpName, VarName, VarName, Computation)]
+  hReturnClause :: (VarName, M Computation),
+  hOpClauses    :: [(OpName, VarName, VarName, M Computation)]
 }
 
 instance Show Handler where
   show (Handler (xr, cr) opCs) =
-    let retStr = "return " ++ xr ++ " -> " ++ show cr
-        opStrs = map (\(op, x, k, c) -> op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) opCs
+    let retStr = "return " ++ xr ++ " -> " ++ "xxx"
+        opStrs = map (\(op, x, k, c) -> op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ "...") opCs
         allClauses = if null retStr then opStrs else retStr : opStrs
     in  "handler { " ++ (concat $ intersperse ", " allClauses) ++ " }"

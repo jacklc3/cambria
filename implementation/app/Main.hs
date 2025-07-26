@@ -7,8 +7,11 @@ import Gensym
 import System.Environment (getArgs)
 import Text.Megaparsec.Error (errorBundlePretty)
 
-run :: Env -> Computation -> M EvalResult
-run env c = eval env c
+topHandler :: Handler
+topHandler = Handler ("__", return $ CReturn (VVar "__"))
+  [ ("new", "_x", "_k", gensym >>= (\p -> return $ CApp (VVar "_k") (VParameter p)))
+  ]
+
 
 main :: IO ()
 main = do
@@ -19,6 +22,6 @@ main = do
       case parseProgram filename content of
         Left bundle -> putStr (errorBundlePretty bundle)
         Right ast -> do
-          let result = runSymbolGen (eval initialEnv ast)
+          let result = runSymbolGen (eval initialEnv (CHandle topHandler ast))
           print result
     _ -> putStrLn "Usage: run-handler <filename>"
