@@ -1,9 +1,12 @@
 module Eval where
 
 import Ast
+import Gensym
 import Data.Map (Map)
-import Data.List (foldl')
+import Data.List (foldl', find)
 import qualified Data.Map as Map
+
+type M a = SymbolGen Parameter a
 
 data EvalResult
     = Pure Value
@@ -15,12 +18,11 @@ instance Show EvalResult where
     show (Impure op v _ _) = "Impure " ++ op ++ " " ++ show v
     show (RuntimeError s)  = "Error: " ++ s
 
-eval :: Env -> Computation -> EvalResult
-eval env (CReturn val) = Pure (evalValue env val)
+eval :: Env -> Computation -> M EvalResult
+eval env (CReturn val) = return $ Pure (evalValue env val)
 
 eval env (CApp funVal argVal) =
   case evalValue env funVal of
-    VFun _ _ -> RuntimeError $ "We applied a function - this should be a closure"
     VClosure var body cEnv ->
       let newEnv = Map.insert var (evalValue env argVal) cEnv
       in eval newEnv body
@@ -32,25 +34,44 @@ eval env (CApp funVal argVal) =
       in eval newEnv body
     -}
     VContinuation k kEnv -> eval kEnv (k (evalValue env argVal))
-    _ -> RuntimeError $ "Cannot apply non-function: " ++ show funVal
+    _ -> return $ RuntimeError $ "Cannot apply closure or continutation: " ++ show funVal
 
 eval env (CIf cond c1 c2) =
   case evalValue env cond of
     VBool True -> eval env c1
     VBool False -> eval env c2
-    _ -> RuntimeError $ "If condition must be a boolean, but got: " ++ show cond
+    _ -> return $ RuntimeError $ "If condition must be a boolean, but got: " ++ show cond
 
 eval env (CSeq var c1 c2) =
-  case eval env c1 of
+  eval env c1 >>= (\r -> case r of
     Pure val -> eval (Map.insert var val env) c2
-    Impure op v k opEnv -> Impure op v (\res -> CSeq var (k res) c2) opEnv
-    err@(RuntimeError _) -> err
+    Impure op v k opEnv -> return $ Impure op v (\res -> CSeq var (k res) c2) opEnv
+    err@(RuntimeError _) -> return $ err
+  )
 
 eval env (COp op v) =
-    Impure op (evalValue env v) CReturn env
+    return $ Impure op (evalValue env v) CReturn env
 
-eval env (CHandle handler comp) =
-    evalHandler env handler comp
+eval env (CHandle h c) = evalHandle env h c
+
+evalHandle :: Env -> Handler -> Computation -> M EvalResult
+evalHandle env h c =
+  eval env c >>= (\r ->
+    case r of
+      Pure val -> let (var, retBody) = hReturnClause h
+                  in eval (Map.insert var val env) retBody
+      Impure op v cont opEnv ->
+        case findOpClause op (hOpClauses h) of
+          Just (x, k, b) ->
+            let hCont = VContinuation (\v' -> CHandle h (cont v')) opEnv
+                hEnv = foldl' (flip (uncurry Map.insert)) env [(x, v), (k, hCont)]
+            in  eval hEnv b
+          Nothing -> return $ Impure op v (\v' -> CHandle h (cont v')) opEnv
+      err@(RuntimeError _) -> return err)
+  where
+    findOpClause op cs = case find (\(op', _, _, _) -> op == op') cs of
+                           Nothing           -> Nothing
+                           Just (_, x, k, c) -> Just (x, k, c)
 
 evalValue :: Env -> Value -> Value
 evalValue env (VVar name) =
@@ -60,33 +81,6 @@ evalValue env (VVar name) =
 evalValue env (VPair v1 v2) = VPair (evalValue env v1) (evalValue env v2)
 evalValue env (VFun var c) = VClosure var c env
 evalValue _ val = val
-
-evalHandler :: Env -> Handler -> Computation -> EvalResult
-evalHandler env handler comp =
-  case eval env comp of
-    Pure val -> let (var, retBody) = hReturnClause handler
-                in eval (Map.insert var val env) retBody
-
-    Impure opName opVal opCont opEnv ->
-      case findOpClause opName (hOpClauses handler) of
-        Just (paramName, contName, clauseBody) ->
-          let
-            handledContinuation = VContinuation (\resultVal ->
-              CHandle handler (opCont resultVal)) opEnv
-            handlerEnv = Map.insert paramName opVal
-                       $ Map.insert contName handledContinuation env
-          in eval handlerEnv clauseBody
-        Nothing ->
-          Impure opName opVal (\resultVal ->
-            CHandle handler (opCont resultVal)) opEnv
-
-    err@(RuntimeError _) -> err
-
-findOpClause :: OpName -> [(OpName, VarName, VarName, Computation)] -> Maybe (VarName, VarName, Computation)
-findOpClause name = foldl' go Nothing
-  where
-    go Nothing (op, x, k, c) | op == name = Just (x, k, c)
-    go acc _ = acc
 
 initialEnv :: Env
 initialEnv = Map.fromList [
