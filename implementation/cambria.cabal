@@ -1,5 +1,5 @@
 cabal-version:      2.4
-name:               implementation
+name:               cambria
 version:            0.1.0.0
 
 -- A short (one-line) description of the package.
@@ -34,11 +34,10 @@ executable cambria
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:
   build-depends:
-    base ^>=4.16.4.0,
-    containers ^>=0.6.5.1,
-    megaparsec ^>=9.5.0,
-    text ^>=1.2.5.0,
-    parser-combinators ^>=1.3.0,
-    mtl ^>=2.2.2
-  hs-source-dirs:   app
-  defa
+    base >=4.16.4.0,
+    containers >=0.6.5.1,
+    megaparsec >=9.5.0,
+    text >=1.2.5.0,
+    parser-combinators >=1.3.0,
+    mtl >=2.2.2
+  hs-source-dirs:   src

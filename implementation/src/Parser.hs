@@ -126,7 +126,7 @@ pHandler = VHandler <$> (symbol "handler" *> braces (do
     [retClause] -> return $ Handler retClause opClauses
     _           -> fail   $ "handler must have one return clause"))
 
-pOpClause :: Parser (Either a (OpName, VarName, VarName, M Computation))
+pOpClause :: Parser (Either a (OpName, VarName, VarName, Computation))
 pOpClause = do
   opName <- pIdentifier
   (param, k) <- parens $ do
@@ -136,14 +136,14 @@ pOpClause = do
     return (p, c)
   symbol "->"
   body <- pComputation Seq
-  return $ Right (opName, param, k, return body)
+  return $ Right (opName, param, k, body)
 
-pReturnClause :: Parser (Either (VarName, M Computation) b)
+pReturnClause :: Parser (Either (VarName, Computation) b)
 pReturnClause = Left <$> (symbol "return" *> do
   var <- pIdentifier
   symbol "->"
   body <- pComputation Seq
-  return (var, return body))
+  return (var, body))
 
 pInfixOps :: [Text] -> Parser Computation
 pInfixOps ops = do

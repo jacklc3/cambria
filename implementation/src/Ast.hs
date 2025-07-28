@@ -22,7 +22,7 @@ data Value
   -- | VRecFun (Map VarName Value) VarName VarName Computation -- rec fun f x -> body
   | VHandler Handler
     -- Runtime-only values
-  | VContinuation (Value -> M Computation) Env
+  | VContinuation (Value -> Computation) Env
   | VClosure VarName Computation Env
   | VParameter Parameter
 
@@ -66,8 +66,8 @@ instance Show Computation where
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
 
 data Handler = Handler {
-  hReturnClause :: (VarName, M Computation),
-  hOpClauses    :: [(OpName, VarName, VarName, M Computation)]
+  hReturnClause :: (VarName, Computation),
+  hOpClauses    :: [(OpName, VarName, VarName, Computation)]
 }
 
 instance Show Handler where
@@ -76,3 +76,6 @@ instance Show Handler where
         opStrs = map (\(op, x, k, c) -> op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ "...") opCs
         allClauses = if null retStr then opStrs else retStr : opStrs
     in  "handler { " ++ (concat $ intersperse ", " allClauses) ++ " }"
+
+data InbuiltHandler = InbuiltHandler
+  [(OpName, Value -> (Value -> M Computation) -> M Computation)]
