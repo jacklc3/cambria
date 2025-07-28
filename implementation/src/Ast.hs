@@ -1,10 +1,7 @@
 module Ast where
 
-import Gensym
-import Data.Map (Map)
+import Data.Map (Map, toList)
 import Data.List (intersperse)
-
-type M a = SymbolGen Parameter a
 
 type VarName = String
 type OpName  = String
@@ -65,17 +62,16 @@ instance Show Computation where
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
 
+data RetClause = RetClause VarName Computation
+data OpClause = OpClause VarName VarName Computation
 data Handler = Handler {
-  hReturnClause :: (VarName, Computation),
-  hOpClauses    :: [(OpName, VarName, VarName, Computation)]
+  hRetClause :: RetClause,
+  hOpClauses :: Map OpName OpClause
 }
 
 instance Show Handler where
-  show (Handler (xr, cr) opCs) =
-    let retStr = "return " ++ xr ++ " -> " ++ "xxx"
-        opStrs = map (\(op, x, k, c) -> op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ "...") opCs
-        allClauses = if null retStr then opStrs else retStr : opStrs
-    in  "handler { " ++ (concat $ intersperse ", " allClauses) ++ " }"
-
-data InbuiltHandler = InbuiltHandler
-  [(OpName, Value -> (Value -> M Computation) -> M Computation)]
+  show (Handler (RetClause xr cr) opCs) =
+    let retStr = "return " ++ xr ++ " -> " ++ show cr
+        opStrs = map (\(op, OpClause x k c) ->
+          op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) (toList opCs)
+    in  "handler { " ++ (concat $ intersperse ", " (retStr : opStrs)) ++ " }"

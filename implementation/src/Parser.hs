@@ -7,10 +7,11 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import Control.Monad.Combinators.Expr
 import qualified Text.Megaparsec.Char.Lexer as L
-import Data.Void (Void)
-import Data.Text (Text, pack, unpack)
-import Data.List (foldl', foldl1', find, reverse, filter)
 import Data.Either (partitionEithers)
+import Data.List (foldl', foldl1', reverse)
+import Data.Map (fromList)
+import Data.Text (Text, pack, unpack)
+import Data.Void (Void)
 
 type Parser = Parsec Void Text
 
@@ -45,7 +46,7 @@ pIdentifier = (lexeme . try) $ do
     then fail $ "keyword " ++ show name ++ " cannot be an identifier"
     else return name
 
--- Takes a list of value/computation terms and desugars them by sequencing any computations
+-- Takes a list of ValComp terms and desugars them by sequencing any computations
 desugar :: [ValComp] -> ([Value] -> Computation) -> Computation
 desugar xs f = gos xs [] 0
   where
@@ -123,10 +124,10 @@ pHandler = VHandler <$> (symbol "handler" *> braces (do
   clauses <- sepBy (pReturnClause <|> pOpClause) (symbol ",")
   let (retClauses, opClauses) = partitionEithers clauses
   case retClauses of
-    [retClause] -> return $ Handler retClause opClauses
+    [retClause] -> return $ Handler retClause (fromList opClauses)
     _           -> fail   $ "handler must have one return clause"))
 
-pOpClause :: Parser (Either a (OpName, VarName, VarName, Computation))
+pOpClause :: Parser (Either a (OpName, OpClause))
 pOpClause = do
   opName <- pIdentifier
   (param, k) <- parens $ do
@@ -136,14 +137,14 @@ pOpClause = do
     return (p, c)
   symbol "->"
   body <- pComputation Seq
-  return $ Right (opName, param, k, body)
+  return $ Right (opName, OpClause param k body)
 
-pReturnClause :: Parser (Either (VarName, Computation) b)
-pReturnClause = Left <$> (symbol "return" *> do
+pReturnClause :: Parser (Either RetClause b)
+pReturnClause = symbol "return" *> do
   var <- pIdentifier
   symbol "->"
   body <- pComputation Seq
-  return (var, body))
+  return $ Left (RetClause var body)
 
 pInfixOps :: [Text] -> Parser Computation
 pInfixOps ops = do

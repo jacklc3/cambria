@@ -5,6 +5,7 @@ module Gensym (
     , runSymbolGen
     , SymbolGenT
     , runSymbolGenT
+    , liftIO
     ) where
 
 import Control.Applicative
