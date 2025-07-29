@@ -65,8 +65,8 @@ instance Show Computation where
 data RetClause = RetClause VarName Computation
 data OpClause = OpClause VarName VarName Computation
 data Handler = Handler {
-  hRetClause :: RetClause,
-  hOpClauses :: Map OpName OpClause
+  retClause :: RetClause,
+  opClauses :: Map OpName OpClause
 }
 
 instance Show Handler where

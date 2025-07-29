@@ -5,13 +5,13 @@ import qualified Data.Map as Map
 
 data Result
     = Pure Value
-    | Impure OpName Value (Value -> Computation) Env
+    | Impure OpName Value Value
     | RuntimeError String
 
 instance Show Result where
-    show (Pure v)        = "Pure " ++ show v
-    show (Impure op v _ _) = "Impure " ++ op ++ " " ++ show v
-    show (RuntimeError s)  = "Error: " ++ s
+    show (Pure v)         = "Pure " ++ show v
+    show (Impure op v ct) = "Impure " ++ op ++ " " ++ show v
+    show (RuntimeError s) = "Error: " ++ s
 
 eval :: Env -> Computation -> Result
 eval env (CReturn v) = Pure (evalValue env v)
@@ -40,25 +40,29 @@ eval env (CIf cond c1 c2) =
 eval env (CSeq x c1 c2) =
   case eval env c1 of
     Pure v               -> eval (Map.insert x v env) c2
-    Impure op v k opEnv  -> Impure op v (\res -> CSeq x (k res) c2) opEnv
+    Impure op v ct       -> Impure op v (updateCont ct)
     err@(RuntimeError _) -> err
+  where
+    updateCont (VClosure y c' env) = VClosure y (CSeq x c' c2) env
+    updateCont _                   = error "Non-closure in continuation of impure"
 
 eval env (COp op v) =
-  Impure op (evalValue env v) CReturn env
+  Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
 
 eval env (CHandle h c) =
   case eval env c of
     Pure v ->
-      let RetClause x c' = hRetClause h
-      in  eval (Map.insert x v env) c'
-    Impure op v opCont opEnv ->
-      case Map.lookup op (hOpClauses h) of
-        Just (OpClause x k c') ->
-          let hCont = VContinuation deepHandle opEnv
-              hEnv = Map.insert x v $ Map.insert k hCont opEnv
-          in  eval hEnv c'
-        Nothing -> Impure op v deepHandle opEnv
-      where deepHandle v = CHandle h (opCont v)
+      let RetClause x cr = retClause h
+      in  eval (Map.insert x v env) cr
+    Impure op v ct ->
+      case Map.lookup op (opClauses h) of
+        Just (OpClause x k cop) ->
+          let newEnv = Map.insert x v $ Map.insert k (deepHandle ct) env
+          in  eval newEnv cop
+        Nothing -> Impure op v (deepHandle ct)
+      where
+        deepHandle (VClosure y c env) = VClosure y (CHandle h c) env
+        deepHandle _                  = error "continuation of handler was not a closure"
     err@(RuntimeError _) -> err
 
 evalValue :: Env -> Value -> Value

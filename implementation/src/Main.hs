@@ -12,6 +12,7 @@ import qualified Data.Map as Map
 type M a = SymbolGenT Parameter IO a
 type InbuiltHandler = Map OpName (Value -> (Value -> Computation) -> M Computation)
 
+{-
 -- TODO: Add other IO effects like randomness
 inbuiltHandler :: InbuiltHandler
 inbuiltHandler = Map.fromList
@@ -24,10 +25,11 @@ evalInbuilt :: Env -> Computation -> M Result
 evalInbuilt env c =
   case eval env c of
     Pure v -> return $ Pure v
-    Impure op v opCont opEnv ->
+    Impure op v ct ->
       case Map.lookup op inbuiltHandler of
         Just k  -> k v opCont >>= (\r -> evalInbuilt opEnv r)
         Nothing -> return $ Impure op v opCont opEnv -- Immediatly propogate to top level
+-}
 
 main :: IO ()
 main = do
@@ -38,7 +40,6 @@ main = do
       case parseProgram filename content of
         Left err  -> putStr (errorBundlePretty err)
         Right ast -> do
-          print ast
-          result <- runSymbolGenT (evalInbuilt initialEnv ast)
+          let result = eval initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"
