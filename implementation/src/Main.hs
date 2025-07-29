@@ -10,14 +10,13 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 type M a = SymbolGenT Parameter IO a
-type InbuiltHandler = Map OpName (Value -> (Value -> Computation) -> M Computation)
+type InbuiltHandler = Map OpName (Value -> Value -> M Computation)
 
-{-
 -- TODO: Add other IO effects like randomness
 inbuiltHandler :: InbuiltHandler
 inbuiltHandler = Map.fromList
-  [ ("new", \_ k -> gensym >>= (\p -> return $ k (VParameter p)))
-  , ("print", \(VString s) k -> liftIO (putStrLn s) >>= (\_ -> return $ k VUnit))
+  [ ("new", \_ k -> gensym >>= (\p -> return $ CApp k (VParameter p)))
+  , ("print", \(VString s) k -> liftIO (putStrLn s) >>= (\_ -> return $ CApp k VUnit))
   ]
 
 -- Catches any inbuilt effects at the top level and handles them
@@ -25,11 +24,10 @@ evalInbuilt :: Env -> Computation -> M Result
 evalInbuilt env c =
   case eval env c of
     Pure v -> return $ Pure v
-    Impure op v ct ->
+    Impure op v cl ->
       case Map.lookup op inbuiltHandler of
-        Just k  -> k v opCont >>= (\r -> evalInbuilt opEnv r)
-        Nothing -> return $ Impure op v opCont opEnv -- Immediatly propogate to top level
--}
+        Just k  -> k v cl >>= (\r -> evalInbuilt env r)
+        Nothing -> return $ Impure op v cl -- Immediatly propogate to top level
 
 main :: IO ()
 main = do
@@ -40,6 +38,6 @@ main = do
       case parseProgram filename content of
         Left err  -> putStr (errorBundlePretty err)
         Right ast -> do
-          let result = eval initialEnv ast
+          result <- runSymbolGenT (evalInbuilt initialEnv ast)
           print result
     _ -> putStrLn "Usage: run-handler <filename>"

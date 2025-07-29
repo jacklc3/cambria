@@ -19,23 +19,23 @@ data Value
   -- | VRecFun (Map VarName Value) VarName VarName Computation -- rec fun f x -> body
   | VHandler Handler
     -- Runtime-only values
-  | VContinuation (Value -> Computation) Env
+  | VPrimative (Value -> Computation)
   | VClosure VarName Computation Env
   | VParameter Parameter
 
 instance Show Value where
-  show (VInt i)            = show i
-  show (VBool b)           = show b
-  show (VString s)         = show s
-  show VUnit               = "()"
-  show (VPair v1 v2)       = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
-  show (VVar v)            = v
-  show (VFun x c)          = "(fun " ++ x ++ " -> " ++ show c ++ ")"
+  show (VInt i)         = show i
+  show (VBool b)        = show b
+  show (VString s)      = show s
+  show VUnit            = "()"
+  show (VPair v1 v2)    = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
+  show (VVar v)         = v
+  show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   -- show (VRecFun _ f x c) = "(rec fun " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
-  show (VHandler _)        = "<handler>"
-  show (VContinuation _ _) = "<continuation>"
-  show (VClosure _ _ _)    = "<closure>"
-  show (VParameter p)      = "<p" ++ show p ++ ">"
+  show (VHandler _)     = "<handler>"
+  show (VPrimative _)   = "<primative>"
+  show (VClosure _ _ _) = "<closure>"
+  show (VParameter p)   = "<p" ++ show p ++ ">"
 
 instance Eq Value where
   (VInt i1) == (VInt i2) = i1 == i2

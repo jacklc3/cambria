@@ -10,7 +10,7 @@ data Result
 
 instance Show Result where
     show (Pure v)         = "Pure " ++ show v
-    show (Impure op v ct) = "Impure " ++ op ++ " " ++ show v
+    show (Impure op v f)  = "Impure " ++ op ++ " " ++ show v
     show (RuntimeError s) = "Error: " ++ s
 
 eval :: Env -> Computation -> Result
@@ -28,8 +28,8 @@ eval env (CApp f v) =
           newEnv = Map.insert xName evaluatedArg (Map.insert fName recClosure recEnv)
       in eval newEnv body
     -}
-    VContinuation k kEnv ->  eval kEnv (k (evalValue env v))
-    _ -> RuntimeError $ "Cannot apply closure or continutation: " ++ show f
+    VPrimative f ->  eval env (f (evalValue env v))
+    _ -> RuntimeError $ "Cannot apply non-function: " ++ show f
 
 eval env (CIf cond c1 c2) =
   case evalValue env cond of
@@ -40,10 +40,11 @@ eval env (CIf cond c1 c2) =
 eval env (CSeq x c1 c2) =
   case eval env c1 of
     Pure v               -> eval (Map.insert x v env) c2
-    Impure op v ct       -> Impure op v (updateCont ct)
+    Impure op v f        -> Impure op v (updateCont f)
     err@(RuntimeError _) -> err
   where
-    updateCont (VClosure y c' env) = VClosure y (CSeq x c' c2) env
+     -- TODO: Will union overwirte things?
+    updateCont (VClosure y c' env') = VClosure y (CSeq x c' c2) (Map.union env' env)
     updateCont _                   = error "Non-closure in continuation of impure"
 
 eval env (COp op v) =
@@ -54,12 +55,12 @@ eval env (CHandle h c) =
     Pure v ->
       let RetClause x cr = retClause h
       in  eval (Map.insert x v env) cr
-    Impure op v ct ->
+    Impure op v f ->
       case Map.lookup op (opClauses h) of
         Just (OpClause x k cop) ->
-          let newEnv = Map.insert x v $ Map.insert k (deepHandle ct) env
+          let newEnv = Map.insert x v $ Map.insert k (deepHandle f) env
           in  eval newEnv cop
-        Nothing -> Impure op v (deepHandle ct)
+        Nothing -> Impure op v (deepHandle f)
       where
         deepHandle (VClosure y c env) = VClosure y (CHandle h c) env
         deepHandle _                  = error "continuation of handler was not a closure"
@@ -81,21 +82,21 @@ initialEnv = Map.fromList [
     ("*", primBinOpInt (\x y -> VInt (x * y))),
     ("++", primBinOpStr (\x y -> VString (x ++ y))),
     ("max", primBinOpInt (\x y -> VInt (max x y))),
-    ("fst", VContinuation (\(VPair x _) -> CReturn x) Map.empty),
-    ("snd", VContinuation (\(VPair _ x) -> CReturn x) Map.empty) ]
+    ("fst", VPrimative (\(VPair x _) -> CReturn x)),
+    ("snd", VPrimative (\(VPair _ x) -> CReturn x)) ]
 
 primBinOpInt :: (Integer -> Integer -> Value) -> Value
-primBinOpInt op = VContinuation handle_x Map.empty
+primBinOpInt op = VPrimative handleX
   where
-    handle_x (VInt x) = CReturn (VContinuation (handle_y x) Map.empty)
-    handle_x _        = error "Type error: first argument to primitive was not an integer."
-    handle_y x (VInt y) = CReturn (op x y)
-    handle_y _ _        = error "Type error: second argument to primitive was not an integer."
+    handleX (VInt x)   = CReturn (VPrimative (handleY x))
+    handleX _          = error "Type error: first argument to primitive was not an integer."
+    handleY x (VInt y) = CReturn (op x y)
+    handleY _ _        = error "Type error: second argument to primitive was not an integer."
 
 primBinOpStr :: (String -> String -> Value) -> Value
-primBinOpStr op = VContinuation handle_x Map.empty
+primBinOpStr op = VPrimative handleX
   where
-    handle_x (VString x)   = CReturn (VContinuation (handle_y x) Map.empty)
-    handle_x _             = error "Type error: first argument was not a string."
-    handle_y x (VString y) = CReturn (op x y)
-    handle_y v v'          = error ("Type error: second argument was not a string: " ++ show v ++ show v')
+    handleX (VString x)   = CReturn (VPrimative (handleY x))
+    handleX _             = error "Type error: first argument was not a string."
+    handleY x (VString y) = CReturn (op x y)
+    handleY _ _           = error "Type error: second argument to primitive was not a string."
