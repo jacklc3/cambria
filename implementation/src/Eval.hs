@@ -16,20 +16,20 @@ instance Show Result where
 eval :: Env -> Computation -> Result
 eval env (CReturn v) = Pure (evalValue env v)
 
-eval env (CApp funVal argVal) =
-  case evalValue env funVal of
+eval env (CApp f v) =
+  case evalValue env f of
     VClosure x c cEnv ->
-      let newEnv = Map.insert x (evalValue env argVal) cEnv
-      in eval newEnv c
+      let newEnv = Map.insert x (evalValue env v) cEnv
+      in  eval newEnv c
     {-
     VRecFun recEnv fName xName body ->
-      let evaluatedArg = evalValue env argVal
+      let evaluatedArg = evalValue env v
           recClosure = VRecFun recEnv fName xName body
           newEnv = Map.insert xName evaluatedArg (Map.insert fName recClosure recEnv)
       in eval newEnv body
     -}
-    VContinuation k kEnv ->  eval kEnv (k (evalValue env argVal))
-    _ -> RuntimeError $ "Cannot apply closure or continutation: " ++ show funVal
+    VContinuation k kEnv ->  eval kEnv (k (evalValue env v))
+    _ -> RuntimeError $ "Cannot apply closure or continutation: " ++ show f
 
 eval env (CIf cond c1 c2) =
   case evalValue env cond of
