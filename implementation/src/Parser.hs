@@ -166,6 +166,7 @@ pReturnClause = symbol "return" *> do
   body <- pComputation Seq
   return $ Left (RetClause var body)
 
+-- TODO: Make the order of operations matter
 pInfixOps :: [Text] -> Parser Computation
 pInfixOps ops = do
     x  <- pValComp App

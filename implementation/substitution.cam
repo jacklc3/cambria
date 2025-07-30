@@ -1,10 +1,10 @@
 with handler {
   return x  -> return (inl x),
   var(v; k) -> return (inr v),
-  sub(v; k) -> do a <- #new () in
-    case k (inl a) of {
+  sub(v; k) -> do c <- #new () in
+    case k (inl c) of {
       inl x  -> return (inl x),
-      inr b -> if b == a then k (inr ()) else return (inr b)
+      inr d -> if d == c then k (inr ()) else return (inr d)
     }
 } handle (
   case #sub () of {

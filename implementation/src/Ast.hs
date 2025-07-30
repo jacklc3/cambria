@@ -49,6 +49,7 @@ instance Eq Value where
   (VPair v1 v2) == (VPair v3 v4)     = v1 == v3 && v2 == v4
   (VEither s1 v1) == (VEither s2 v2) = s1 == s2 && v1 == v2
   (VVar x1) == (VVar x2)             = x1 == x2
+  (VParameter p1) == (VParameter p2) = p1 == p2
   _ == _ = False
 
 data Computation

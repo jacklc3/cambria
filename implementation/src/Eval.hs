@@ -49,8 +49,8 @@ eval env (CSeq x c1 c2) =
     Impure op v f        -> Impure op v (updateCont f)
     err@(RuntimeError _) -> err
   where
-     -- TODO: We should evaluate c' with env' and c2 with env
-    updateCont (VClosure y c' env') = VClosure y (CSeq x c' c2) (Map.union env' env)
+     -- TODO: Will union overwirte things?
+    updateCont (VClosure y c env') = VClosure y (CSeq x c c2) (Map.union env' env)
     updateCont _                   = error "Non-closure in continuation of impure"
 
 eval env (COp op v) =
