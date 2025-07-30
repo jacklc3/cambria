@@ -55,7 +55,7 @@ instance Eq Value where
 data Computation
   = CReturn Value
   | COp OpName Value
-  | CSeq VarName Computation Computation
+  | CDo VarName Computation Computation
   | CIf Value Computation Computation
   | CCase Value VarName Computation VarName Computation
   | CApp Value Value
@@ -64,7 +64,7 @@ data Computation
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v
   show (COp op v)     = op ++ "(" ++ show v ++ ")"
-  show (CSeq x c1 c2) = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
+  show (CDo x c1 c2) = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
   show (CIf v c1 c2)  = "if " ++ show v ++ " then " ++ show c1 ++ " else " ++ show c2
   show (CCase v x1 c1 x2 c2) =
     "case " ++ show v ++ " of { inl " ++ show x1 ++ " -> " ++ show c1 ++ ", inr "

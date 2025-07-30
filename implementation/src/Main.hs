@@ -24,10 +24,10 @@ evalInbuilt :: Env -> Computation -> M Result
 evalInbuilt env c =
   case eval env c of
     Pure v -> return $ Pure v
-    Impure op v cl ->
+    Impure op v f ->
       case Map.lookup op inbuiltHandler of
-        Just k  -> k v cl >>= (\r -> evalInbuilt env r)
-        Nothing -> return $ Impure op v cl -- Immediatly propogate to top level
+        Just k  -> k v f >>= (\r -> evalInbuilt env r)
+        Nothing -> return $ Impure op v f -- Immediatly propogate to top level
 
 main :: IO ()
 main = do

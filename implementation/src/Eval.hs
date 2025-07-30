@@ -43,14 +43,14 @@ eval env (CCase e x1 c1 x2 c2) =
     VEither R v -> eval (Map.insert x2 v env) c2
     v           -> RuntimeError $ "Case analysis must be an either, but got: " ++ show v
 
-eval env (CSeq x c1 c2) =
+eval env (CDo x c1 c2) =
   case eval env c1 of
     Pure v               -> eval (Map.insert x v env) c2
     Impure op v f        -> Impure op v (updateCont f)
     err@(RuntimeError _) -> err
   where
-     -- TODO: Will union overwirte things?
-    updateCont (VClosure y c env') = VClosure y (CSeq x c c2) (Map.union env' env)
+     -- TODO: Is unioning the correct way to handle the environments here?
+    updateCont (VClosure y c env') = VClosure y (CDo x c c2) (Map.union env' env)
     updateCont _                   = error "Non-closure in continuation of impure"
 
 eval env (COp op v) =

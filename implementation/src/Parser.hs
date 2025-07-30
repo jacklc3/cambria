@@ -63,7 +63,7 @@ desugar xs f = gos xs [] 0
     gos []     vs n = f (reverse vs)
     go :: ValComp -> Int -> (Value, Computation -> Computation, Int)
     go (V v) n          = (v, id, n)
-    go (C c) n          = (VVar (hiddenVar n), \c' -> CSeq (hiddenVar n) c c', succ n)
+    go (C c) n          = (VVar (hiddenVar n), \c' -> CDo (hiddenVar n) c c', succ n)
     go (VCPair x y) n   = let (v1, k1, n1) = go x n
                               (v2, k2, n2) = go y n1
                           in  (VPair v1 v2, k1 . k2, n2)
@@ -178,13 +178,13 @@ pInfixOps ops = do
     foldInfix op (x:y:z:xs) = foldInfix op ((C (desugar [x,y] (sequenceInfix op))) : z : xs)
     foldInfix op [x,y]      = desugar [x,y] (sequenceInfix op)
     foldInfix _  _          = error "infix operator with less than 2 arguments, this should have failed at the parser"
-    sequenceInfix op [v1, v2] = CSeq "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2)
+    sequenceInfix op [v1, v2] = CDo "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2)
 
 pSeq :: Parser Computation
 pSeq = do
   x  <- pComputation Infix
   xs <- some (symbol ";" >> pComputation Infix)
-  return $ foldl1' (\c1 c2 -> CSeq "_" c1 c2) (x:xs)
+  return $ foldl1' (\c1 c2 -> CDo "_" c1 c2) (x:xs)
 
 pReturn :: Parser Computation
 pReturn = do
@@ -200,7 +200,7 @@ pDo = do
   c1 <- pComputation Infix
   symbol "in"
   c2 <- pComputation Infix
-  return $ CSeq var c1 c2
+  return $ CDo var c1 c2
 
 pWith :: Parser Computation
 pWith = do
