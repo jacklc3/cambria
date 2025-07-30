@@ -14,9 +14,13 @@ import Data.Text (Text, pack, unpack)
 import Data.Void (Void)
 
 type Parser = Parsec Void Text
-
-data ValComp = V Value | C Computation | VCPair ValComp ValComp
 data CompScope = Seq | Infix | App | Expr | Paren deriving (Eq, Ord)
+
+data ValComp
+  = V Value
+  | C Computation
+  | VCPair ValComp ValComp
+  | VCEither Side ValComp
 
 sc :: Parser ()
 sc = L.space space1 empty empty
@@ -36,7 +40,8 @@ braces = between (symbol "{") (symbol "}")
 reservedWords :: [String]
 reservedWords =
   [ "true", "false", "fun", "handler", "return", "do", "in",
-    "if", "then", "else", "with", "handle"
+    "if", "then", "else", "with", "handle", "inl", "inr",
+    "case", "of"
   ]
 
 pIdentifier :: Parser String
@@ -57,25 +62,28 @@ desugar xs f = gos xs [] 0
                       in  k (gos xs (v:vs) n')
     gos []     vs n = f (reverse vs)
     go :: ValComp -> Int -> (Value, Computation -> Computation, Int)
-    go (V v) n        = (v, id, n)
-    go (C c) n        = (VVar (hiddenVar n), \c' -> CSeq (hiddenVar n) c c', succ n)
-    go (VCPair x y) n = let (v1, k1, n1) = go x n
-                            (v2, k2, n2) = go y n1
-                        in  (VPair v1 v2, k1 . k2, n2)
+    go (V v) n          = (v, id, n)
+    go (C c) n          = (VVar (hiddenVar n), \c' -> CSeq (hiddenVar n) c c', succ n)
+    go (VCPair x y) n   = let (v1, k1, n1) = go x n
+                              (v2, k2, n2) = go y n1
+                          in  (VPair v1 v2, k1 . k2, n2)
+    go (VCEither s x) n = let (v, k, n') = go x n
+                          in  (VEither s v, k, n')
 
 pComputation :: CompScope -> Parser Computation
 pComputation cs = choice $ seq ++ infi ++ app ++ expr ++ [try (parens (pComputation Seq))]
   where
     seq  = if cs > Seq   then [] else [try pSeq]
-    infi = if cs > Infix then [] else [try (pInfixOps ["++", "*", "+", "-"])]
+    infi = if cs > Infix then [] else [try (pInfixOps ["++", "*", "+", "-", "=="])]
     app  = if cs > App   then [] else [try pApp]
-    expr = if cs > Expr  then [] else [pIf, pDo, pWith, pFun, pOp, pReturn]
+    expr = if cs > Expr  then [] else [pIf, pCase, pDo, pWith, pFun, pOp, pReturn]
 
 
 pValComp :: CompScope -> Parser ValComp
 pValComp cs = choice
   [ try $ V <$> pUnit
   , try pPair
+  , pEither
   , V <$> pBool
   , V <$> pInteger
   , V <$> pString
@@ -111,6 +119,18 @@ pFun = do
     desugarVars [v] b    = VFun v b
     desugarVars (v:vs) b = VFun v (CReturn (desugarVars vs b))
     desugarVars [] _     = error "fun with no arguments, this should have failed at the parser"
+
+pEither :: Parser ValComp
+pEither = pInl <|> pInr
+  where
+    pInl = do
+      symbol "inl"
+      x <- pValComp Paren
+      return $ VCEither L x
+    pInr = do
+      symbol "inr"
+      x <- pValComp Paren
+      return $ VCEither R x
 
 pPair :: Parser ValComp
 pPair = parens $ do
@@ -200,6 +220,24 @@ pIf = do
   symbol "else"
   c2 <- pComputation Infix
   return $ desugar [x] (\[v] -> CIf v c1 c2)
+
+pCase :: Parser Computation
+pCase = do
+  symbol "case"
+  x <- pValComp Infix
+  symbol "of"
+  (y1,c1,y2,c2) <- braces $ do
+    symbol "inl"
+    y1 <- pIdentifier
+    symbol "->"
+    c1 <- pComputation Seq
+    symbol ","
+    symbol "inr"
+    y2 <- pIdentifier
+    symbol "->"
+    c2 <- pComputation Seq
+    return (y1,c1,y2,c2)
+  return $ desugar [x] (\[v] -> CCase v y1 c1 y2 c2)
 
 pOp :: Parser Computation
 pOp = do

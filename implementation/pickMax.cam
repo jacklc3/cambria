@@ -2,8 +2,8 @@ with handler {
   return x -> return x,
   decide(v; k) -> max (k true) (k false)
 } handle (
-  do y  <- #print "Im getting handled!!" in
   do x1 <- if #decide () then return 15 else return 30 in
+  do y  <- #print "Im getting handled!!" in
   do x2 <- if #decide () then return 5  else return 10 in
   return (x1 - x2)
 )

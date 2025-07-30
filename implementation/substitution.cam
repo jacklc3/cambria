@@ -1,0 +1,17 @@
+with handler {
+  return x  -> return (inl x),
+  var(v; k) -> return (inr v),
+  sub(v; k) -> do a <- #new () in
+    case k (inl a) of {
+      inl x  -> return (inl x),
+      inr b -> if b == a then k (inr ()) else return (inr b)
+    }
+} handle (
+  case #sub () of {
+    inl a -> case #sub () of {
+      inl b -> #var a,
+      inr x -> return 2
+    },
+    inr x -> return 3
+  }
+)

@@ -31,11 +31,17 @@ eval env (CApp f v) =
     VPrimative f ->  eval env (f (evalValue env v))
     _ -> RuntimeError $ "Cannot apply non-function: " ++ show f
 
-eval env (CIf cond c1 c2) =
-  case evalValue env cond of
+eval env (CIf b c1 c2) =
+  case evalValue env b of
     VBool True  -> eval env c1
     VBool False -> eval env c2
-    _           -> RuntimeError $ "If condition must be a boolean, but got: " ++ show cond
+    v           -> RuntimeError $ "If condition must be a boolean, but got: " ++ show v
+
+eval env (CCase e x1 c1 x2 c2) =
+  case evalValue env e of
+    VEither L v -> eval (Map.insert x1 v env) c1
+    VEither R v -> eval (Map.insert x2 v env) c2
+    v           -> RuntimeError $ "Case analysis must be an either, but got: " ++ show v
 
 eval env (CSeq x c1 c2) =
   case eval env c1 of
@@ -43,7 +49,7 @@ eval env (CSeq x c1 c2) =
     Impure op v f        -> Impure op v (updateCont f)
     err@(RuntimeError _) -> err
   where
-     -- TODO: Will union overwirte things?
+     -- TODO: We should evaluate c' with env' and c2 with env
     updateCont (VClosure y c' env') = VClosure y (CSeq x c' c2) (Map.union env' env)
     updateCont _                   = error "Non-closure in continuation of impure"
 
@@ -72,18 +78,21 @@ evalValue env (VVar name) =
     Just v -> evalValue env v
     Nothing -> error $ "Unbound variable: " ++ name
 evalValue env (VPair v1 v2) = VPair (evalValue env v1) (evalValue env v2)
+evalValue env (VEither s v) = VEither s (evalValue env v)
 evalValue env (VFun x c) = VClosure x c env
 evalValue _ v = v
 
 initialEnv :: Env
-initialEnv = Map.fromList [
-    ("+", primBinOpInt (\x y -> VInt (x + y))),
-    ("-", primBinOpInt (\x y -> VInt (x - y))),
-    ("*", primBinOpInt (\x y -> VInt (x * y))),
-    ("++", primBinOpStr (\x y -> VString (x ++ y))),
-    ("max", primBinOpInt (\x y -> VInt (max x y))),
-    ("fst", VPrimative (\(VPair x _) -> CReturn x)),
-    ("snd", VPrimative (\(VPair _ x) -> CReturn x)) ]
+initialEnv = Map.fromList
+  [ ("+", primBinOpInt (\x y -> VInt (x + y)))
+  , ("-", primBinOpInt (\x y -> VInt (x - y)))
+  , ("*", primBinOpInt (\x y -> VInt (x * y)))
+  , ("++", primBinOpStr (\x y -> VString (x ++ y)))
+  , ("max", primBinOpInt (\x y -> VInt (max x y)))
+  , ("fst", VPrimative (\(VPair x _) -> CReturn x))
+  , ("snd", VPrimative (\(VPair _ x) -> CReturn x))
+  , ("==", primBinOpVal (\x y -> VBool (x == y)))
+  ]
 
 primBinOpInt :: (Integer -> Integer -> Value) -> Value
 primBinOpInt op = VPrimative handleX
@@ -100,3 +109,9 @@ primBinOpStr op = VPrimative handleX
     handleX _             = error "Type error: first argument was not a string."
     handleY x (VString y) = CReturn (op x y)
     handleY _ _           = error "Type error: second argument to primitive was not a string."
+
+primBinOpVal :: (Value -> Value -> Value) -> Value
+primBinOpVal op = VPrimative handleX
+  where
+    handleX v = CReturn (VPrimative (handleY v))
+    handleY v v' = CReturn (op v v')
