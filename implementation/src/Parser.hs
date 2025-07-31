@@ -3,15 +3,15 @@
 module Parser (parseProgram) where
 
 import Ast
-import Text.Megaparsec
-import Text.Megaparsec.Char
+
 import Control.Monad.Combinators.Expr
-import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Either (partitionEithers)
 import Data.List (foldl', foldl1', reverse)
-import Data.Map (fromList)
 import Data.Text (Text, pack, unpack)
 import Data.Void (Void)
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void Text
 data CompScope = Seq | Infix | App | Expr | Paren deriving (Eq, Ord)
@@ -56,7 +56,7 @@ pIdentifier = (lexeme . try) $ do
 desugar :: [ValComp] -> ([Value] -> Computation) -> Computation
 desugar xs f = gos xs [] 0
   where
-    hiddenVar :: Int -> VarName
+    hiddenVar :: Int -> Ident
     hiddenVar n = "_" ++ show n
     gos :: [ValComp] -> [Value] -> Int -> Computation
     gos (x:xs) vs n = let (v, k, n') = go x n
@@ -133,17 +133,17 @@ pHandler = VHandler <$> (symbol "handler" *> braces (do
   clauses <- sepBy (pRetClause <|> pOpClause) (symbol ",")
   let (retClauses, opClauses) = partitionEithers clauses
   case retClauses of
-    [retClause] -> return $ Handler retClause (fromList opClauses)
+    [retClause] -> return $ Handler retClause opClauses
     _           -> fail   $ "handler must have one return clause"))
 
-pOpClause :: Parser (Either RetClause (OpName, OpClause))
+pOpClause :: Parser (Either RetClause (Op, OpClause))
 pOpClause = do
   op <- pIdentifier
   (x, k) <- parens $ (,) <$> pIdentifier <* symbol ";" <*> pIdentifier
   c <- symbol "->" *> pComputation Seq
   return $ Right (op, OpClause x k c)
 
-pRetClause :: Parser (Either RetClause (OpName, OpClause))
+pRetClause :: Parser (Either RetClause (Op, OpClause))
 pRetClause = do
   x <- symbol "return" *> pIdentifier
   c <- symbol "->" *> pComputation Seq

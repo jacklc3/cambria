@@ -1,13 +1,14 @@
 module Ast where
 
-import Data.Map (Map, toList)
 import Data.List (intersperse)
+import Data.Map (Map)
+import Data.Unique (Unique)
 
-type VarName = String
-type OpName  = String
-type Env = Map VarName Value
-type Parameter = Integer
-data Side = L | R deriving (Eq)
+type Ident     = String
+type Op        = String
+type Env       = Map Ident Value
+type Parameter = Unique
+data Side      = L | R deriving (Eq)
 
 data Value
   = VInt Integer
@@ -16,13 +17,13 @@ data Value
   | VUnit
   | VPair Value Value
   | VEither Side Value
-  | VVar VarName
-  | VFun VarName Computation
+  | VVar Ident
+  | VFun Ident Computation
   | VHandler Handler
   | VPrimative (Value -> Computation)
   | VParameter Parameter
     -- Runtime-only values
-  | VClosure VarName Computation Env
+  | VClosure Ident Computation Env
 
 instance Show Value where
   show (VInt i)         = show i
@@ -37,7 +38,7 @@ instance Show Value where
   show (VHandler _)     = "<handler>"
   show (VPrimative _)   = "<primative>"
   show (VClosure _ _ _) = "<closure>"
-  show (VParameter p)   = "<p" ++ show p ++ ">"
+  show (VParameter _)   = "<parameter>"
 
 instance Eq Value where
   (VInt i1) == (VInt i2)             = i1 == i2
@@ -52,10 +53,10 @@ instance Eq Value where
 
 data Computation
   = CReturn Value
-  | COp OpName Value
-  | CDo VarName Computation Computation
+  | COp Op Value
+  | CDo Ident Computation Computation
   | CIf Value Computation Computation
-  | CCase Value VarName Computation VarName Computation
+  | CCase Value Ident Computation Ident Computation
   | CApp Value Value
   | CHandle Handler Computation
 
@@ -70,16 +71,16 @@ instance Show Computation where
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
 
-data RetClause = RetClause VarName Computation
-data OpClause = OpClause VarName VarName Computation
+data RetClause = RetClause Ident Computation
+data OpClause = OpClause Ident Ident Computation
 data Handler = Handler {
   retClause :: RetClause,
-  opClauses :: Map OpName OpClause
+  opClauses :: [(Op, OpClause)]
 }
 
 instance Show Handler where
-  show (Handler (RetClause xr cr) opCs) =
+  show (Handler (RetClause xr cr) ops) =
     let retStr = "return " ++ xr ++ " -> " ++ show cr
         opStrs = map (\(op, OpClause x k c) ->
-          op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) (toList opCs)
+          op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) ops
     in  "handler { " ++ (concat $ intersperse ", " (retStr : opStrs)) ++ " }"

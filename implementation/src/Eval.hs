@@ -5,7 +5,7 @@ import qualified Data.Map as Map
 
 data Result
   = Pure Value
-  | Impure OpName Value Value
+  | Impure Op Value Value
   | RuntimeError String
 
 instance Show Result where
@@ -54,7 +54,7 @@ eval env (CHandle h c) =
       let RetClause x cr = retClause h
       in  eval (Map.insert x v env) cr
     Impure op v f ->
-      case Map.lookup op (opClauses h) of
+      case lookup op (opClauses h) of
         Just (OpClause x k cop) ->
           let newEnv = Map.insert x v $ Map.insert k (deepHandle f) env
           in  eval newEnv cop
