@@ -4,14 +4,14 @@ import Ast
 import qualified Data.Map as Map
 
 data Result
-    = Pure Value
-    | Impure OpName Value Value
-    | RuntimeError String
+  = Pure Value
+  | Impure OpName Value Value
+  | RuntimeError String
 
 instance Show Result where
-    show (Pure v)         = "Pure " ++ show v
-    show (Impure op v f)  = "Impure " ++ op ++ " " ++ show v
-    show (RuntimeError s) = "Error: " ++ s
+  show (Pure v)         = "Pure " ++ show v
+  show (Impure op v f)  = "Impure " ++ op ++ " " ++ show v
+  show (RuntimeError s) = "Error: " ++ s
 
 eval :: Env -> Computation -> Result
 eval env (CReturn v) = Pure (evalValue env v)
@@ -39,12 +39,11 @@ eval env (CCase e x1 c1 x2 c2) =
 eval env (CDo x c1 c2) =
   case eval env c1 of
     Pure v               -> eval (Map.insert x v env) c2
-    Impure op v f        -> Impure op v (updateCont f)
+    Impure op v f        -> Impure op v (newBody f)
     err@(RuntimeError _) -> err
   where
-     -- TODO: Is unioning the correct way to handle the environments here?
-    updateCont (VClosure y c env') = VClosure y (CDo x c c2) (Map.union env' env)
-    updateCont _                   = error "Non-closure in continuation of impure"
+    newBody f@(VClosure y c env') = VClosure y (CDo x (CApp f (VVar y)) c2) env
+    newBody _                     = error "Non-closure in continuation of impure"
 
 eval env (COp op v) =
   Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
@@ -72,8 +71,8 @@ evalValue env (VVar name) =
     Nothing -> error $ "Unbound variable: " ++ name
 evalValue env (VPair v1 v2) = VPair (evalValue env v1) (evalValue env v2)
 evalValue env (VEither s v) = VEither s (evalValue env v)
-evalValue env (VFun x c) = VClosure x c env
-evalValue _ v = v
+evalValue env (VFun x c)    = VClosure x c env
+evalValue _   v             = v
 
 initialEnv :: Env
 initialEnv = Map.fromList
@@ -88,23 +87,23 @@ initialEnv = Map.fromList
   ]
 
 primBinOpInt :: (Integer -> Integer -> Value) -> Value
-primBinOpInt op = VPrimative handleX
+primBinOpInt op = VPrimative f1
   where
-    handleX (VInt x)   = CReturn (VPrimative (handleY x))
-    handleX _          = error "Type error: first argument to primitive was not an integer."
-    handleY x (VInt y) = CReturn (op x y)
-    handleY _ _        = error "Type error: second argument to primitive was not an integer."
+    f1 (VInt x)   = CReturn (VPrimative (f2 x))
+    f1 _          = error "Type error: first argument to primitive was not an integer."
+    f2 x (VInt y) = CReturn (op x y)
+    f2 _ _        = error "Type error: second argument to primitive was not an integer."
 
 primBinOpStr :: (String -> String -> Value) -> Value
-primBinOpStr op = VPrimative handleX
+primBinOpStr op = VPrimative f1
   where
-    handleX (VString x)   = CReturn (VPrimative (handleY x))
-    handleX _             = error "Type error: first argument was not a string."
-    handleY x (VString y) = CReturn (op x y)
-    handleY _ _           = error "Type error: second argument to primitive was not a string."
+    f1 (VString x)   = CReturn (VPrimative (f2 x))
+    f1 _             = error "Type error: first argument was not a string."
+    f2 x (VString y) = CReturn (op x y)
+    f2 _ _           = error "Type error: second argument to primitive was not a string."
 
 primBinOpVal :: (Value -> Value -> Value) -> Value
-primBinOpVal op = VPrimative handleX
+primBinOpVal op = VPrimative f1
   where
-    handleX v = CReturn (VPrimative (handleY v))
-    handleY v v' = CReturn (op v v')
+    f1 v    = CReturn (VPrimative (f2 v))
+    f2 v v' = CReturn (op v v')

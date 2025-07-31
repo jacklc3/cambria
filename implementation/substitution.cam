@@ -9,8 +9,8 @@ with handler {
 } handle (
   case #sub () of {
     inl a -> case #sub () of {
-      inr x -> return 2,
-      inl b -> #var a
+      inl b -> #var a,
+      inr x -> return 2
     },
     inr x -> return 3
   }
