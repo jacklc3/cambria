@@ -18,12 +18,11 @@ data Value
   | VEither Side Value
   | VVar VarName
   | VFun VarName Computation
-  -- | VRecFun (Map VarName Value) VarName VarName Computation -- rec fun f x -> body
   | VHandler Handler
-    -- Runtime-only values
   | VPrimative (Value -> Computation)
-  | VClosure VarName Computation Env
   | VParameter Parameter
+    -- Runtime-only values
+  | VClosure VarName Computation Env
 
 instance Show Value where
   show (VInt i)         = show i
@@ -35,7 +34,6 @@ instance Show Value where
   show (VEither R v)    = "inr " ++ show v
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
-  -- show (VRecFun _ f x c) = "(rec fun " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VHandler _)     = "<handler>"
   show (VPrimative _)   = "<primative>"
   show (VClosure _ _ _) = "<closure>"

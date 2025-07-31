@@ -110,61 +110,43 @@ pString = VString <$> lexeme (char '"' *> manyTill L.charLiteral (char '"'))
 
 pFun :: Parser Computation
 pFun = do
-    symbol "fun"
-    vars <- some pIdentifier
-    symbol "->"
-    body <- pComputation Seq
-    return $ CReturn $ desugarVars vars body
+    xs <- symbol "fun" *> some pIdentifier
+    c <- symbol "->" *> pComputation Seq
+    return $ CReturn $ desugarVars xs c
   where
-    desugarVars [v] b    = VFun v b
-    desugarVars (v:vs) b = VFun v (CReturn (desugarVars vs b))
-    desugarVars [] _     = error "fun with no arguments, this should have failed at the parser"
+    desugarVars [x]    c = VFun x c
+    desugarVars (x:xs) c = VFun x (CReturn (desugarVars xs c))
+    desugarVars []     _ = error "fun with no arguments, this should have failed at the parser"
 
 pEither :: Parser ValComp
 pEither = pInl <|> pInr
   where
-    pInl = do
-      symbol "inl"
-      x <- pValComp Paren
-      return $ VCEither L x
-    pInr = do
-      symbol "inr"
-      x <- pValComp Paren
-      return $ VCEither R x
+    pInl = VCEither L <$> (symbol "inl" *> pValComp Paren)
+    pInr = VCEither R <$> (symbol "inr" *> pValComp Paren)
 
 pPair :: Parser ValComp
-pPair = parens $ do
-  x1 <- pValComp Seq
-  symbol ","
-  x2 <- pValComp Seq
-  return $ VCPair x1 x2
+pPair = parens $ VCPair <$> pValComp Seq <* symbol "," <*> pValComp Seq
 
 pHandler :: Parser Value
 pHandler = VHandler <$> (symbol "handler" *> braces (do
-  clauses <- sepBy (pReturnClause <|> pOpClause) (symbol ",")
+  clauses <- sepBy (pRetClause <|> pOpClause) (symbol ",")
   let (retClauses, opClauses) = partitionEithers clauses
   case retClauses of
     [retClause] -> return $ Handler retClause (fromList opClauses)
     _           -> fail   $ "handler must have one return clause"))
 
-pOpClause :: Parser (Either a (OpName, OpClause))
+pOpClause :: Parser (Either RetClause (OpName, OpClause))
 pOpClause = do
-  opName <- pIdentifier
-  (param, k) <- parens $ do
-    p <- pIdentifier
-    symbol ";"
-    c <- pIdentifier
-    return (p, c)
-  symbol "->"
-  body <- pComputation Seq
-  return $ Right (opName, OpClause param k body)
+  op <- pIdentifier
+  (x, k) <- parens $ (,) <$> pIdentifier <* symbol ";" <*> pIdentifier
+  c <- symbol "->" *> pComputation Seq
+  return $ Right (op, OpClause x k c)
 
-pReturnClause :: Parser (Either RetClause b)
-pReturnClause = symbol "return" *> do
-  var <- pIdentifier
-  symbol "->"
-  body <- pComputation Seq
-  return $ Left (RetClause var body)
+pRetClause :: Parser (Either RetClause (OpName, OpClause))
+pRetClause = do
+  x <- symbol "return" *> pIdentifier
+  c <- symbol "->" *> pComputation Seq
+  return $ Left (RetClause x c)
 
 -- TODO: Make the order of operations matter
 pInfixOps :: [Text] -> Parser Computation
@@ -183,67 +165,52 @@ pInfixOps ops = do
 pSeq :: Parser Computation
 pSeq = do
   x  <- pComputation Infix
-  xs <- some (symbol ";" >> pComputation Infix)
+  xs <- some (symbol ";" *> pComputation Infix)
   return $ foldl1' (\c1 c2 -> CDo "_" c1 c2) (x:xs)
 
 pReturn :: Parser Computation
 pReturn = do
-  symbol "return"
-  x <- pValComp Paren
+  x <- symbol "return" *> pValComp Paren
   return $ desugar [x] (\[v] -> CReturn v)
 
 pDo :: Parser Computation
 pDo = do
-  symbol "do"
-  var <- pIdentifier
-  symbol "<-"
-  c1 <- pComputation Infix
-  symbol "in"
-  c2 <- pComputation Infix
+  var <- symbol "do" *> pIdentifier
+  c1 <- symbol "<-" *> pComputation Infix
+  c2 <- symbol "in" *> pComputation Infix
   return $ CDo var c1 c2
 
 pWith :: Parser Computation
 pWith = do
-  symbol "with"
-  h <- pHandler
-  symbol "handle"
-  c <- pComputation Seq
+  h <- symbol "with" *> pHandler
+  c <- symbol "handle" *> pComputation Seq
   case h of
     VHandler handler -> return $ CHandle handler c
     _ -> fail "Expected a handler value in 'with' expression"
 
 pIf :: Parser Computation
 pIf = do
-  symbol "if"
-  x <- pValComp Infix
-  symbol "then"
-  c1 <- pComputation Infix
-  symbol "else"
-  c2 <- pComputation Infix
+  x <- symbol "if" *> pValComp Infix
+  c1 <- symbol "then" *> pComputation Infix
+  c2 <- symbol "else" *> pComputation Infix
   return $ desugar [x] (\[v] -> CIf v c1 c2)
 
 pCase :: Parser Computation
 pCase = do
-  symbol "case"
-  x <- pValComp Infix
-  symbol "of"
-  (y1,c1,y2,c2) <- braces $ do
-    symbol "inl"
-    y1 <- pIdentifier
-    symbol "->"
-    c1 <- pComputation Seq
-    symbol ","
-    symbol "inr"
-    y2 <- pIdentifier
-    symbol "->"
-    c2 <- pComputation Seq
-    return (y1,c1,y2,c2)
+  x <- symbol "case" *> pValComp Infix <* symbol "of"
+  ((y1,c1),(y2,c2)) <- braces $ leftRight <|> rightLeft
   return $ desugar [x] (\[v] -> CCase v y1 c1 y2 c2)
+    where
+      pIn s = do
+        y <- symbol s *> pIdentifier
+        c <- symbol "->" *> pComputation Seq
+        return (y,c)
+      leftRight = (,) <$> pIn "inl" <* symbol "," <*> pIn "inr"
+      rightLeft = flip (,) <$> pIn "inr" <* symbol "," <*> pIn "inl"
 
 pOp :: Parser Computation
 pOp = do
-  symbol "#"
-  op <- pIdentifier
+  op <- symbol "#" *> pIdentifier
   x <- pValComp Paren
   return $ desugar [x] (\[v] -> COp op v)
 

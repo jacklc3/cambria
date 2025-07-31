@@ -21,13 +21,6 @@ eval env (CApp f v) =
     VClosure x c cEnv ->
       let newEnv = Map.insert x (evalValue env v) cEnv
       in  eval newEnv c
-    {-
-    VRecFun recEnv fName xName body ->
-      let evaluatedArg = evalValue env v
-          recClosure = VRecFun recEnv fName xName body
-          newEnv = Map.insert xName evaluatedArg (Map.insert fName recClosure recEnv)
-      in eval newEnv body
-    -}
     VPrimative f ->  eval env (f (evalValue env v))
     _ -> RuntimeError $ "Cannot apply non-function: " ++ show f
 
