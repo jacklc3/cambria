@@ -51,7 +51,8 @@ pIdentifier = (lexeme . try) $ do
     then fail $ "keyword " ++ show name ++ " cannot be an identifier"
     else return name
 
--- Takes a list of ValComp terms and desugars them by sequencing any computations
+ -- Takes a list of ValComp terms and desugars them by
+ -- sequencing any computations which should be values
 desugar :: [ValComp] -> ([Value] -> Computation) -> Computation
 desugar xs f = gos xs [] 0
   where
@@ -198,15 +199,15 @@ pIf = do
 pCase :: Parser Computation
 pCase = do
   x <- symbol "case" *> pValComp Infix <* symbol "of"
-  ((y1,c1),(y2,c2)) <- braces $ leftRight <|> rightLeft
+  ((y1,c1),(y2,c2)) <- braces $ lr <|> rl
   return $ desugar [x] (\[v] -> CCase v y1 c1 y2 c2)
     where
       pIn s = do
         y <- symbol s *> pIdentifier
         c <- symbol "->" *> pComputation Seq
         return (y,c)
-      leftRight = (,) <$> pIn "inl" <* symbol "," <*> pIn "inr"
-      rightLeft = flip (,) <$> pIn "inr" <* symbol "," <*> pIn "inl"
+      lr = (,) <$> pIn "inl" <* symbol "," <*> pIn "inr"
+      rl = flip (,) <$> pIn "inr" <* symbol "," <*> pIn "inl"
 
 pOp :: Parser Computation
 pOp = do
