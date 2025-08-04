@@ -16,11 +16,11 @@ import qualified Text.Megaparsec.Char.Lexer as L
 type Parser = Parsec Void Text
 data CompScope = Seq | Infix | App | Expr | Paren deriving (Eq, Ord)
 
-data ValComp
+data Expression
   = V Value
   | C Computation
-  | VCPair ValComp ValComp
-  | VCEither Side ValComp
+  | EPair Expression Expression
+  | EEither Side Expression
 
 sc :: Parser ()
 sc = L.space space1 empty empty
@@ -51,24 +51,24 @@ pIdentifier = (lexeme . try) $ do
     then fail $ "keyword " ++ show name ++ " cannot be an identifier"
     else return name
 
- -- Takes a list of ValComp terms and desugars them by
+ -- Takes a list of Expressions and desugars them by
  -- sequencing any computations which should be values
-desugar :: [ValComp] -> ([Value] -> Computation) -> Computation
+desugar :: [Expression] -> ([Value] -> Computation) -> Computation
 desugar xs f = gos xs [] 0
   where
     hiddenVar :: Int -> Ident
     hiddenVar n = "_" ++ show n
-    gos :: [ValComp] -> [Value] -> Int -> Computation
-    gos (x:xs) vs n = let (v, k, n') = go x n
-                      in  k (gos xs (v:vs) n')
+    gos :: [Expression] -> [Value] -> Int -> Computation
+    gos (e:es) vs n = let (v, k, n') = go e n
+                      in  k (gos es (v:vs) n')
     gos []     vs n = f (reverse vs)
-    go :: ValComp -> Int -> (Value, Computation -> Computation, Int)
-    go (V v) n          = (v, id, n)
-    go (C c) n          = (VVar (hiddenVar n), \c' -> CDo (hiddenVar n) c c', succ n)
-    go (VCPair x y) n   = let (v1, k1, n1) = go x n
-                              (v2, k2, n2) = go y n1
-                          in  (VPair v1 v2, k1 . k2, n2)
-    go (VCEither s x) n = let (v, k, n') = go x n
+    go :: Expression -> Int -> (Value, Computation -> Computation, Int)
+    go (V v) n         = (v, id, n)
+    go (C c) n         = (VVar (hiddenVar n), \c' -> CDo (hiddenVar n) c c', succ n)
+    go (EPair e1 e2) n = let (v1, k1, n1) = go e1 n
+                             (v2, k2, n2) = go e2 n1
+                         in  (VPair v1 v2, k1 . k2, n2)
+    go (EEither s e) n = let (v, k, n') = go e n
                           in  (VEither s v, k, n')
 
 pComputation :: CompScope -> Parser Computation
@@ -80,7 +80,7 @@ pComputation cs = choice $ seq ++ infi ++ app ++ expr ++ [try (parens (pComputat
     expr = if cs > Expr  then [] else [pIf, pCase, pDo, pWith, pFun, pOp, pReturn]
 
 
-pValComp :: CompScope -> Parser ValComp
+pValComp :: CompScope -> Parser Expression
 pValComp cs = choice
   [ try $ V <$> pUnit
   , try pPair
@@ -119,14 +119,11 @@ pFun = do
     desugarVars (x:xs) c = VFun x (CReturn (desugarVars xs c))
     desugarVars []     _ = error "fun with no arguments, this should have failed at the parser"
 
-pEither :: Parser ValComp
-pEither = pInl <|> pInr
-  where
-    pInl = VCEither L <$> (symbol "inl" *> pValComp Paren)
-    pInr = VCEither R <$> (symbol "inr" *> pValComp Paren)
+pEither :: Parser Expression
+pEither = EEither <$> (L <$ symbol "inl" <|> R <$ symbol "inr") <*> pValComp Paren
 
-pPair :: Parser ValComp
-pPair = parens $ VCPair <$> pValComp Seq <* symbol "," <*> pValComp Seq
+pPair :: Parser Expression
+pPair = parens $ EPair <$> pValComp Seq <* symbol "," <*> pValComp Seq
 
 pHandler :: Parser Value
 pHandler = VHandler <$> (symbol "handler" *> braces (do
@@ -152,27 +149,27 @@ pRetClause = do
 -- TODO: Make the order of operations matter
 pInfixOps :: [Text] -> Parser Computation
 pInfixOps ops = do
-    x  <- pValComp App
+    e  <- pValComp App
     op <- choice (fmap symbol ops)
-    x' <- pValComp App
-    xs <- many (symbol op >> pValComp App)
-    return $ foldInfix op (x:x':xs)
+    e' <- pValComp App
+    es <- many (symbol op >> pValComp App)
+    return $ foldInfix op (e:e':es)
   where
-    foldInfix op (x:y:z:xs) = foldInfix op ((C (desugar [x,y] (sequenceInfix op))) : z : xs)
-    foldInfix op [x,y]      = desugar [x,y] (sequenceInfix op)
-    foldInfix _  _          = error "infix operator with less than 2 arguments, this should have failed at the parser"
-    sequenceInfix op [v1, v2] = CDo "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2)
+    foldInfix op (e1:e2:es@(_:_)) = foldInfix op (C (desugar [e1,e2] (sequenceInfix op)) : es)
+    foldInfix op [e1,e2]          = desugar [e1,e2] (sequenceInfix op)
+    foldInfix _  _                = error "infix operator with less than 2 arguments, this should have failed at the parser"
+    sequenceInfix op [v1, v2]     = CDo "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2)
 
 pSeq :: Parser Computation
 pSeq = do
-  x  <- pComputation Infix
-  xs <- some (symbol ";" *> pComputation Infix)
-  return $ foldl1' (\c1 c2 -> CDo "_" c1 c2) (x:xs)
+  c  <- pComputation Infix
+  cs <- some (symbol ";" *> pComputation Infix)
+  return $ foldl1' (\c1 c2 -> CDo "_" c1 c2) (c:cs)
 
 pReturn :: Parser Computation
 pReturn = do
-  x <- symbol "return" *> pValComp Paren
-  return $ desugar [x] (\[v] -> CReturn v)
+  e <- symbol "return" *> pValComp Paren
+  return $ desugar [e] (\[v] -> CReturn v)
 
 pDo :: Parser Computation
 pDo = do
@@ -183,24 +180,24 @@ pDo = do
 
 pWith :: Parser Computation
 pWith = do
-  h <- symbol "with" *> pHandler
+  v <- symbol "with" *> pHandler
   c <- symbol "handle" *> pComputation Seq
-  case h of
-    VHandler handler -> return $ CHandle handler c
+  case v of
+    VHandler h -> return $ CHandle h c
     _ -> fail "Expected a handler value in 'with' expression"
 
 pIf :: Parser Computation
 pIf = do
-  x <- symbol "if" *> pValComp Infix
+  e <- symbol "if" *> pValComp Infix
   c1 <- symbol "then" *> pComputation Infix
   c2 <- symbol "else" *> pComputation Infix
-  return $ desugar [x] (\[v] -> CIf v c1 c2)
+  return $ desugar [e] (\[v] -> CIf v c1 c2)
 
 pCase :: Parser Computation
 pCase = do
-  x <- symbol "case" *> pValComp Infix <* symbol "of"
+  e <- symbol "case" *> pValComp Infix <* symbol "of"
   ((y1,c1),(y2,c2)) <- braces $ lr <|> rl
-  return $ desugar [x] (\[v] -> CCase v y1 c1 y2 c2)
+  return $ desugar [e] (\[v] -> CCase v y1 c1 y2 c2)
     where
       pIn s = do
         y <- symbol s *> pIdentifier
@@ -212,8 +209,8 @@ pCase = do
 pOp :: Parser Computation
 pOp = do
   op <- symbol "#" *> pIdentifier
-  x <- pValComp Paren
-  return $ desugar [x] (\[v] -> COp op v)
+  e <- pValComp Paren
+  return $ desugar [e] (\[v] -> COp op v)
 
 pApp :: Parser Computation
 pApp = do
@@ -221,7 +218,7 @@ pApp = do
     vs <- some (pValComp Paren)
     return $ desugarApp f vs
   where
-    desugarApp f (x:xs) = foldl' (\acc x -> desugar [C acc, x] appVec2) (desugar [f,x] appVec2) xs
+    desugarApp f (e:es) = foldl' (\acc e' -> desugar [C acc, e'] appVec2) (desugar [f,e] appVec2) es
     desugarApp _ []     = error "fun with no arguments, this should have failed at the parser"
     appVec2 [v1,v2]     = CApp v1 v2
 

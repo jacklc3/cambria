@@ -42,8 +42,8 @@ eval env (CDo x c1 c2) =
     Impure op v f        -> Impure op v (newCont f)
     err@(RuntimeError _) -> err
   where
-    newCont f@(VClosure y c env') = VClosure y (CDo x (CApp f (VVar y)) c2) env
-    newCont _                     = error "Non-closure in continuation of impure"
+    newCont f@(VClosure y _ _) = VClosure y (CDo x (CApp f (VVar y)) c2) env
+    newCont _                  = error "Non-closure in continuation of impure"
 
 eval env (COp op v) =
   Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)

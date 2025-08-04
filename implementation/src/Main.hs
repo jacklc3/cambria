@@ -9,22 +9,23 @@ import System.Environment (getArgs)
 import System.Random (randomIO)
 import Text.Megaparsec.Error (errorBundlePretty)
 
-ioHandler :: [(Op, Value -> Value -> IO Computation)]
-ioHandler =
-  [ ("new", \_ k -> newUnique >>= (\p -> return $ CApp k (VParameter p)))
-  , ("print", \v k -> print v >>= (\_ -> return $ CApp k VUnit))
-  , ("flip", \_ k -> randomIO >>= (\b -> return $ CApp k (VBool b)))
+handlerIO :: [(Op, Value -> Value -> IO Computation)]
+handlerIO =
+  [ ("new",   \_ k           -> newUnique  >>= return . CApp k . VParameter)
+  , ("print", \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
+  , ("read",  \_ k           -> getLine    >>= return . CApp k . VString)
+  , ("flip",  \_ k           -> randomIO   >>= return . CApp k . VBool)
   ]
 
 -- Catches any inbuilt effects at the top level and handles them
-evalInbuilt :: Env -> Computation -> IO Result
-evalInbuilt env c =
+evalIO :: Env -> Computation -> IO Result
+evalIO env c =
   case eval env c of
-    Pure v -> return $ Pure v
+    Pure v        -> return $ Pure v
     Impure op v f ->
-      case lookup op ioHandler of
-        Just k  -> k v f >>= (\r -> evalInbuilt env r)
-        Nothing -> return $ Impure op v f -- Immediatly propogate to top level
+      case lookup op handlerIO of
+        Just k  -> k v f >>= (\r -> evalIO env r)
+        Nothing -> return $ Impure op v f
 
 main :: IO ()
 main = do
@@ -35,6 +36,6 @@ main = do
       case parseProgram filename content of
         Left err  -> putStr (errorBundlePretty err)
         Right ast -> do
-          result <- evalInbuilt initialEnv ast
+          result <- evalIO initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"

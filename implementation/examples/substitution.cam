@@ -1,6 +1,6 @@
 with handler {
   return x  -> return (inl x),
-  var(v; k) -> return (inr v),
+  var(a; k) -> return (inr a),
   sub(v; k) -> do c <- #new () in
     case k (inl c) of {
       inl x -> return (inl x),

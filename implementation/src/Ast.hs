@@ -20,9 +20,9 @@ data Value
   | VVar Ident
   | VFun Ident Computation
   | VHandler Handler
-  | VPrimative (Value -> Computation)
   | VParameter Parameter
     -- Runtime-only values
+  | VPrimative (Value -> Computation)
   | VClosure Ident Computation Env
 
 instance Show Value where
@@ -35,7 +35,7 @@ instance Show Value where
   show (VEither R v)    = "inr " ++ show v
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
-  show (VHandler _)     = "<handler>"
+  show (VHandler h)     = show h
   show (VPrimative _)   = "<primative>"
   show (VClosure _ _ _) = "<closure>"
   show (VParameter _)   = "<parameter>"
