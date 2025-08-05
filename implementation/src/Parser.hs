@@ -183,7 +183,7 @@ pWith = do
   v <- symbol "with" *> pHandler
   c <- symbol "handle" *> pComputation Seq
   case v of
-    VHandler h -> return $ CHandle h c
+    VHandler h -> return $ CHandle (VHandler h) c
     _ -> fail "Expected a handler value in 'with' expression"
 
 pIf :: Parser Computation

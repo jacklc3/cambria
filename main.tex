@@ -32,8 +32,8 @@
   identifierstyle=\rmfamily\itshape,
   language=haskell,                 % the language of the code
   basicstyle=\sffamily\upshape,
-  morekeywords=[2]{with,handle,handler,where,param},            % if you want to add more keywords to the set
-  keywordstyle=[2]\itshape\bfseries,       % keyword style
+  morekeywords=[2]{with,handle,handler,fun},            % if you want to add more keywords to the set
+  keywordstyle=[2]\bfseries,       % keyword style
 %  morekeywords=[3]{Prob,uniform,bernoulli,normal,beta,exponential},            % if you want to add more keywords to the set
 %  keywordstyle=[3]\color{mygreen},       % keyword style
 %  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
@@ -192,12 +192,13 @@ These data must satisfy the monad coherence laws given by substitution lemmas. S
 \newcommand{\get}{\mathsf{get}}
 \newcommand{\set}[1]{\mathsf{set}_{#1}}
 \newcommand{\eq}{\mathsf{eq}}
+\newcommand{\rf}{\mathsf{ref}}
 
 The theory of local store~\cite{staton_instances_2013} is an algebraic theory parameterised by the theory of sets. In this case, the parameters represent the different memory cells. There are four operators.
 \begin{itemize}
     \item $\get : (1\mid 0, 0)$ reads the bit of memory in the parameter and continues with the first continuation if it is false and the second if it is true
     \item $\set{i} : (1 \mid 0)$ writes $i$ to the bit of memory in the parameter
-    \item $\nu_i : (0 \mid 1)$ creates a new memory cell bound to the parameter in the continuation initialised to $i$
+    \item $\ref_i : (0 \mid 1)$ creates a new memory cell bound to the parameter in the continuation initialised to $i$
     \item $\eq : (2\mid 0, 0)$ checks if two parameters are equal and continues with the first continuation if they are and the second if they are not
 \end{itemize}
 
@@ -211,8 +212,8 @@ A sample of the set of equations for the theory are:
     u:0,v:0,x:0,y:0\mid a,b,c,d &\vdash \eq(a,b , \eq(c,d , u,v), \eq(c,d , x,y)) \\
     &\qquad = \eq(c,d, \eq(a,b, u,x), \eq(a,b, v,y)) \\
     x:1,y:0 \mid a,b &\vdash \eq(a,b, x[a],y) = \eq(a,b, x[b],y) \\
-    x: 0 \mid - &\vdash \nu a.x = x \\
-    x: 2 \mid - &\vdash \nu a.\nu b.x[a,b] = \nu b.\nu a.x[a,b]
+    x: 0 \mid - &\vdash \rf(a.x) = x \\
+    x: 2 \mid - &\vdash \rf(a.\rf(b.x[a,b])) = \rf(b.\rf(a.x[a,b]))
 \end{align*}
 
 \subsection{Example: Substitution and Jumps}
@@ -260,12 +261,12 @@ For local binary state, the type signatures would become:
 \begin{align*}
     \get &: \alpha \leadsto \Bool \\
     \set{} &: \alpha \times \Bool \leadsto 1 \\
-    \nu  &: \Bool \leadsto \alpha \\
+    \rf  &: \Bool \leadsto \alpha \\
     \eq  &: \alpha \times \alpha \leadsto \Bool
 \end{align*}
 \end{example}
 
-Note, that the coarity type captures the \emph{configuation} of the operator (i.e. the $i$ in $w_i$ or $\nu_i$).
+Note, that the coarity type captures the \emph{configuation} of the operator (i.e. the $i$ in $\set i$ or $\rf_i$).
 In contrast, the arity type can group continuations with the same parameter bind count (i.e. instead of two continuations in $r$ we have a single continuation with argument $\Bool$).
 
 \begin{example}
@@ -278,314 +279,55 @@ For substitution, the type signatures would become:
 
 \subsection{Handlers}
 
-Motivated by the presheaf semantics of the parameterised algebraic theories, we can think of the return type of a handler as a type that is dependant on a \emph{context} of parameters (i.e. a map from context to set). We first start with some examples to get a feel for how this should work.
+Motivated by the presheaf semantics of the parametrised algebraic theories, we can think of the return type of a handler as a type that is dependant on a \emph{context} of parameters (i.e. a map from context to set). We first start with some examples to get a feel for how this should work.
 
 \subsubsection{Example: Substitution}
 
-For the theory of substitution, the handler will either return a value $R$ or a parameter in provable by the current parameter context. We use $\PCtx$ to represent the latter. Hence we expect the return type to look like $R+\PCtx$. So given the layout
+For the theory of substitution, the handler will either return a value $R$ or a parameter in provable by the current parameter context.
+We use $\PCtx$ to represent the latter. Hence we expect the return type to look like $R+\PCtx$.
 \begin{lstlisting}
-    H = handler {
-        return x         = ...
-        sub[]((); k, k') = ...
-        var[a](();)      = ...
+    handler {
+      return x  -> return (inl x)
+      var(v; k) -> return (inr v)
+      sub(v; k) -> do a <- #new () in
+        case k (inl a) of {
+          inl x -> return (inl x),
+          inr b -> if b == a then k (inr ()) else return (inr b)
+        }
     }
-\end{lstlisting}
-we expect the return operation to simply inject the return value into the return type
-\begin{lstlisting}
-    return x = inl x
-\end{lstlisting}
-and the $\var$ operator to inject the parameter (which we assume exists within our context $\PCtx$) into the context type.
-\begin{lstlisting}
-    var[a](();) = inr a
-\end{lstlisting}
-However, for the $\sub$ operator, the continuation $k$ returns a value in a context extended by an additional parameter, that is a value in $R + (\PCtx + 1)$. So in this case if our value comes from the $R$ or $\PCtx$ component, we may simply return the result, otherwise, we call $k'$ for a new value in $R+\PCtx$. This results in the following code.
-\begin{lstlisting}
-    sub[]((); k, k') = case k () of
-                            inl x        = inl x
-                            inr (inl a)  = inr a
-                            inr (inr ()) = k' ()
 \end{lstlisting}
 
 \subsubsection{Example: Local Binary State}
 
-We may follow a similar path to create a handler for local binary state. In this theory, the parameters represent reference cells, so we can represent our local memory by the function type $\PCtx \to S$, where $\PCtx$ is our context of parameters and $S$ is the type of values in memory. So the whole return type of the handler in parameter passing style would be $(\PCtx \to S) \to R \times (\PCtx \to S)$. The implementation of the handler from here is straightforward apart from the implementation of the operator $\nu$ in which the continuation produces a return type with the parameter context extended by a fresh parameter, or $(\PCtx +1 \to S) \to R \times (\PCtx + 1 \to S)$. We can see how it is handled below.
+We may follow a similar path to create a handler for local binary state.
+In this theory, the parameters represent reference cells, so we can represent our local memory by the function type $\PCtx \to S$, where $\PCtx$
+is our context of parameters and $S$ is the type of values in memory. So the whole return type of the handler in parameter passing style would be
+$(\PCtx \to S) \to R \times (\PCtx \to S)$. The implementation of the handler from here is straightforward apart from the implementation of the operator
+$\rf$ in which the continuation produces a return type with the parameter context extended by a fresh parameter, or $(\PCtx +1 \to S) \to R \times (\PCtx + 1 \to S)$.
+We can see how it is handled below.
 \begin{lstlisting}
-    H = handler {
-        return x      = lambdas.(x,s)
-        get[a]((); k) = lambdas.k (s a) s
-        set[a](v; k)  = lambdas.k () (lambdab.case b of
-                                a = x
-                                b' = s b')
-        new[](v; k)   = lambdas.let s' (inr ()) = v
-                               s' (inl x)  = s x
-                               (v', s'') = k () s'
-                           in  (v', lambdab.s'' (inl b))
+    handler {
+        return x  -> return (fun s -> return (x,s))
+        get(v; k) -> return (fun s -> k (s v) s)
+        set(v; k) -> return (fun s -> k () (fun a -> if a == fst v then snd v else s a)
+        ref(v; k) -> do a <- #new () in
+            return (fun s -> k a (fun b -> if a == b then return v else return s b))
     }
 \end{lstlisting}
-There are a few elegant aspects of this approach:
-\begin{itemize}
-    \item It prevents the fresh parameter names from escaping their continuation context. In particular, we cannot simply return \lstinline{(v',s'')} in the handler for the \lstinline{new} operator because it is of type $R\times (\PCtx+1\to S)$, while the handler expects a return type of $R\times (\PCtx \to S)$. So we are forced to restrict the function from the fresh parameter before returning it. Even though the function could not be called with the fresh parameter because it is an abstract instance no longer in scope, this formally guarantees that.
-    \item For closed terms (which are the terms we expect from regular programs), the parameter context would be empty ($\PCtx \cong 0$). This nicely restricts how the return type of the handler can be used. For example, in the substitution case, the result would be $R + \PCtx = R + 0 \cong R$ giving only a result type. In the local binary state case, the return type would be $(0 \to S) \to R \times (0 \to S) \cong R$ because $0$ is initial.
-\end{itemize}
-However, we have brushed past an issue with this solution. That is, what do the coarity parameters refer to in the operators? For instance, say we have the following line of code.
-\begin{lstlisting}
-    sub(... sub(var[a](()), t1), ...), tn)
-\end{lstlisting}
-What does the \lstinline{a} refer to here? By the inductive construction of $\PCtx$, we would expect it to be of the form \lstinline{inl ( ... inl (inr ()) ... )}, but attempting to reference the
-right substitution by the number of \lstinline{inl}s in the parameter name in the is not conducive to good coding practices. Hence the goal is to extend the type system to give names to each of the context parameters so that they can be easily referenced within the program.
-
-\subsection{Giving Parameters Names}
-
-In this section, we give names to the parameters so that they can be easily referenced by the programmer. The idea is to label the fresh parameters so that they would have the form $\PCtx,a$ instead of $\PCtx+1$. However, care must be taken into account when doing this so that there are no naming conflicts, name escapes, or type mismatches. We indicate the new name with a bracketed parameter name on the continuations, such as $new[](v; [a]k)$, where the continuation $k$ would now return the type $((\PCtx,a)\to S)\to R\times ((\PCtx,a)\to S)$. To process the extended parameter context (as was done by case analysis on $\PCtx+1$ earlier), we use a handler within the handler as illustrated by the following two examples.
-
-\begin{example}
-A handler in the named setting for the theory of substitution is
-\begin{lstlisting}
-    H = handler {
-        return x         = return (inl x)
-        var[a](();)      = return (inr a)
-        sub[]((); k, k') = case k () (lambdaa.lambdar.case r of
-                                inl x  = return (inl x)
-                                inr a' = handle a' with
-                                            param a    = k' () (lambdar'.return r')
-                                            return a'' = return (inr a''))
-    }
-\end{lstlisting}
-\end{example}
-
-\begin{example} \label{ex:named_sub}
-A handler in the named setting for the theory of local state is
-\begin{lstlisting}
-    H = handler {
-        return x       = return lambdas.(x,s)
-        get[a]((); k)  = return lambdas.k (s a) s
-        set[a](v; k)   = return lambdas.k () (lambdab.handle b with
-                                                param a   = v
-                                                return b' = s (nua.b'))
-        new[](v; k) = return lambdas.k () (nua.lambdar.do (x,s') <- return (r lambdab.handle b with
-                                                            param a   = v
-                                                            return b' = s b')
-                                            in (x, lambdab.s' (nua.b))
-        eq[a,b]((); k, k') = return handle a with
-                                        param b   = k ()
-                                        default _ = k' ()
-    }
-\end{lstlisting}
-\end{example}
-One could see how the parameter handler could also be adapted when the parameterising theory is not the theory of sets, but we ignore this generalisation for now as the majority of effects in literature are described by the theories parameterised over sets.
-
-\todo[inline]{Can the parameter handler and parametrised theory handler be integrated into a single handler?}
 
 \section{Type System}
 
 The type and effect system closely follows that of~\cite{pretnar_introduction_2015}. We have an extra parameter type that captures the current parameter context. 
 \begin{align*}
     A, B &::= \PCtx \mid \Unit \mid A + B \mid A \times B \mid A \to \cC \mid \cC \Rightarrow \cD \\
-    \cC, \cD &::= A\star n!\Sigma \\
+    \cC, \cD &::= A!\Sigma \\
     \Sigma &::= \{\op_1,\dots,\op_n\}
 \end{align*}
-where $n\in\mathbb{N}$ represents the number of times we extend the parameter context within the typed term. We use the syntactic sugar of $\Bool$ for $\Unit + \Unit$ and \lstinline{true} and \lstinline{false} for the two instances \lstinline{inl ()} and \lstinline{inr ()} of the type $\Bool$, respectively. This type system captures the presheaf semantics of the parameterised algebraic theories because a value type can be considered a functor over variable $\PCtx$, i.e. $F: \PCtx \mapsto R + \PCtx$. In the case of presheaves over $\Fin^{op}$, the type $\PCtx$ would represent a set of parameters in context.
-
-\if false
-To account for parameter context extension, on top of function abstraction, we introduce a restriction operator as in \cite{pitts_structural_2011} which converts a free parameter to a parameter bounded in an extended context.
-\begin{prooftree}
-    \AxiomC{$\Gamma, a:\PCtx \vdash t : A!\Sigma$}
-    \UnaryInfC{$\Gamma \vdash \lambda a.t : \PCtx \to A!\Sigma$}
-    \UnaryInfC{$\Gamma \vdash \nu(\lambda a.t) : A!\Sigma$}
-\end{prooftree}
-\fi
-
-Again we follow from the type system given in \cite{kammar_no_2017}. We use notation $\vec{a}:A$ in the variable typing context to mean $a_1:A, \dots, a_n:A$, where $|\vec{a}| = n$. The new handler typing terms can be given by:
-
-\begin{prooftree}
-    \AxiomC{$\Delta \vdash a$}
-    \UnaryInfC{$\Delta\mid \Gamma\vdash a : \PCtx \star 0$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta \mid \Gamma, x:A \vdash c_r : B!\Sigma'\star n$}
-    \AxiomC{$\Sigma \subseteq \Sigma'$}
-    \BinaryInfC{$\Delta \mid \Gamma \vdash$ \lstinline|handler \{ return x mapsto cr \} | $: A!\Sigma \Rightarrow B!\Sigma' \star n$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\op : (|\vec{p}|, A') \leadsto (m_1, B_1; \dots; m_l,B_l)$}
-    \AxiomC{$\Delta\mid \Gamma \vdash H : A!\Sigma \Rightarrow B!\Sigma'\star n$}
-    \noLine
-    \BinaryInfC{$\Delta \mid \Gamma, x:A', \vec{p} : \PCtx, k_1: (B_1 \to B!\Sigma')\star m_1, \dots, k_l: B_l \to B\star m_l!\Sigma' \vdash c_{\op} : B!\Sigma'\star n$}
-    \UnaryInfC{$\Gamma \vdash (\op[\vec{p}](x; k_1, \dots , k_l) \mapsto c_{\op}); H : A!\Sigma \cup \{op\} \Rightarrow B!\Sigma'\star n$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$[\op : (|\vec{a}|, A') \leadsto (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)] \in \Sigma$}
-    \AxiomC{$\Delta\mid\Gamma \vdash v: A'$}
-    \AxiomC{$\Delta \vdash \vec{a}$}
-    \noLine
-    \TrinaryInfC{$\Delta, \vec{b}_1\mid\Gamma,y_1:B_1 \vdash c_1 : A!\Sigma \quad \cdots \quad \Delta, \vec{b}_l\mid \Gamma,y_l:B_l \vdash c_l : A!\Sigma$}
-    \UnaryInfC{$\Delta\mid\Gamma\vdash \op[\vec{a}](v; [\vec{b}_1]y_1.c_1, \dots, [\vec{b}_l]y_l.c_l): A!\Sigma$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta,\vec{b}\mid\Gamma \vdash t : A\star n$}
-    \UnaryInfC{$\Delta\mid\Gamma \vdash \nu \vec{b}.t : A\star n+|\vec{b}|$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta,\mid\Gamma \vdash t : A$}
-    \UnaryInfC{$\Delta\mid\Gamma \vdash return t : A\star 0!\Sigma$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta\mid\Gamma \vdash a : \PCtx\star n+1!\Sigma$}
-    \AxiomC{$\Delta\mid\Gamma, b:\PCtx \vdash u : A\star n!\Sigma$}
-    \AxiomC{$\Delta\mid\Gamma \vdash t : A\star n!\Sigma$}
-    \TrinaryInfC{$\Delta \mid \Gamma \vdash$ \lstinline|strengthen a with t in b -> u| $: A\star n!\Sigma$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta\mid\Gamma \vdash a : \PCtx\star n$}
-    \UnaryInfC{$\Delta \mid \Gamma \vdash$ \lstinline|weaken a| $: \PCtx\star n+1$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$\Delta,\vec{b}\mid\Gamma \vdash t : A$}
-    \UnaryInfC{$\Delta\mid\Gamma \vdash \nu \vec{b}.t : A\star |\vec{b}|$}
-\end{prooftree}
-
-
-
-\subsection{Small-Step Semantics}
-
-In the small-step semantics, we augment the terms with a natural number to indicate the number of free parameters. Given any term $t$, we initiate the operational semantics with $(t,0)$.
-
-\begin{prooftree}
-    \AxiomC{\lstinline{(c_1,n) leadsto (c_1',n')}}
-    \UnaryInfC{\lstinline{(do x <- c_1 in c_2, n) leadsto (do x <- c_1' in c_2, n')}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{\lstinline{(do x <- return v in c, n) leadsto (c[v/x], n)}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{\lstinline{(do x <- op(v; [vecb1]y1.c1,...,[vecbl]y_l.cl) in c, n) leadsto (op(v; [vecb1]y1.do x <- c1 in c,...,[vecbl]y_l.do x <- cl in c), n)}}
-\end{prooftree}
-
-For \lstinline|h = handler { return x mapsto c_r, ..., op[vecq](v; k1,..., kl) mapsto c_op, ...}|, we have:
-
-\begin{prooftree}
-    \AxiomC{\lstinline{(c, n) leadsto (c', n')}}
-    \UnaryInfC{\lstinline{(with h handle c, m) leadsto (with h handle c', m - n + n')}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{\lstinline{(with h handle return v, n) leadsto (c_r[v/x], n)}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{$(\nu a_1\dots a_m.t, n) \leadsto (t[\psi(n+1)/a_1,\dots,\psi(m+n)/a_m], m+n)$}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{\lstinline{(weaken a, n) leadsto (a, n + 1)}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$i = n+1$}
-    \UnaryInfC{\lstinline{(strengthen psi(i) with t in b -> u, n+1) leadsto (t, n)}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{$i < n+1$}
-    \UnaryInfC{\lstinline{(strengthen psi(i) with t in b -> u, n + 1) leadsto (u[b/psi_i], n)}}
-\end{prooftree}
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{\lstinline{with h handle op[veca](v; [vecb1]y1.c1,..., [vecbl]y_l.cl) leadsto c_op[v/x, veca/vecq, lambday1.with h handle nuvecb1.c1)/k1,..., lambday_l.with h handle nuvecbl.cl)/kl]}}
-\end{prooftree}
-
-For $\op \notin h$, we have:
-
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{\lstinline{with h handle op[veca](v; [vecb1]y1.c1,..., [vecbl]y_l.cl) leadsto op[veca](v; [vecb1]y1.with h handle c1,..., [vecbl]y_l.with h handle cl)}}
-\end{prooftree}
-
-\begin{theorem}[Type Preservation]
-    If $\Gamma \vdash c : A!\Sigma$ and $c \leadsto c'$, then $\Gamma \vdash c': A!\Sigma$.
-\end{theorem}
-
-\begin{proof}
-We prove type preservation by induction. The majority of the induction steps are straightforward. We focus on the crucial element, which is handling an operation that is within the handler.
-
-Assume that the reduct is well-typed and invert its type derivation:
-\begin{prooftree}
-    \AxiomC{$\Delta\mid\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
-    \AxiomC{$\Delta\mid\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_l]y_l.c_l) : B!\Sigma'$}
-    \BinaryInfC{$\Delta\mid\Gamma \vdash$ \lstinline{with h handle op(v; [vecb1]y1.c1,..., [vecbl]y_l.cl)} $: A!\Sigma$}
-\end{prooftree}
-Given the structure of $\op\in h$, the handler typing derivation leads to for some $h' \subset h$ and $\op\notin h'$:
-\begin{prooftree}
-    \AxiomC{$\op : (|\vec{q}|, A') \leadsto (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)$}
-    \AxiomC{$\Delta\mid\Gamma \vdash h' : B!\Sigma' \Rightarrow A!\Sigma$}
-    \noLine
-    \BinaryInfC{$\Delta\mid\Gamma, x:A', \vec{p} : \PCtx, k_1: B_1 \to A\star|\vec{b}_1|!\Sigma, \dots, k_l: B_l \to A\star|\vec{b}_l|!\Sigma \vdash c_{\op} : A!\Sigma$}
-    \UnaryInfC{$\vdots$}
-    \UnaryInfC{$\Gamma \vdash h : B!\Sigma' \Rightarrow A!\Sigma$}
-\end{prooftree}
-On the other side, we have:
-\begin{prooftree}
-    \AxiomC{$\left[\op : (|\vec{a}|, A') \leadsto (|\vec{b}_1|, B_1; \dots; |\vec{b}_l|,B_l)\right] \in \Sigma$}
-    \AxiomC{$\Delta\mid\Gamma \vdash v: A'$}
-    \AxiomC{$\Delta \vdash \vec{a}$}
-    \noLine
-    \TrinaryInfC{$\left[\Delta,\vec{b}_i\mid\Gamma,y_i:B_i \vdash c_i : B!\Sigma'\right]_{1\leq i\leq p}$}
-    \UnaryInfC{$\Gamma\vdash\op[\vec{a}](v; [\vec{b}_1]y_1.c_1,\dots,[\vec{b}_l]y_l.c_l) : B!\Sigma'$}
-\end{prooftree}
-From $\Delta\vdash \vec{a}$ we can deduce $\Delta\mid\Gamma\vdash \vec{a} :\PCtx$. Additionally, for each $1\leq i\leq l$, we can weaken the parameter context in the continuation judgements and handler to derive:
-\begin{prooftree}
-    \AxiomC{$\Delta,\vec{b}_i\mid\Gamma,y_i,:B_i\vdash c_i:A!\Sigma$}
-    \UnaryInfC{$\Delta\mid\Gamma,y_i,:B_i\vdash \nu\vec{b}_i.c_i:A\star|\vec{b}_i|!\Sigma$}
-    \UnaryInfC{$\Delta\mid\Gamma,y_i,:B_i\vdash \nu\vec{b}_i.c_i:A\star|\vec{b}_i|!\Sigma$}
-    \UnaryInfC{$\Delta\mid\Gamma,y_i,:B_i\vdash$ \lstinline{with h handle} $\nu\vec{b}_i.c_i : A\star|\vec{b}_i|!\Sigma$}
-    \UnaryInfC{$\Delta\mid\Gamma\vdash$ \lstinline{lambday_i.with h handle} $\nu\vec{b}_i.c_i : B_i\to A\star|\vec{b}_i|!\Sigma$}
-\end{prooftree}
-So using all of the above, we can finally conclude:
-\begin{prooftree}
-    \AxiomC{$\vdots$}
-    \UnaryInfC{$\Gamma \vdash$ \lstinline|c_op[v/x, veca/vecq, lambday1.with h handle nuvecb1.c_1/k1,..., lambday_l.with h handle nuvecbl.cl/kl]| $:A!\Sigma$}
-\end{prooftree}
-as required.
-\end{proof}
+where $n\in\mathbb{N}$ represents the number of times we extend the parameter context within the typed term.
 
 \section{Reasoning with Equations}
 
-We may prove the equations hold in our handlers using equational reasoning. We begin with examples from the theory of substitution.
-
-\begin{example}
-Consider the handler $H$ from Example \ref{ex:named_sub}. The following is a proof that the handler satisfies the equation
-\[x: 0 \mid - \vdash \sub(a.\var(a), k) = k.\]
-We have:
-\begin{lstlisting}
-    with H handle sub[]((); [a]y.var[a](();), k)
-leadsto
-    case ( () (nua.lambdar.case r of
-                    inl x  = return (inl x)
-                    inr a' = handle a' with
-                                param a    = k () (lambdar'.return r')
-                                return a'' = return (inr a''))
-
-\end{lstlisting}
-
-Psi (Psi,a)
-
-\end{example}
+We may prove the equations hold in our handlers using equational reasoning. We begin with examples from the theory of substitution...
 
 \printbibliography
 

@@ -1,0 +1,372 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage[margin=1in]{geometry}
+
+\title{Unifying Handlers and Parameterized Theories: An Operational Approach}
+\author{Project Outline}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Algebraic effects and handlers offer a powerful, modular way to manage computational effects. However, the standard framework struggles with effects that require dynamic creation of resources, such as multiple, independent state cells or fresh name generation. This "problem of instances" finds a robust theoretical solution in the denotational semantics of Parameterized Algebraic Theories (PATs), as developed by Staton. This paper bridges the gap between the operational world of handlers and the denotational world of PATs. We present Lambda-HP, a minimal extension to a standard effect-and-handler calculus. The language is augmented with a single primitive operation, \texttt{\#new()}, which generates a fresh, unique parameter. We formalize the syntax, operational semantics, and type system of Lambda-HP. We then demonstrate its expressive power by providing complete, annotated implementations of handlers for two canonical PATs: local binary state and substitution with jumps. These examples show how the \texttt{\#new()} primitive allows handlers to directly model the creation and management of resources, unifying the operational and equational perspectives on instanced effects.
+\end{abstract}
+
+\section{Introduction}
+Algebraic effects and handlers [1] have emerged as a compelling paradigm for structuring programs with computational effects like I/O, non-determinism, and state.[1] By separating the specification of an effect (an operation) from its implementation (a handler), they provide a high degree of modularity and composability. A standard calculus for effects, such as the one presented by Pretnar [1], can model global state by having a handler pass a single state value through the computation.[1]
+
+However, this approach encounters a fundamental limitation when faced with effects that require multiple, dynamically created instances of a resource.[3, 8] For example, how can a program create an arbitrary number of independent memory cells at runtime? The standard algebraic framework, which typically deals with a fixed set of global operations, does not offer a natural solution to this "problem of instances".[3]
+
+A powerful theoretical answer comes from the work of Sam Staton on Parameterized Algebraic Theories (PATs).[1] PATs extend algebraic theories by allowing operations to be parameterized by resource identifiers. Crucially, they formally distinguish between operations that *use* existing parameters and those that *bind* new ones, thereby providing a denotational account of resource creation.[1]
+
+The goal of this project is to connect the highly practical, operational framework of effect handlers with the expressive, denotational semantics of PATs. We present an extended programming language, Lambda-HP, which builds upon a standard effect calculus. The core extension is the introduction of a primitive computational form, `\texttt{\#new()}` that generates a fresh, unique parameter. This construct provides the operational tool necessary to implement handlers that act as models for PATs. By formalizing this language and demonstrating its use for key examples, we show how the operational world of handlers can be unified with the equational world of parameterized theories, creating a practical and expressive tool for programming with sophisticated computational effects.
+
+\section{The Lambda-H Calculus: A Foundation for Effects}
+To build our extended language, we first establish a formal foundation based on the calculus presented by Matija Pretnar in "An Introduction to Algebraic Effects and Handlers".[1] This language, which we refer to as Lambda-H, employs a fine-grain call-by-value strategy, separating inert \emph{values} from potentially effectful \emph{computations}. This separation is crucial for reasoning about the order of evaluation in the presence of effects.
+
+\subsection{Syntax}
+The syntax of Lambda-H is defined by the grammar in Table \ref{tab:syntax}. Values ($v$) include variables, constants, functions, and handlers themselves. Computations ($c$) include returning a value, calling an operation, sequencing, conditionals, application, and handling.
+
+\begin{table}[h!]
+\centering
+\caption{Syntax of Terms in Lambda-H [1]}
+\label{tab:syntax}
+\begin{tabular}{r c l l}
+\hline
+Value & $v$ & $::=$ & $x \mid \texttt{true} \mid \texttt{false} \mid \texttt{fun } x \mapsto c \mid h$ \\
+Handler & $h$ & $::=$ & $\texttt{handler } \{\texttt{return } z \mapsto c_r, \mathfrak{op}_1(x;k) \mapsto c_1, \dots, \mathfrak{op}_n(x;k) \mapsto c_n\}$ \\
+Computation & $c$ & $::=$ & $\texttt{return } v \mid \mathfrak{op}(v; y, c) \mid \texttt{do } x \leftarrow c_1 \texttt{ in } c_2 \mid \texttt{if } v \texttt{ then } c_1 \texttt{ else } c_2$ \\
+& & $\mid$ & $v_1 v_2 \mid \texttt{with } h \texttt{ handle } c$ \\
+\hline
+\end{tabular}
+\end{table}
+
+An operation call $\mathfrak{op}(v; y, c)$ passes a parameter $v$ to the operation $\mathfrak{op}$. The term $c$ is the \emph{continuation}, which is the computation to be executed after the operation completes, with its result bound to $y$. A handler can intercept this call and manipulate the continuation in arbitrary ways.
+
+\subsection{Operational Semantics}
+The behavior of Lambda-H programs is defined by a small-step operational semantics, denoted by the relation $c \leadsto c'$. The rules are given in Table \ref{tab:semantics}. Operation calls that are not handled by any enclosing handler propagate outwards. If a call escapes the top level, the computation is considered stuck. In practice, one can imagine a top-level handler that implements "real-world" effects.[1]
+
+\begin{table}[h!]
+\centering
+\caption{Small-Step Operational Semantics ($c \leadsto c'$) [1]}
+\label{tab:semantics}
+\begin{align*}
+    & \frac{c_1 \leadsto c_1'}{\texttt{do } x \leftarrow c_1 \texttt{ in } c_2 \leadsto \texttt{do } x \leftarrow c_1' \texttt{ in } c_2}
+    \qquad
+    \texttt{do } x \leftarrow \texttt{return } v \texttt{ in } c_2 \leadsto c_2[v/x] \\
+    \\
+    & \texttt{do } x \leftarrow \mathfrak{op}(v;y,c_1) \texttt{ in } c_2 \leadsto \mathfrak{op}(v;y, \texttt{do } x \leftarrow c_1 \texttt{ in } c_2) \\
+    \\
+    & \texttt{if true then } c_1 \texttt{ else } c_2 \leadsto c_1
+    \qquad
+    \texttt{if false then } c_1 \texttt{ else } c_2 \leadsto c_2 \\
+    \\
+    & (\texttt{fun } x \mapsto c)v \leadsto c[v/x] \\
+    \\
+    & \text{Let } h = \texttt{handler } \{\texttt{return } x \mapsto c_r, \dots, \mathfrak{op}_i(x;k) \mapsto c_i, \dots \}: \\
+    \\
+    & \frac{c \leadsto c'}{\texttt{with } h \texttt{ handle } c \leadsto \texttt{with } h \texttt{ handle } c'} \\
+    \\
+    & \texttt{with } h \texttt{ handle } (\texttt{return } v) \leadsto c_r[v/x] \\
+    \\
+    & \texttt{with } h \texttt{ handle } (\mathfrak{op}_i(v;y,c)) \leadsto c_i[v/x, (\texttt{fun } y \mapsto \texttt{with } h \texttt{ handle } c)/k] \quad (1 \le i \le n) \\
+    \\
+    & \texttt{with } h \texttt{ handle } \mathfrak{op}(v;y,c) \leadsto \mathfrak{op}(v;y, \texttt{with } h \texttt{ handle } c) \quad (\mathfrak{op} \notin \{\mathfrak{op}_1, \dots, \mathfrak{op}_n\})
+\end{align*}
+\end{table}
+
+The most interesting rules are those for handling. When a handled computation returns a value, the handler's `return` clause is executed. When it performs an operation $\mathfrak{op}_i$ that is matched by the handler, the corresponding clause $c_i$ is executed. The crucial part is that the original continuation $c$ is not discarded; it is wrapped in a function and passed to the clause, bound to the variable $k$. The handler continues to handle this captured continuation, which is why the body of the function is $\texttt{with } h \texttt{ handle } c$. If an operation is not matched, it propagates outwards, but the handler remains attached to its continuation.
+
+\subsection{Type and Effect System}
+To ensure that programs are well-behaved (e.g., do not apply a boolean as a function), Lambda-H is equipped with a type and effect system. Types are split into value types and computation types, as shown in Table \ref{tab:types}.
+
+\begin{table}[h!]
+\centering
+\caption{Syntax of Types [1]}
+\label{tab:types}
+\begin{tabular}{r c l l}
+\hline
+Value Type & $A, B$ & $::=$ & $\texttt{bool} \mid A \rightarrow \underline{C} \mid \underline{C} \Rightarrow \underline{D}$ \\
+Computation Type & $\underline{C}, \underline{D}$ & $::=$ & $A!\Delta$ \\
+Effect Set & $\Delta$ & $::=$ & $\{\mathfrak{op}_1, \dots, \mathfrak{op}_n\}$ \\
+\hline
+\end{tabular}
+\end{table}
+
+A computation type $A!\Delta$ describes a computation that, upon termination, returns a value of type $A$ and may perform any of the operations in the effect set $\Delta$. The effect set is an over-approximation. The typing judgements $\Gamma \vdash v: A$ and $\Gamma \vdash c: \underline{C}$ are defined by the rules in Table \ref{tab:typing}. The context $\Gamma$ maps variables to value types, and an operation signature $\Sigma$ maps operation names to their input and output types, e.g., $\mathfrak{op}: A_{op} \rightarrow B_{op}$.
+
+\begin{table}[h!]
+\centering
+\caption{Typing Judgements [1]}
+\label{tab:typing}
+\begin{gather*}
+\frac{(x:A) \in \Gamma}{\Gamma \vdash x:A}
+\qquad
+\frac{\Gamma, x:A \vdash c: \underline{C}}{\Gamma \vdash \texttt{fun } x \mapsto c: A \rightarrow \underline{C}}
+\qquad
+\frac{\Gamma \vdash v:A}{\Gamma \vdash \texttt{return } v: A!\Delta}
+\\ \\
+\frac{\Gamma \vdash v_1: A \rightarrow \underline{C} \quad \Gamma \vdash v_2: A}{\Gamma \vdash v_1 v_2: \underline{C}}
+\qquad
+\frac{\Gamma \vdash c_1: A!\Delta \quad \Gamma, x:A \vdash c_2: B!\Delta}{\Gamma \vdash \texttt{do } x \leftarrow c_1 \texttt{ in } c_2: B!\Delta}
+\\ \\
+\frac{(\mathfrak{op}: A_{op} \rightarrow B_{op}) \in \Sigma \quad \Gamma \vdash v: A_{op} \quad \Gamma, y:B_{op} \vdash c: A!\Delta \quad \mathfrak{op} \in \Delta}{\Gamma \vdash \mathfrak{op}(v;y,c): A!\Delta}
+\\ \\
+\frac{\Gamma \vdash h: \underline{C} \Rightarrow \underline{D} \quad \Gamma \vdash c: \underline{C}}{\Gamma \vdash \texttt{with } h \texttt{ handle } c: \underline{D}}
+\\ \\
+\frac{
+\begin{array}{c}
+\Gamma, x:A \vdash c_{r}:B!\Delta' \\
+{_{1\le i\le n}} \\
+\Delta \setminus \{\mathfrak{op}_{i}\}_{1\le i\le n} \subseteq \Delta'
+\end{array}
+}
+{\Gamma \vdash \texttt{handler } \{\dots\}: A!\Delta \Rightarrow B!\Delta'}
+\end{gather*}
+\end{table}
+
+The typing rule for a handler is the most intricate. To have type $A!\Delta \Rightarrow B!\Delta'$, a handler must transform a computation of type $A!\Delta$ into one of type $B!\Delta'$. This requires that its `return` clause can handle a value of type $A$, and each operation clause for $\mathfrak{op}_i: A_i \rightarrow B_i$ can handle a parameter of type $A_i$ and a continuation that accepts a result of type $B_i$. Any operations in $\Delta$ that are not explicitly handled must be included in the output effect set $\Delta'$, as they will be propagated outwards. This system guarantees that well-typed programs do not get stuck due to type errors.[1]
+
+\section{An Introduction to Parameterized Algebraic Theories}
+The Lambda-H calculus provides a solid operational foundation. However, to address the problem of instances, we turn to the denotational framework of Parameterized Algebraic Theories (PATs), primarily developed by Sam Staton.[2, 3]
+
+\subsection{The Need for Parameters}
+The core motivation for PATs is to provide a formal account of computational effects that involve multiple, dynamically created instances of a resource.[3] Consider the effect of state. In the standard algebraic approach, we can define operations `get: unit -> int` and `set: int -> unit`. A handler can implement these by passing a single integer value around.[1] This works perfectly for a single, global memory cell.
+
+But what if we need two, or `n`, independent cells? We could define operations `get1`, `set1`, `get2`, `set2`, etc., but this is static and inflexible. We cannot dynamically create a new cell at runtime. The key insight of PATs is to make the resource instance itself a \emph{parameter} to the operation. Instead of `get()`, we have `get(a)`, where `a` is a parameter identifying the specific cell to be read. This simple change has profound consequences, leading to a much richer and more expressive theory.
+
+\subsection{Formalism of Parameterized Theories}
+Following the definitions in [1, 4], a parameterized algebraic theory is built upon a more structured notion of an operator signature.
+
+\subsubsection{Parameterized Signatures}
+In a PAT, an operator $F$ is assigned a signature of the form $F:(n|m_{1},...,m_{l})$. This signature has two components:
+\begin{itemize}
+    \item $n \in \mathbb{N}$: The number of existing parameters the operation $F$ \emph{uses}. These are drawn from the current context of available parameters.
+    \item $(m_{1},...,m_{l})$: A list of natural numbers. The operation has $l$ distinct continuations (or branches), and the $i$-th continuation binds $m_i$ \emph{new} parameters that are local to that branch.
+\end{itemize}
+This distinction between using existing parameters and binding new ones is fundamental. It allows the theory to formally capture not just the manipulation of existing resources but also the creation of fresh ones.
+
+\subsubsection{Parameterized Contexts and Terms}
+Terms in a PAT are judged within a parameterized context $\Gamma|\Delta$.
+\begin{itemize}
+    \item $\Gamma = \{x_1:p_1, \dots, x_n:p_n\}$ is a context of \emph{computation variables}. Each variable $x_i$ is a placeholder for a computation that itself binds $p_i$ parameters.
+    \item $\Delta = \{a_1, \dots, a_m\}$ is a context of \emph{parameter variables}, representing the currently available resources or instances.
+\end{itemize}
+The rules for forming terms then naturally follow this structure. For an operator $F:(n|m_{1},...,m_{l})$, a term is formed as $F(\vec{a}, \vec{b}_1.t_1, \dots, \vec{b}_l.t_l)$, where $\vec{a}$ is a vector of $n$ parameters from $\Delta$, and each $t_i$ is a term in a context extended with $m_i$ new parameters $\vec{b}_i$.[1, 4]
+
+\subsection{A Glimpse into the Semantics: Presheaves}
+While this report focuses on an operational account, it is worth noting that PATs have a deep semantic foundation in category theory. A PAT can be formally described as a finitary enriched monad on a presheaf category $\hat{S}$, where $S$ is the underlying theory of parameters.[2, 1] The intuition behind this is that a presheaf can be understood as a "set with substitution structure".[2] It provides a way to model not just a collection of terms, but how those terms behave under substitution of their parameters. This categorical semantics ensures that the theory is mathematically sound and connects it to the broader study of computational monads and denotational semantics.[5, 6] This semantic underpinning provides confidence that the syntactic structures we are modeling are not ad-hoc, but are mathematically natural and well-behaved.
+
+\subsection{Canonical Examples}
+To make the abstract formalism concrete, we consider two canonical examples of PATs described in.[1]
+
+\subsubsection{Local Binary State}
+This theory models memory cells that can be dynamically created and store a single bit. The parameters of the theory represent the memory locations. The operators are defined in Table \ref{tab:localstore}.
+
+\begin{table}[h!]
+\centering
+\caption{Operators for the Theory of Local Store [1]}
+\label{tab:localstore}
+\begin{tabular}{l l p{8cm}}
+\hline
+\textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
+\hline
+$\texttt{get}$ & $(1|0,0)$ & Takes one parameter (a location). Has two continuations, one for when the stored value is 0, one for when it is 1. Binds no new parameters. \\
+$\texttt{set}_i$ & $(1|0)$ & Takes one parameter (a location) and writes value $i \in \{0,1\}$. Has one continuation. \\
+$\texttt{ref}_i$ & $(0|1)$ & Takes no parameters. Creates a new location initialized to $i \in \{0,1\}$. Its single continuation binds one new parameter (the new location). \\
+$\texttt{eq}$ & $(2|0,0)$ & Takes two parameters (locations). Has two continuations, one for when they are equal, one for when they are not. \\
+\hline
+\end{tabular}
+\end{table}
+
+The signature for $\texttt{ref}_i: (0|1)$ is particularly illuminating. It formally captures the act of \emph{creation}: the operation itself does not depend on any existing parameter, but it introduces a new one into the context of the computation that follows. An operational language aiming to implement this theory must have a mechanism to create such a fresh parameter and make it available to the continuation.
+
+\subsubsection{Substitution and Jumps}
+This theory models a simple form of control flow with labels and jumps. The parameters represent code labels. The operators are defined in Table \ref{tab:subst}.
+
+\begin{table}[h!]
+\centering
+\caption{Operators for the Theory of Substitution and Jumps [1]}
+\label{tab:subst}
+\begin{tabular}{l l p{8cm}}
+\hline
+\textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
+\hline
+$\texttt{sub}$ & $(0|1,0)$ & Takes no parameters. Binds one new parameter (a label) in its first continuation, representing the attachment of the label to that code point. The second continuation is for the code that follows the `sub` block. \\
+$\texttt{var}$ & $(1|0)$ & Takes one parameter (a label) and performs a jump to that label. It has one continuation, which is typically not reached if the jump is successful. \\
+\hline
+\end{tabular}
+\end{table}
+
+Here again, the signature for `sub` shows how a new resource—a code label—is bound and made available to a part of the subsequent computation. The design of our extended language is directly motivated by the need to provide a concrete programming construct that mirrors this semantic action of binding a new parameter.
+
+\section{Extending Lambda-H with Parameters}
+We now present the core technical contribution of this work: an extension of the Lambda-H calculus, which we call Lambda-HP (Lambda-H with Parameters), designed to directly support the implementation of handlers for parameterized algebraic theories. The extension is minimal but powerful, centered around a new type for parameters and a single new computational form for their creation.
+
+\subsection{Extended Syntax}
+We augment the syntax of Lambda-H in two ways. First, we introduce a new primitive value type, $\texttt{Param}$, for the unique parameters. Second, we add a new computational form, $\texttt{\#new()}$, which evaluates to a fresh parameter. The complete syntax is given in Table \ref{tab:extsyntax}.
+
+\begin{table}[h!]
+\centering
+\caption{Extended Syntax of Lambda-HP}
+\label{tab:extsyntax}
+\begin{tabular}{r c l l}
+\hline
+Value Type & $A, B$ & $::=$ & $\dots \mid \texttt{Param}$ \\
+Computation & $c$ & $::=$ & $\dots \mid \texttt{\#new()}$ \\
+\hline
+\end{tabular}
+\end{table}
+
+The intention is that a programmer will use this new construct within a sequencing `do` block, as in $\texttt{do } a \leftarrow \texttt{\#new()} \texttt{ in } c$, to generate a fresh parameter $a$ and use it within the computation $c$.
+
+\subsection{Extended Operational Semantics}
+To formally define the behavior of $\texttt{\#new()}$, we must ensure that it generates a parameter that is genuinely unique. To model this, we index the reduction relation with a set $P$ of parameters that are currently "in use" or "active" in the computation. The judgement becomes $P \vdash c \leadsto c'$. The existing rules from Table \ref{tab:semantics} are adapted to carry the set $P$ along unchanged. The key new rule, shown in Table \ref{tab:extsemantics}, governs the evaluation of $\texttt{\#new()}$.
+
+\begin{table}[h!]
+\centering
+\caption{Extended Operational Semantics for Parameter Generation}
+\label{tab:extsemantics}
+$$\frac{p \notin P}{P \vdash \texttt{\#new()} \leadsto \texttt{return } p}$$
+\end{table}
+
+This rule states that evaluating $\texttt{\#new()}$ in a context with active parameters $P$ reduces to returning a new parameter $p$, provided that $p$ is not already in $P$. The set of all parameters is assumed to be an infinite, countable set. This rule, combined with the standard sequencing rule, provides the desired semantics: when evaluating $\texttt{do } a \leftarrow \texttt{\#new()} \texttt{ in } c$, a fresh $p$ is chosen, and the evaluation proceeds with $c[p/a]$ in a context where $p$ is now considered active. A full formalization would require threading the set $P$ through all rules, but for brevity, we focus on the essential new mechanism.
+
+\subsection{An Extended Type and Effect System}
+The most significant extension is to the type system, which must now track the usage of parameters to ensure safety. A simple effect set $\Delta$ is no longer sufficient. Following the structure of parameterized theories and the sketch in [1], we must enrich the computation type to capture the parameter context.
+
+A computation type is extended to the form $A!\Sigma[\Pi]$, where $A$ is the return type, $\Sigma$ is the set of effects, and $\Pi$ is a \emph{parameter context} describing parameters that are bound within the computation. The typing judgement for computations becomes $\Gamma | \Delta \vdash c : A!\Sigma[\Pi]$, which reads: "In a variable context $\Gamma$ and an available parameter context $\Delta$, the computation $c$ returns a value of type $A$, may perform effects in $\Sigma$, and binds a new set of parameters described by $\Pi$."
+
+The base type system is extended with the value type $\texttt{Param}$. The crucial new typing rules are for $\texttt{\#new()}$ and for handlers that operate over these new computation types. They are presented in Table \ref{tab:exttyping}.
+
+\begin{table}[h!]
+\centering
+\caption{Key Rules for the Extended Type and Effect System}
+\label{tab:exttyping}
+\begin{gather*}
+% Rule for #new
+\frac{}{\Gamma | \Delta \vdash \texttt{\#new()} : \texttt{Param}!\emptyset[a:\texttt{Param}]}
+\\ \\
+% Rule for do-binding a new parameter
+\frac{\Gamma | \Delta \vdash c_1 : A!\Sigma_1[a:\texttt{Param}] \quad \Gamma, x:A | \Delta, a:\texttt{Param} \vdash c_2 : B!\Sigma_2[\Pi]}{\Gamma | \Delta \vdash \texttt{do } x \leftarrow c_1 \texttt{ in } c_2 : B!(\Sigma_1 \cup \Sigma_2)[a:\texttt{Param}, \Pi]}
+\\ \\
+% Rule for handlers over parameterized computations
+\frac{
+\begin{array}{c}
+\Gamma, x:A | \Delta, \Pi \vdash c_{r} : B!\Sigma'[\Pi'] \\
+\dots \\
+\Gamma, x:A_i, k: (B_i \rightarrow B!\Sigma'[\Pi']) | \Delta, \Pi \vdash c_i : B!\Sigma'[\Pi'] \\
+\dots
+\end{array}
+}
+{\Gamma | \Delta \vdash \texttt{handler } \{\dots\}: (A!\Sigma[\Pi]) \Rightarrow (B!\Sigma'[\Pi'])}
+\end{gather*}
+\end{table}
+
+The rule for $\texttt{\#new()}$ states that it is a computation that returns a $\texttt{Param}$, has no effects, and binds one new parameter $a$. The rule for sequencing shows how a parameter bound by $c_1$ (such as one from $\texttt{\#new()}$) is added to the available parameter context $\Delta$ for the typing of the continuation $c_2$. Finally, the type for a handler is generalized to a function between parameterized computation types. The handler's clauses are typed in a context that includes the parameters $\Pi$ bound by the computation it is handling. This system statically ensures that parameters are properly scoped and cannot be forged or used outside the context in which they are bound.
+
+\section{Programming with Parameterized Handlers}
+The value of Lambda-HP lies in its expressiveness. We now demonstrate how it can be used to implement handlers for the canonical parameterized theories from Section 3. The examples are based on the implementation sketches from [1] and illustrate how the $\texttt{\#new()}$ primitive enables the direct implementation of PAT semantics.
+
+\subsection{Example: Local Binary State}
+The theory of local binary state models dynamically allocated memory cells. A handler can implement this by adopting a parameter-passing style, a technique also used by Pretnar for simple global state.[1] However, in our parameterized setting, the "state" that is passed is not a single value but a \emph{function} from parameters to their stored values, e.g., a map $s: \texttt{Param} \rightarrow \texttt{Bool}$. The $\texttt{\#new()}$ construct provides the crucial mechanism for dynamically extending the domain of this state map.
+
+The handler implementation is as follows:
+\begin{lstlisting}[language=Haskell, basicstyle=\small\ttfamily]
+state_handler = handler {
+  return x -> fun s -> return (x, s),
+
+  get(v; k) -> fun s -> (k (s v)) s,
+
+  set((v, i); k) -> fun s ->
+    (k ()) (fun p -> if p == v then i else s p),
+
+  ref(i; k) -> fun s ->
+    do a <- #new() in
+      let s' = (fun p -> if p == a then i else s p) in
+        (k a) s'
+}
+\end{lstlisting}
+
+\subsubsection{Analysis of the Handler}
+\begin{itemize}
+    \item \textbf{`ref(i; k)`}: This clause directly implements the semantics of the $\texttt{ref}_i: (0|1)$ operator. It first generates a fresh parameter `a` using $\texttt{do } a \leftarrow \texttt{\#new()}$. This `a` represents the address of the new memory cell. It then constructs a new state map, `s'`, which behaves like the old state map `s` for all existing parameters but returns the initial value `i` for the new parameter `a`. Finally, it resumes the continuation `k`, passing it the new address `a` as its result, and provides the \emph{new} state map `s'` for the resumed computation. This perfectly models the creation of a new resource and its introduction into the continuation's scope.
+
+    \item \textbf{`get(v; k)` and `set((v, i); k)`}: These clauses demonstrate how existing parameters are used. The `get` clause looks up the parameter `v` in the current state map `s` and passes the result to its continuation `k`. The state map itself remains unchanged. The `set` clause constructs a new state map that is updated at parameter `v` and passes this new map to its continuation. In both cases, the parameter `v` acts as a key to dispatch the operation to the correct piece of state within the state map.
+
+    \item \textbf{`return x`}: The return clause, when the computation is finished, simply returns the final result `x` along with the final state map `s`.
+\end{itemize}
+This example reveals a general and powerful design pattern: stateful parameterized effects can be implemented by handlers that pass a function representing the state space, and $\texttt{\#new()}$ is the fundamental tool for growing that state space at runtime.
+
+\subsection{Example: Substitution and Jumps}
+The theory of substitution and jumps models a form of non-local control flow where parameters act as code labels. A handler for this theory must be able to create new labels and interpret jumps to them. A key feature of the implementation from [1] is its return type: it is a sum type, which we can write as $\texttt{Value} + \texttt{Param}$. This allows the handler to distinguish between a normal computation that returns a value and a computation that has been aborted by a jump to a label. We use `inl` for values and `inr` for labels.
+
+\begin{lstlisting}[language=Haskell, basicstyle=\small\ttfamily]
+subst_handler = handler {
+  return x -> return (inl x),
+
+  var(v; k) -> return (inr v),
+
+  sub(v; k) ->
+    do a <- #new() in
+      case (k a) of {
+        inl x -> return (inl x);
+        inr b -> if b == a
+                   then -- Jump to 'a' was caught
+                        -- What happens next depends on the full theory
+                        -- For now, we can imagine it continues the second branch
+                        -- of the original 'sub' call.
+                        return (inl ()) 
+                   else -- Uncaught jump, propagate it
+                        return (inr b)
+      }
+}
+\end{lstlisting}
+
+\subsubsection{Analysis of the Handler}
+\begin{itemize}
+    \item \textbf{`return x` and `var(v; k)`}: The `return` clause wraps a normal value in `inl`. The `var(v; k)` clause, which represents an explicit jump, immediately terminates the current computation and returns the label `v` wrapped in `inr`. This signals to any enclosing handlers that a jump has occurred.
+
+    \item \textbf{`sub(v; k)`}: This is the most sophisticated clause and implements the semantics of $\texttt{sub}: (0|1,0)$. It first creates a new, unique label `a` with $\texttt{\#new()}$. It then resumes the continuation `k`, passing it this new label `a`. The core logic resides in the `case` statement, which inspects the result of the continuation:
+    \begin{itemize}
+        \item If the continuation returns a normal value (`inl x`), the `sub` block has completed without a jump, and the value is propagated.
+        \item If the continuation returns a label (`inr b`), it means a `var` call occurred inside. The handler then performs a crucial check: `if b == a`.
+        \item If the jump was to the label `a` that this very `sub` clause created, the jump is "caught". The handler can then execute some specific logic. In a full implementation of the theory from [1], this would likely involve executing the second continuation of the `sub` operation.
+        \item If the jump was to a different label `b`, this handler cannot resolve it. It therefore propagates the jump by re-returning `inr b`, allowing an outer handler to catch it.
+    \end{itemize}
+\end{itemize}
+This example demonstrates a profound capability of parameterized handlers: they can inspect the \emph{identity} of the parameter associated with an effect. This allows for a form of dynamic, resource-aware dispatch that is impossible in the standard algebraic effects framework. A handler can distinguish between different instances of an effect and react accordingly, which is the very essence of programming with parameterized theories.
+
+\section{Conclusion and Future Work}
+
+\subsection{Summary of Contributions}
+This report has detailed the design, formalization, and demonstration of Lambda-HP, a novel programming language that unifies the operational paradigm of algebraic effect handlers with the denotational framework of parameterized algebraic theories. We began by establishing the power and limitations of the standard handler-based calculus, identifying the "problem of instances" as a key challenge. We then introduced parameterized algebraic theories as the correct formal tool for reasoning about instanced and resource-aware effects.
+
+The central contribution is the extension of a simple effect calculus with a primitive for generating fresh parameters, $\texttt{\#new()}$, and the development of a corresponding type and effect system that statically ensures the safe handling of these parameters. We have shown that this minimal extension is sufficient to implement handlers for canonical PATs, such as local binary state and substitution with jumps. The implementation examples reveal powerful programming patterns, such as the generalization of parameter-passing to handle state spaces represented by functions and the ability of handlers to inspect parameter identities to perform resource-aware dispatch. This work successfully bridges the gap between the operational and denotational views of effects, providing an expressive and formally grounded language for programming with a sophisticated class of computational effects.
+
+\subsection{Future Work}
+The framework presented here opens up several promising avenues for future research.
+
+\subsubsection{Equational Reasoning}
+The most critical next step is to formally connect the operational semantics of our handlers with the equational specifications of the theories they are meant to model. For example, using the language's semantics, one should prove that the `state_handler` from Section 5 satisfies the equational laws for local store given in [1], such as:
+$$
+x:0|a,b \vdash \texttt{set}_{i}(a,\texttt{set}_{j}(b,x)) = \texttt{eq}(a,b,\texttt{set}_{j}(a,x),\texttt{set}_{j}(b,\texttt{set}_{i}(a,x)))
+$$
+Successfully carrying out such proofs would provide a powerful soundness theorem for our language, demonstrating that our operational implementations are faithful models of the abstract theories.
+
+\subsubsection{Type Inference}
+The extended type and effect system presented in Section 4 is explicit, requiring programmers to write out potentially complex type annotations involving parameter contexts. A significant practical improvement would be the development of a type inference algorithm, likely based on constraint generation and unification, to automatically infer these types. This would make Lambda-HP far more usable in practice and lower the barrier to entry for programmers.
+
+\subsubsection{Advanced Theories and Applications}
+The expressiveness of Lambda-HP should be further tested by implementing handlers for more advanced parameterized theories. Interesting targets include a fragment of the $\pi$-calculus, where parameters represent channel names, or Staton's algebraic formulation of quantum computation, where parameters represent qubits.[3, 1] Success in these areas would solidify the language's claim to be a general-purpose tool for programming with PATs.
+
+\subsubsection{Connection to Scoped Effects}
+Recent research has established a deep connection between PATs and another extension of algebraic effects known as \emph{scoped effects}.[4, 7] Scoped effects, which are used to model features like transaction rollback or backtracking with `once`, can be modeled by PATs where parameters are used in a linear and non-commutative (stack-like) fashion.[4] A fascinating line of future work would be to extend the type system of Lambda-HP with substructural properties like linearity to track parameter usage more precisely. This could allow for the safe and direct implementation of handlers for scoped effects, further unifying different strands of research in the field of computational effects.
+
+\end{document}
+

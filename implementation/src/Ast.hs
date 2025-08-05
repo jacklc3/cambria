@@ -6,8 +6,8 @@ import Data.Unique (Unique)
 
 type Ident     = String
 type Op        = String
-type Env       = Map Ident Value
 type Parameter = Unique
+data Env       = Env (Map Ident Value)
 data Side      = L | R deriving (Eq)
 
 data Value
@@ -58,7 +58,7 @@ data Computation
   | CIf Value Computation Computation
   | CCase Value Ident Computation Ident Computation
   | CApp Value Value
-  | CHandle Handler Computation
+  | CHandle Value Computation
 
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v

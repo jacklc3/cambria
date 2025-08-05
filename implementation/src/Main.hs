@@ -1,8 +1,9 @@
 module Main where
 
 import Ast
+import Environment (initialEnv)
 import Parser (parseProgram)
-import Eval (Result(..), eval, initialEnv)
+import Eval (Result(..), eval)
 
 import Data.Unique (newUnique)
 import System.Environment (getArgs)
