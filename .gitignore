@@ -10,3 +10,4 @@
 *.run.xml
 *.synctex.gz
 implementation/dist-newstyle/*
+*.DS_Store
