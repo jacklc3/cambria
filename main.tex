@@ -1,18 +1,23 @@
-\documentclass{scrartcl}
+\documentclass{article}
 
-\usepackage{amsmath}
-\usepackage{amsthm}
+\newcommand{\hide}[1]{}
 \usepackage{amsfonts}
-\usepackage{bm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{cleveref}
+\usepackage{datetime}
+\usepackage{enumerate}
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
-\usepackage{hyperref}
-\usepackage{tikz}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
 \usepackage{tikz-cd}
-\usepackage{todonotes}
-\usepackage{bussproofs}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
+\usepackage{tikz}
+\usepackage[small]{titlesec}
+\usepackage{xy}
+\xyoption{all}
+
 \usepackage{listings}
 \lstset{
   backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
@@ -28,307 +33,517 @@
 %  frame=single,	                   % adds a frame around the code
   keepspaces=true,                 % keeps spaces in text, useful for keeping indentation of code (possibly needs columns=flexible)
   columns=flexible,
-  keywordstyle=\itshape\bfseries,       % keyword style
+  keywordstyle= \sffamily,       % keyword style
   identifierstyle=\rmfamily\itshape,
   language=haskell,                 % the language of the code
   basicstyle=\sffamily\upshape,
-  morekeywords=[2]{with,handle,handler,fun},            % if you want to add more keywords to the set
-  keywordstyle=[2]\bfseries,       % keyword style
+%  morekeywords=[2]{knight,bernoulli},            % if you want to add more keywords to the set
+%  keywordstyle=[2]\itshape\bfseries,       % keyword style
 %  morekeywords=[3]{Prob,uniform,bernoulli,normal,beta,exponential},            % if you want to add more keywords to the set
 %  keywordstyle=[3]\color{mygreen},       % keyword style
-%  numbers=left,                    % where to put the line-numbers; possible values are (none, left, right)
- % numbersep=5pt,                   % how far the line-numbers are from the code
+%  numbers=left,                    % where to put the line numbers; possible values are (none, left, right)
+%  numbersep=5pt,                   % how far the line numbers are from the code
 %  numberstyle=\tiny\color{mygray}, % the style that is used for the line-numbers
- % rulecolor=\color{black},         % if not set, the frame-color may be changed on line-breaks within not-black text (e.g. comments (green here))
+%  rulecolor=\color{black},         % if not set, the frame colour may be changed on line breaks within not-black text (e.g. comments (green here))
   showspaces=false,                % show spaces everywhere adding particular underscores; it overrides 'showstringspaces'
   showstringspaces=false,          % underline spaces within strings only
   showtabs=false,                  % show tabs within strings adding particular underscores
-%  stepnumber=2,                    % the step between two line-numbers. If it's 1, each line will be numbered
+%  stepnumber=2,                    % the step between two line numbers. If it's 1, each line will be numbered
   stringstyle=\color{mymauve},     % string literal style
- % tabsize=2,	                   % sets default tabsize to 2 spaces
- % title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
- escapeinside={(*@}{@*)},
+%  tabsize=2,	                   % sets default tab size to 2 spaces
+%  title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
  literate={->}{$\rightarrow\;$}{2}
  {<-}{$\leftarrow\;$}{2}
- {a1}{$a_1$}{2}
- {a2}{$a_2$}{2}
- {vecc}{$\vec{c}$}{1}
- {vecq}{$\vec{q}$}{1}
- {vecd1}{$\vec{d}_1$}{2}
- {vecdl}{$\vec{d}_l$}{2}
- {veca}{$\vec{a}$}{1}
- {vecb1}{$\vec{b}_1$}{1}
- {vecbl}{$\vec{b}_l$}{1}
- {vecbi}{$\vec{b}_i$}{1}
- {y1}{$y_1$}{1}
- {y_l}{$y_l$}{1}
- {c1}{$c_1$}{1}
- {cl}{$c_l$}{1}
- {cr}{$c_r$}{1}
- {k1}{$k_1$}{1}
- {kl}{$k_l$}{1}
- {t1}{$t_1$}{1}
- {tn}{$t_n$}{1}
- {b_1}{$b_1$}{1}
- {u_1}{$u_1$}{1}
- {b_m}{$b_m$}{1}
- {b_i}{$b_i$}{1}
- {y_i}{$y_i$}{1}
- {u_m}{$u_m$}{1}
- {cop}{$c_{\op}$}{2}
- {c_r}{$c_r$}{2}
- {leadsto}{$\leadsto$}{2}
- {mapsto}{$\mapsto$}{2}
- {lambda}{$\lambda$}{1}
- {...}{$\dots$}{1}
- {==}{$\equiv$}{1}
- {_a}{$_a$}{1}
- {c_1}{$c_1$}{1}
- {c_2}{$c_2$}{1}
- {op}{$\op$}{1}
- {c_op}{$c_\op$}{1}
- {c_i}{$c_i$}{1}
- {nu}{$\nu$}{1}
- {psi_n}{$\psi_n$}{1}
- {psi_i}{$\psi_i$}{1}
 }
 
 \newcommand{\mlstinline}[1]{\mbox{\lstinline|#1|}}
 
-\usepackage[
-    url=false,
-    isbn=false,
-    maxnames=3,
-    maxbibnames=99,
-    giveninits
-]{biblatex}
-\AtEveryBibitem{\clearlist{language}}
-\addbibresource{library.bib}
+\newtheorem{thm}{Theorem}
+\newtheorem{prop}[thm]{Proposition}
+\newtheorem{cor}[thm]{Corollary}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{conj}[thm]{Conjecture}
+\newtheorem{claim}[thm]{Claim}
 
-\newtheorem{theorem}{Theorem}
-\newtheorem{proposition}[theorem]{Proposition}
 \theoremstyle{definition}
-\newtheorem{definition}[theorem]{Definition}
-\newtheorem{example}[theorem]{Example}
+\newtheorem{defn}[thm]{Definition}
+\newtheorem{example}[thm]{Example}
+\newtheorem{question}[thm]{Question}
 
-\title{Handlers of Parameterised Algebraic Effects}
-\subject{}
-\author{Jack Liell-Cock, University of Oxford}
-\date{}
+\theoremstyle{remark}
+\newtheorem{remark}[thm]{Remark}
 
-\newcommand\cat[1]{\text{\textbf{#1}}}
-\newcommand\pbr[1]{\langle #1 \rangle}
-\newcommand\bind{\gg\!\!=}
+\newcommand{\MCA}{\ensuremath{\mathcal A}}
+\newcommand{\MCB}{\ensuremath{\mathcal B}}
+\newcommand{\MCC}{\ensuremath{\mathcal C}}
+\newcommand{\MCD}{\ensuremath{\mathcal D}}
+\newcommand{\MCE}{\ensuremath{\mathcal E}}
+\newcommand{\MCF}{\ensuremath{\mathcal F}}
+\newcommand{\MCG}{\ensuremath{\mathcal G}}
+\newcommand{\MCH}{\ensuremath{\mathcal H}}
+\newcommand{\MCI}{\ensuremath{\mathcal I}}
+\newcommand{\MCJ}{\ensuremath{\mathcal J}}
+\newcommand{\MCK}{\ensuremath{\mathcal K}}
+\newcommand{\MCL}{\ensuremath{\mathcal L}}
+\newcommand{\MCM}{\ensuremath{\mathcal M}}
+\newcommand{\MCN}{\ensuremath{\mathcal N}}
+\newcommand{\MCO}{\ensuremath{\mathcal O}}
+\newcommand{\MCP}{\ensuremath{\mathcal P}}
+\newcommand{\MCQ}{\ensuremath{\mathcal Q}}
+\newcommand{\MCR}{\ensuremath{\mathcal R}}
+\newcommand{\MCS}{\ensuremath{\mathcal S}}
+\newcommand{\MCT}{\ensuremath{\mathcal T}}
+\newcommand{\MCU}{\ensuremath{\mathcal U}}
+\newcommand{\MCV}{\ensuremath{\mathcal V}}
+\newcommand{\MCW}{\ensuremath{\mathcal W}}
+\newcommand{\MCX}{\ensuremath{\mathcal X}}
+\newcommand{\MCY}{\ensuremath{\mathcal Y}}
+\newcommand{\MCZ}{\ensuremath{\mathcal Z}}
+
+\newcommand{\BA}{\ensuremath{\mathbb A}}
+\newcommand{\BB}{\ensuremath{\mathbb B}}
+\newcommand{\BC}{\ensuremath{\mathbb C}}
+\newcommand{\BD}{\ensuremath{\mathbb D}}
+\newcommand{\BE}{\ensuremath{\mathbb E}}
+\newcommand{\BF}{\ensuremath{\mathbb F}}
+\newcommand{\BG}{\ensuremath{\mathbb G}}
+\newcommand{\BH}{\ensuremath{\mathbb H}}
+\newcommand{\BI}{\ensuremath{\mathbb I}}
+\newcommand{\BJ}{\ensuremath{\mathbb J}}
+\newcommand{\BK}{\ensuremath{\mathbb K}}
+\newcommand{\BL}{\ensuremath{\mathbb L}}
+\newcommand{\BM}{\ensuremath{\mathbb M}}
+\newcommand{\BN}{\ensuremath{\mathbb N}}
+\newcommand{\BO}{\ensuremath{\mathbb O}}
+\newcommand{\BP}{\ensuremath{\mathbb P}}
+\newcommand{\BQ}{\ensuremath{\mathbb Q}}
+\newcommand{\BR}{\ensuremath{\mathbb R}}
+\newcommand{\BS}{\ensuremath{\mathbb S}}
+\newcommand{\BT}{\ensuremath{\mathbb T}}
+\newcommand{\BU}{\ensuremath{\mathbb U}}
+\newcommand{\BV}{\ensuremath{\mathbb V}}
+\newcommand{\BW}{\ensuremath{\mathbb W}}
+\newcommand{\BX}{\ensuremath{\mathbb X}}
+\newcommand{\BY}{\ensuremath{\mathbb Y}}
+\newcommand{\BZ}{\ensuremath{\mathbb Z}}
+
+\ddmmyyyydate
+\renewcommand{\dateseparator}{-}
+
+\makeatletter
+\def\@maketitle{%
+  \newpage
+  \null
+  \vskip 2em%
+  \begin{center}%
+  \let \footnote \thanks
+    {\large \textbf \@title \par}%
+    \vskip 1.5em%
+    {
+      \lineskip .5em%
+      \begin{tabular}[t]{c}%
+        \@author
+      \end{tabular}\par}%
+    \vskip 1em%
+    {Draft of \@date}%
+  \end{center}%
+  \par
+  \vskip 1.5em}
+\makeatother
+
+\newcommand{\todo}[1]{[Todo: #1]}
+
 \newcommand{\Set}{\mathbf{Set}}
 \newcommand{\Fin}{\mathbf{FinSet}}
-\newcommand{\op}{\mathtt{op}}
-\newcommand{\Unit}{\mathtt{Unit}}
-\newcommand{\Bool}{\mathtt{Bool}}
-\newcommand{\sub}{\mathtt{sub}}
-\newcommand{\var}{\mathtt{var}}
-\newcommand{\PCtx}{\Psi}
-\newcommand{\cC}{\underline{C}}
-\newcommand{\cD}{\underline{D}}
+\newcommand{\Ctx}{\mathbf{Ctx}}
+\newcommand{\Rel}{\mathbf{Rel}}
+\newcommand{\preT}{[\MCT\op, \Set]}
+\newcommand{\bangle}[1]{\langle #1 \rangle}
+\newcommand\sem[1]{\llbracket #1 \rrbracket}
+\newcommand\opsem[1]{\llparenthesis #1 \rrparenthesis}
+\newcommand\symb{\Sigma}
+
+\newcommand\NF{\mathsf{NF}}
+
+\newcommand\Id{\mathsf{id}}
+\newcommand\id{\mathsf{id}}
+\newcommand\swp{\mathsf{swp}}
+\newcommand\cons{{:}}
+
+\newcommand\bang{\mathbin{!}}
+\newcommand\new{\mathsf{new}}
+\newcommand\true{\mathsf{true}}
+\newcommand\false{\mathsf{false}}
+\newcommand\bool{\mathsf{Bool}}
+\newcommand\comp[1]{\underline{#1}}
+\newcommand\fun[2]{{\mathsf{fun} \ #1 \mapsto #2}}
+\newcommand\handler[1]{{\mathsf{handler} \ \{ \ #1 \ \}}}
+\newcommand\retc[2]{{\mathsf{return} \ #1 \mapsto #2}}
+\newcommand\opc[4]{{#1 (#2 ; #3) \mapsto #4}}
+\newcommand\ret[1]{{\mathsf{return} \ #1}}
+\newcommand\op{\mathsf{op}}
+\newcommand{\doin}[3]{\mathsf{do}\, #1 \leftarrow #2\, \mathsf{in}\, #3}
+\newcommand{\ifelse}[3]{\mathsf{if}\, #1 \,\mathsf{then} \,#2\, \mathsf{else}\, #3}
+\newcommand{\with}[2]{\mathsf{with}\, #1 \,\mathsf{handle} \,#2}
+\newcommand{\app}[2]{{#1 \, #2}}
+
+\newcommand{\jv}[3]{{#1 \vdash #2 : #3}}
+\newcommand{\jc}[3]{{#1 \vdash #2 : #3}}
+
+\newcommand\get{\mathsf{get}}
+\newcommand\set{\mathsf{set}}
+\newcommand\newref{\mathsf{ref}}
+\newcommand\eq{\mathsf{eq}}
+\newcommand\sub{\mathsf{sub}}
+\newcommand\var{\mathsf{var}}
+
+\newcommand\fst[1]{{\mathsf{fst} \ #1}}
+\newcommand\snd[1]{{\mathsf{snd} \ #1}}
+\newcommand\inl[1]{{\mathsf{inl} \ #1}}
+\newcommand\inr[1]{{\mathsf{inr} \ #1}}
+
+\title{Cambria: A language for Parametrized Handlers}
+\author{Jack Liell-Cock}
+\date{\today}
 
 \begin{document}
 
 \maketitle
 
-\section{Parameterised Algebraic Theories}
+\section{Introduction}
 
-We first consider a classic algebraic theory $S$ of parameters. For a signature of operators $\sigma$ with arity function $ar : \sigma \to \mathbb{N}$, the terms in context $\Delta$ are inductively generated by the following:
-\begin{prooftree}
-    \AxiomC{}
-    \UnaryInfC{$\Delta,a\vdash a$}
-\end{prooftree}
-\begin{prooftree}
-    \AxiomC{$\Delta \vdash a_1 \quad\cdots\quad \Delta\vdash a_{ar(f)}$}
-    \UnaryInfC{$\Delta \vdash f(a_1,\dots,a_{ar(f)})$}
-\end{prooftree}
-for $f\in\sigma$.
+Algebraic effects and handlers~\cite{pretnar_introduction_2015} have emerged as a compelling paradigm for structuring programs with computational effects like I/O, non-determinism, and state.
+By separating the specification of an effect (an operation) from its implementation (a handler), they provide a high degree of modularity and composability.
 
-A signature $T$ parameterised by $S$ is a set of operators $\Sigma$ with arity a natural number and list of natural numbers, $AR: \Sigma \to \mathbb{N} \times \mathbb{N}^*$. For instance, given $F\in\Sigma$,
-\[AR(F) = (n\mid m_1,\dots,m_l).\]
-We usually denote this as $F : (n\mid m_1,\dots,m_l)$. Intuitively, $n$ is the number of parameters used by $F$ and each $m_i$ is the number of parameters bound in each of the $p$ continuations.
+However, this approach encounters a fundamental limitation when faced with effects that require multiple, dynamically created instances of a resource.
+For example, how can a program create an arbitrary number of independent memory cells at runtime?
+The standard algebraic framework, which typically deals with a fixed set of global operations, does not offer a natural solution to this "problem of instances".
 
-A parametrised context $\Gamma\mid\Delta$ is a finite set of computation variables $\Gamma = x_i:p_1,\cdots,x_n:p_n$ where each variable $x_i$ binds $p_i$ parameters, and a finite set of parameter variables $\Delta = a_1,\cdots,a_m$. Parameterised terms in context $\Gamma\mid\Delta$ are inductively generated by the following:
-\begin{prooftree}
-    \AxiomC{$\Delta\vdash a_1 \quad \cdots \quad \Delta\vdash a_n$}
-    \UnaryInfC{$\Gamma,x:n \mid \Delta \vdash x(a_1,\dots,a_n)$}
-\end{prooftree}
-\begin{prooftree}
-    \AxiomC{$\Delta\vdash \vec{a}$}
-    \AxiomC{$\Gamma\mid\Delta,\vec{b}_1\vdash t_1 \quad \cdots \quad \Gamma\mid\Delta,\vec{b}_l\vdash t_l$}
-    \BinaryInfC{$\Gamma\mid\Delta\vdash F(\vec{a}, \vec{b}_1.t_1, \cdots, \vec{b}_l.t_l)$}
-\end{prooftree}
-where $F:(|\vec{a}| \mid |\vec{b}_1|,\dots,|\vec{b}_l|) \in \Sigma$.
+An answer comes from Parametrized Algebraic Theories (PATs).
+PATs extend algebraic theories by allowing operations to be parametrized by resource identifiers.
+Crucially, they formally distinguish between operations that \emph{use} existing parameters and those that \emph{bind} new ones,
+thereby providing a denotational account of resource creation.
 
-A parametrised equation is two terms in the same context, often denoted $\Delta\mid\Gamma\vdash t = s$.
+The goal of this project is to connect the highly practical, operational framework of effect handlers with the expressive, denotational semantics of PATs.
+We present an extended programming language which builds upon a standard effect calculus.
+The core extension is the introduction of a primitive computational form, $\new$ that generates a fresh parameter.
+This construct provides the operational tool necessary to implement handlers that act as models for PATs.
+By formalizing this language and demonstrating its use for key examples, we show how the operational world of handlers can be unified with the equational world of parametrized theories,
+creating a practical and expressive tool for programming with sophisticated computational effects.
 
-Substitution can be done at the parameter or variable level
-\begin{prooftree}
-    \AxiomC{$\Delta\vdash a'$}
-    \AxiomC{$\Gamma\mid\Delta,a\vdash u$}
-    \BinaryInfC{$\Gamma\mid\Delta\vdash u[a'/a]$}
-\end{prooftree}
-\begin{prooftree}
-    \AxiomC{$\Gamma\mid\Delta,\vec{a}\vdash t$}
-    \AxiomC{$\Gamma,x:|\vec{a}|\mid\Delta\vdash u$}
-    \BinaryInfC{$\Gamma\mid\Delta\vdash u[\vec{a}.t/x]$}
-\end{prooftree}
+\section{A First Language for Effects and Handlers}
 
-\subsection{Presheaf Semantics}
+To build our extended language, we first establish a formal foundation based on the effect calculus in \emph{An Introduction to Algebraic Effects and Handlers}~\cite{pretnar_introduction_2015}.
+This language, employs a fine-grain call-by-value strategy, separating inert \emph{values} from potentially effectful \emph{computations}.
+This separation is crucial for reasoning about the order of evaluation in the presence of effects.
 
-We build a finitary enriched monad on the self-enriched category $\hat{S}$. The strongly finitely presentable objects of $\hat{S}$ are $J(\vec{n}) := \coprod_{n\in\vec{n}}S({-},n)$ where $\vec{n}$ is a list of natural numbers. For an enriched monad we require:
+\subsection{Syntax}
+
+The syntax is defined below. Values $v$ include variables, constants, functions, and handlers themselves.
+Computations $c$ include returning a value, calling an operation, sequencing, conditionals, application, and handling.
+
+\begin{alignat*}{3}
+  &\text{Value} \quad & v &:= x \mid \true \mid \false \mid \fun x c \mid h \\
+  &\text{Handler} \quad & h &:= \handler{ \ret{x} \mapsto c_r, \op_1(x;k) \mapsto c_1, \dots, \op_n(x;k) \mapsto c_n } \\
+  &\text{Computation} \quad & c &:= \ret{v} \mid \op(v; x.c) \mid \doin{x}{c_1}{c_2} \mid \ifelse{v}{c_1}{c_2} \mid \app{v_1}{v_2} \mid \with{h}{c} \\
+\end{alignat*}
+
+An operation call $\op(v; x.c)$ passes a parameter $v$ to the operation $\op$ and continues with $c$ after completion, where the result is bound to $x$.
+In the actual syntax of the language, we only expose the generic effect $\op \ v$ which is syntactic sugar for $\op(v; x.\ret{x})$.
+We can recover an arbitrary continuation using do binding.
+\[
+  \op(v; x.c) = \doin{x}{\op \ v}{c}
+\]
+
+\subsection{Operational Semantics}
+
+The behaviour is defined by a small-step operational semantics, denoted by the relation $c \leadsto c'$.
+Operation calls that are not handled by any enclosing handler propagate outwards, called \emph{forwarding}.
+If a call escapes the top level, the computation stops.
+\begin{mathpar}
+  \inferrule{c_1 \leadsto c_1'}{\doin{x}{c_1}{c_2} \leadsto \doin{x}{c_1'}{c_2}}
+  \and
+  \inferrule{ }{\doin{x}{\ret v}{c_2} \leadsto c_2[v / x]}
+  \and
+  \inferrule{ }{\doin{x}{\op(v; y.c_1)}{c_2} \leadsto \op(v; y.\doin{x}{c_1}{c_2}}
+  \and
+  \inferrule{ }{\ifelse \true {c_1} {c_2} \leadsto c_1}
+  \and
+  \inferrule{ }{\ifelse \false {c_1} {c_2} \leadsto c_2}
+  \and
+  \inferrule{ }{\app{(\fun{x}{c})}{v} \leadsto c[v / x]}
+\end{mathpar}
+Let $h = \handler{ \ret{x} \mapsto c_r, \dots, \op(x;k) \mapsto c_\op, \dots }$:
+\begin{mathpar}
+  \inferrule{c \leadsto c'}{\with h c \leadsto \with h c'}
+  \and
+  \inferrule{ }{\with h {\ret{v}} \leadsto c_r[v / x]}
+  \and
+  \inferrule{ }{\with h {\op(v;y.c)} \leadsto c_\op[v / x, (\fun{y}{\with h c}) / k]}
+  \and
+  \inferrule{ }{\with h {\op'(v;y.c)} \leadsto \op'(v;y.\with h c)} (\op' \notin h)
+\end{mathpar}
+
+When a handled computation returns a value, the handler's return clause is executed.
+When it performs an operation $\op$ that is matched by the handler, the corresponding clause $c_\op$ is executed.
+Here, the original continuation $c$ is not discarded; it is wrapped in a function and passed to the clause, bound to the variable $k$.
+The handler continues to handle this captured continuation, which is why the body of the function is $\with h c$. This is called \emph{deep handling}.
+If an operation is not matched, it propagates outwards, but the handler remains attached to its continuation.
+
+\subsection{Type and Effect System}
+
+To ensure that programs are well-behaved (e.g., do not apply a boolean as a function), we have a type and effect system.
+Types are split into value types and computation types.
+
+\begin{alignat*}{3}
+  &\text{Value Type} \quad & v &:= \bool \mid A \to \comp C \mid \comp C \Rightarrow \comp D \\
+  &\text{Computation Type} \quad & c &:= A \bang \Sigma \\
+  &\text{Effect Set} \quad & \Sigma &:= \{\op_1 : A_1 \to B_1, \dots , \op_n : A_n \to B_n \}
+\end{alignat*}
+
+A computation type $A\bang \Sigma$ describes a computation that, returns a value of type $A$ and may perform any of the operations in the effect set $\Sigma$.
+The effect set is an over-approximation. The typing judgements $\jv \Gamma v A$ and $\jc \Gamma c {\comp{C}}$ are defined by the following rules.
+
+\begin{mathpar}
+  \inferrule{ }{\jv {\Gamma, x:A, \Gamma'} x A}
+  \and
+  \inferrule{\jc{\Gamma, x:A}{c}{\comp C}}{\jv \Gamma {\fun x c} {A\to \comp C}}
+  \and
+  \inferrule{\jv{\Gamma}{v}{A}}{\jc \Gamma {\ret{v}}{A\bang\Sigma}}
+  \and
+  \inferrule{\jv{\Gamma}{v_1}{A \to \comp C} \and \jv \Gamma {v_2} A}{\jc \Gamma {\app{v_1}{v_2}}{ \comp C}}
+  \and
+  \inferrule{\jc{\Gamma}{c_1}{A \bang \Sigma} \and \jc {\Gamma,x:A} {c_2} {B \bang \Sigma}}{\jc \Gamma {\doin{x}{c_1}{c_2}}{B\bang \Sigma}}
+  \and
+  \inferrule{\jv{\Gamma}{v}{A_\op}}{\jc \Gamma {\app{\op}{v}}{B_\op\bang \Sigma}}(\op : A_\op \to B_\op \in \Sigma)
+  \and
+  \inferrule{\jv{\Gamma}{h}{\comp C \Rightarrow \comp D} \and \jc{\Gamma}{c}{\comp C}}{\jc \Gamma {\with{h}{c}}{\comp D}}
+  \and
+  \inferrule{\jc{\Gamma, x:A}{c_r}{B\bang\Sigma'} \and \left[\jc{\Gamma, x:A_i, k:B_i \to B\bang\Sigma'}{c_i}{B\bang\Sigma'}\right]_{i=1}^{n}}
+  {\jv \Gamma {\handler{ \ret{x} \mapsto c_r, \op_1(x; k) \mapsto c_1, \dots, \op_n(x; k) \mapsto c_n }} {A\bang\Sigma \Rightarrow B\bang \Sigma'}}
+  (\Sigma \setminus \left\{\op_i \right\}_{i=1}^n \subseteq \Sigma')
+\end{mathpar}
+
+The typing rule for a handler is the most intricate. To have type $A\bang\Sigma \Rightarrow B\bang\Sigma'$, a handler must transform a computation of type
+$A\bang\Sigma$ into one of type $B\bang\Sigma'$.
+This requires that its return clause can handle a value of type $A$, and each operation clause for $\op_i: A_i \to B_i$ can handle a parameter of type $A_i$
+and a continuation that accepts a result of type $B_i$. Any operations in $\Sigma$ that are not explicitly handled must be included in the output effect set $\Sigma'$,
+as they will be propagated outwards. This system guarantees that well-typed programs do not get stuck due to type errors~\cite{pretnar_introduction_2015}.
+
+\section{An Introduction to Parametrized Algebraic Theories}
+
+To address the problem of instances of effects, we turn to the denotational framework of Parametrized Algebraic Theories (PATs)~\cite{staton_instances_2013, staton_algebraic_2013}.
+
+The core motivation for PATs is to provide a formal account of computational effects that involve multiple, dynamically created instances of a resource.
+Consider the effect of global binary state. In the standard algebraic approach, we can define operations $\get: 1 \to \bool$ and $\set: \bool \to 1$.
+A handler can implement these by passing a single boolean value around~\cite{pretnar_introduction_2015}.
+
+But what about two or more independent cells?
+We could define operations $\set: N \to \bool$ and $\get: N \times \bool \to 1$, but this is static and inflexible.
+We cannot dynamically create a new cell at runtime. The key insight of PATs is to make the resource instance itself a \emph{parameter} to the operation.
+
+\subsection{Formalism of Parametrized Theories}
+
+Following the definitions in~\cite{staton_instances_2013, staton_algebraic_2013}, a parametrized algebraic theory is built upon a more structured notion of an operator signature.
+
+\subsubsection{Parametrized Signatures}
+
+In PATs, an operator $\op$ is assigned a signature of the form $\op:(n\mid m_1,\dots ,m_p)$. This signature has two components:
+$n \in \BN$ is the number of parameters the operation $\op$ \emph{uses}, while each
+$m_1,\dots ,m_p \in \BN$ indicates a different continuation, with the $i$-th continuation binding $m_i$ \emph{new} parameters local to that branch.
+This distinction between using existing parameters and binding new ones allows the theory to formally capture the manipulation of existing resources and the creation of fresh ones.
+
+\subsubsection{Parametrized Contexts and Terms}
+
+Terms in a PAT are judged within a parametrized context $\Gamma\mid\Delta$.
 \begin{itemize}
-    \item For each $\vec{n}$, a $T(\vec{n})\in \hat{S}$. We define $T(\vec{n})(p)$ as the set of terms in context $(p\mid\vec{n})$ modulo the equations. The parameter substitution structure gives the functorial action.
-    \item For each $\vec{n}$, a morphism $\eta_{\vec{n}} : I\to\hat{S}(J(\vec{n}), T(\vec{n}))$. This picks out the variables as $\hat{S}(J(\vec{n}), T(\vec{n})) \cong \prod_{n\in\vec{n}}T(\vec{n})({-}+n)$ via Yoneda.
-    \item For each $\vec{n},\vec{m}$, a morphism $*_{\vec{n},\vec{m}}:\hat{S}(J(\vec{n}), T(\vec{m}))\to \hat{S}(T(\vec{n}), T(\vec{m}))$. The parameterised variable substitution structure provides this. 
+    \item $\Gamma = x_1:m_1, \dots, x_n:m_n$ is a context of \emph{computation variables}. Each variable $x_i$ is a placeholder for a computation that itself binds $m_i$ parameters.
+    \item $\Delta = a_1, \dots, a_n$ is a context of \emph{parameter variables}, representing the currently available resources or instances.
 \end{itemize}
-These data must satisfy the monad coherence laws given by substitution lemmas. So an $S$ parameterised algebraic theory is a finitary enriched monad on $\hat{S}$, or equivalently an $\hat{S}$-enriched Lawvere theory. When the parametrising theory is the theory of sets, $\hat{S}$ reduces to the functor category $[\Fin,\Set]$.
+The rules for forming terms then naturally follow this structure. For an operator $\op: (n\mid m_1,\dots,m_p)$, a term is formed as
+\begin{displaymath}
+  F(\vec{a}, \vec{b}_1.t_1, \dots, \vec{b}_l.t_l)
+\end{displaymath}
+where $\vec{a}$ is a vector of $n$ parameters from $\Delta$, and each $t_i$ is a term in a context $\Gamma\mid\Delta$ with $\Delta$ extended by $m_i$ new parameters $\vec{b}_i$.
 
-\subsection{Example: Local Store}
+\subsection{Canonical Examples} \label{sec:examples}
 
-\newcommand{\get}{\mathsf{get}}
-\newcommand{\set}[1]{\mathsf{set}_{#1}}
-\newcommand{\eq}{\mathsf{eq}}
-\newcommand{\rf}{\mathsf{ref}}
+To make this formalism concrete, we consider two canonical examples of PATs.
 
-The theory of local store~\cite{staton_instances_2013} is an algebraic theory parameterised by the theory of sets. In this case, the parameters represent the different memory cells. There are four operators.
+\subsubsection{Local Binary State}
+
+The theory of local binary state~\cite{staton_instances_2013} models single-bit memory cells that can be dynamically created.
+The parameters of the theory represent the memory locations. The operators are defined in Table \ref{tab:localstore}.
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l l p{8cm}}
+    \hline
+    \textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
+    \hline
+    $\get$      & $(1\mid 0,0)$ & Takes one parameter (a location) and has two continuations. One for when the stored value is 0, one for when it is 1. \\
+    $\set_i$    & $(1\mid 0)$   & Takes one parameter (a location). Writes value $i \in \{0,1\}$ to the location and resumes the only continuation. \\
+    $\newref_i$ & $(0\mid 1)$   & Creates a new location initialized to $i \in \{0,1\}$. Its single continuation binds one new parameter (the new location). \\
+    $\eq$       & $(2\mid 0,0)$ & Takes two parameters (locations). Has two continuations, one for when they are equal, one for when they are not. \\
+    \hline
+  \end{tabular}
+  \caption{Operators for the Theory of Local Store}
+  \label{tab:localstore}
+\end{table}
+
+The signature for $\newref_i: (0\mid 1)$ is particularly interesting.
+It captures the act of \emph{creation}. The operation itself does not depend on any existing parameter, but it introduces a new one into the context of the computation that follows.
+A language to implement this theory must have a mechanism to create a fresh parameter and make it available to the continuation.
+
+\subsubsection{Substitution and Jumps}
+
+This theory models a form of control flow with labels and jumps with the parameters representing code labels. The operators are defined in Table \ref{tab:subst}.
+
+\begin{table}[h!]
+  \centering
+  \begin{tabular}{l l p{8cm}}
+    \hline
+    \textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
+    \hline
+    $\sub$ & $(0\mid 1,0)$ & Takes no parameters. Binds one new parameter (a label) in its first continuation, representing the attachment of the label to that code point.
+    The second continuation is for the code that follows the sub block. \\
+    $\var$ & $(1\mid )$    & Takes one parameter (a label) and performs a jump to that label. It has no continuations because we jump to a new section of code. \\
+    \hline
+  \end{tabular}
+  \caption{Operators for the Theory of Substitution and Jumps [1]}
+  \label{tab:subst}
+\end{table}
+
+Here again, the signature for the theory of substitution shows how a new resource is bound and made available to a part of the subsequent computation.
+
+\section{Extending Handlers with Parameters}
+
+We now present an extension of the effects and handlers language, designed to support handlers for parametrized algebraic theories.
+
+\subsection{Extended Syntax}
+
+First, we introduce a new primitive value type, $\Psi$, for the parameters.
+Second, we add an inbuilt operation $\new : 1 \to \Psi$, which evaluates to a fresh parameter.
+
+\begin{alignat*}{3}
+  &\text{Value Type} \quad & v &:= \cdots \mid \Psi \\
+\end{alignat*}
+
+The intention is that a programmer will use this inbuilt $\new$ operation to generate fresh names to represent their resource, which can be used to form other handlers.
+
+\subsection{Extended Operational Semantics}
+
+To formally define the behaviour of $\new$, we must ensure that it generates a parameter that is unique, as shown in the following addition to the small step semantics.
+
+\begin{mathpar}
+  \inferrule{ }{\new(v; y.c) \leadsto c[a / y]} (a \text{ fresh})
+\end{mathpar}
+
+This rule states that evaluating $\new$ reduces to returning a fresh parameter $a$, which we can assume is drawn from an countable set.
+
+\subsection{An Extended Type and Effect System}
+
+Given we are simply adding a base type to the type and effect system, provided the semantics of $\new$ generates a fresh parameter there are no additional updates we need to the effect system.
+Implementing the feature only requires using a gensym library, such as the \texttt{SymbolGen} monad or \texttt{Unique} data type in Haskell.
+As we do not track the scope of newly generated parameters in the handler, we cannot guarantee that the newly generated parameters are not leaked into continuations.
+However, as practise has shown, this bug is usually implicitly captured by the type system, and the lack of added complexity for tracking the parameters provides even greater expressiveness.
+
+\section{Programming with Parametrized Handlers}
+
+We now demonstrate parametrised handlers can be used to implement handlers for the canonical parametrized theories from \Cref{sec:examples}.
+
+\subsection{Example: Local Binary State}
+
+The theory of local binary state models dynamically allocated single-bit memory cells.
+A handler can implement this by adopting a parameter-passing style, a technique also used for simple global state~\cite{pretnar_introduction_2015}.
+However, in our parametrized setting, the state that is passed is not a single value but a \emph{function} from parameters to their stored values,
+e.g., a map $s: \Psi \rightarrow \comp \bool$. The $\new$ construct permits the dynamic extension the domain of the state map.
+
+The handler implementation is as follows:
+
+\begin{lstlisting}[language=Haskell, basicstyle=\small\ttfamily]
+state_handler = handler {
+  return x -> (fun s -> return (x, s)),
+  get(a; k) -> (fun s -> (k (s a)) s),
+  set(x; k) -> (fun s ->
+    (k ()) (fun a -> if a == fst x then snd x else s a)),
+  ref(x; k) -> fun s ->
+    do a <- #new () in
+      (k a) (fun b -> if b == a then x else s b)
+}
+\end{lstlisting}
+
+The handler can be broken down into the following parts:
 \begin{itemize}
-    \item $\get : (1\mid 0, 0)$ reads the bit of memory in the parameter and continues with the first continuation if it is false and the second if it is true
-    \item $\set{i} : (1 \mid 0)$ writes $i$ to the bit of memory in the parameter
-    \item $\ref_i : (0 \mid 1)$ creates a new memory cell bound to the parameter in the continuation initialised to $i$
-    \item $\eq : (2\mid 0, 0)$ checks if two parameters are equal and continues with the first continuation if they are and the second if they are not
+    \item $\newref(x; k)$: This clause implements the $\newref$ operator.
+      It first generates a fresh parameter $a$, which represents the address of the new memory cell.
+      It then constructs a new state map, which behaves like the old state map $s$ for all existing parameters, but returns the initial value $x$ for the new parameter $a$.
+      Finally, it resumes the continuation $k$, passing it the new address $a$ as its result, and provides the \emph{new} state map as the state parameter.
+    \item $\get(a; k)$ and $\set(x; k)$: These clauses use existing parameters.
+      The $\get$ clause looks up the parameter $a$ in the current state map and passes the result to its continuation $k$. The state map itself remains unchanged.
+      The $\set$ clause constructs a new state map that is updated at parameter $\fst x$ (the parameter) to $\snd x$ (the update value) and passes this new map to its continuation.
+    \item $\ret{x}$: The return clause, when the computation is finished, returns the final result $x$ wrapped in the state monad unit.
 \end{itemize}
-
-A sample of the set of equations for the theory are:
-\begin{align*}
-    x: 0 \mid a, b &\vdash \set i(a,\set j(b, x)) = \eq(a,b, \set j(a, x), \set j(b, \set i(a,x))) \\
-    x_0:0,x_1:0\mid a,b &\vdash \set i(a, \get(b, x_0,x_1)) \\
-    &\qquad = \eq(a,b, \set i(a, x_i), \get(b , \set i(a, x_0), \set i(a, x_1))) \\
-    x:0 \mid a &\vdash x = \get(a, \set 0(a, x), \set 1(a, x)) \\
-    x:0 \mid a,b &\vdash x = \eq(a,b, x,x) \\
-    u:0,v:0,x:0,y:0\mid a,b,c,d &\vdash \eq(a,b , \eq(c,d , u,v), \eq(c,d , x,y)) \\
-    &\qquad = \eq(c,d, \eq(a,b, u,x), \eq(a,b, v,y)) \\
-    x:1,y:0 \mid a,b &\vdash \eq(a,b, x[a],y) = \eq(a,b, x[b],y) \\
-    x: 0 \mid - &\vdash \rf(a.x) = x \\
-    x: 2 \mid - &\vdash \rf(a.\rf(b.x[a,b])) = \rf(b.\rf(a.x[a,b]))
-\end{align*}
 
 \subsection{Example: Substitution and Jumps}
 
-An example that doesn't trivially collapse the list of arity types to a singleton for each operator is the theory of substitution~\cite{fiore_substitution_2014}. In this case, the parameters represent code labels. There are two operators
+The theory of substitution and jumps models a form of non-local control flow where parameters act as code labels.
+A handler for this theory must be able to create new labels and interpret jumps to them.
+This is instantiated by the handler returning a sum type, $X + \Psi$, where $X$ is the original return type, to indicate the code either terminates with a value, or jumps to another piece of code.
+
+The handler is implemented as follows:
+
+\begin{lstlisting}[language=Haskell, basicstyle=\small\ttfamily]
+subst_handler = handler {
+  return x -> return (inl x),
+  var(a; k) -> return (inr a),
+  sub(v; k) ->
+    do a <- #new() in
+      case k (inl a) of {
+        inl x -> return (inl x);
+        inr b -> if b == a then return (inl ()) else return (inr b)
+      }
+}
+\end{lstlisting}
+
+The handler can be broken down into the following parts:
 \begin{itemize}
-    \item $\sub : (0\mid 1, 0)$ attaches a label to the current code point and continues with the first continuation
-    \item $\var : (1 \mid -)$ jumps back to the associated code point and continues with the latter continuation
-\end{itemize}
-The full set of equational laws for the theory are:
-\begin{align*}
-    x: 0 \mid - &\vdash \sub(a.\var(a), x) = x \\
-    x: 0, y:0 \mid - &\vdash \sub(a.x,y) = x \\
-    x: 1 \mid a &\vdash \sub(b.x[b], \var(a)) = x[a] \\
-    x:2, y:1, z:0 \mid - &\vdash
-    \sub(a.\sub(b.x[a, b], y[a]), z) = \sub(b.\sub(a.x[a, b], z), \sub(a.y[a], z))
-\end{align*}
-
-\subsection{Further Examples}
-
-A range of other effects captured by parameterised algebraic theories are:
-\begin{itemize}
-    \item Restriction \cite{staton_instances_2013} in the sense of \cite{pitts_structural_2011}
-    \item $\pi$-calculus \cite{staton_instances_2013}
-    \item Quantum information \cite{staton_algebraic_2015}
-    \item Scoped effects~\cite{lindley_scoped_2024}
+    \item $\ret{x}$: The return clause wraps a terminated value in an $\inl{}$
+    \item $\var(v; k)$: The $'var$ clause, which represents an explicit jump, terminates the current computation and returns the code label $a$ wrapped in $\inr{}$.
+      This signals to any enclosing handlers that a jump has occurred. The continuation $k$ cannot be used because it has domain $0$.
+    \item $\sub(v; k)$: This clause first creates a fresh label $a$ with $\new$. It then resumes the continuation $k$, with the new label.
+      The core logic resides in the `case` statement, which inspects the result of the continuation:
+      \begin{itemize}
+          \item If the continuation returns a value $\inl x$, the block has completed without a jump, and the value is propagated.
+          \item If the continuation returns a label $\inr b$, it means a $\var$ call occurred. If the label matches the newly created label, the jump is caught and the jump continuation is run.
+            If the jump was to a different label, the label is propagated upwards.
+      \end{itemize}
 \end{itemize}
 
-\section{Parameterised Effect Handlers}
+\section{Future Work}
 
-The goal of handlers of parameterised algebraic theories is to extend the regular algebraic effect framework to incorporate parameterised algebraic effects.
-Currently, these have \emph{not} been defined or implemented in literature.
+\subsection{Equational Reasoning}
 
-\subsection{Delimited Continuations}
-
-In the delimited continuation implementation of classical algebraic effects, we start with an operator of type signature
+The most critical next step is to formally connect the operational semantics of our handlers with the equational specifications of the theories they are meant to model.
+For example, using the language's semantics, one should prove that the substitution handler satisfies the equational laws~\cite{fiore_substitution_2014}, such as:
 \[
-    \op: A \leadsto B
+  x:1 \mid - \vdash \sub(a.\var(a), x) = x
 \]
-that signifies that an operation is called with an argument of type $A$, and in the continuation of the operation it receives a value of type $B$.
-These are the \emph{coarity} and \emph{arity} types, respectively.
 
-\begin{example}
-For local binary state, the type signatures would become:
-\begin{align*}
-    \get &: \alpha \leadsto \Bool \\
-    \set{} &: \alpha \times \Bool \leadsto 1 \\
-    \rf  &: \Bool \leadsto \alpha \\
-    \eq  &: \alpha \times \alpha \leadsto \Bool
-\end{align*}
-\end{example}
+\subsection{Advanced Theories and Applications}
 
-Note, that the coarity type captures the \emph{configuation} of the operator (i.e. the $i$ in $\set i$ or $\rf_i$).
-In contrast, the arity type can group continuations with the same parameter bind count (i.e. instead of two continuations in $r$ we have a single continuation with argument $\Bool$).
+The expressiveness of Cambria should be further tested by implementing handlers for more advanced parametrized theories.
+Interesting targets include a fragment of the $\pi$-calculus, where parameters represent channel names, or Staton's algebraic formulation of quantum computation,
+where parameters represent qubits. The current barrier is the lack of language features implemented in Cambria.
 
-\begin{example}
-For substitution, the type signatures would become:
-\begin{align*}
-    \sub &: 1 \leadsto \alpha + 1 \\
-    \var &: \alpha \leadsto 0
-\end{align*}
-\end{example}
+\subsection{Connection to Scoped Effects}
 
-\subsection{Handlers}
+Recent research has established a connection between PATs and \emph{scoped effects}~\cite{lindley_scoped_2024}.
+Scoped effects, which are used to model features like transaction rollback or backtracking with `once',
+can be modelled by PATs where parameters are used linearly and non-commutatively.
+It would be interesting to see if Cambria could be augmented to track parameter usage more precisely to enforce for safe implementations of scoped effects.
 
-Motivated by the presheaf semantics of the parametrised algebraic theories, we can think of the return type of a handler as a type that is dependant on a \emph{context} of parameters (i.e. a map from context to set). We first start with some examples to get a feel for how this should work.
-
-\subsubsection{Example: Substitution}
-
-For the theory of substitution, the handler will either return a value $R$ or a parameter in provable by the current parameter context.
-We use $\PCtx$ to represent the latter. Hence we expect the return type to look like $R+\PCtx$.
-\begin{lstlisting}
-    handler {
-      return x  -> return (inl x)
-      var(v; k) -> return (inr v)
-      sub(v; k) -> do a <- #new () in
-        case k (inl a) of {
-          inl x -> return (inl x),
-          inr b -> if b == a then k (inr ()) else return (inr b)
-        }
-    }
-\end{lstlisting}
-
-\subsubsection{Example: Local Binary State}
-
-We may follow a similar path to create a handler for local binary state.
-In this theory, the parameters represent reference cells, so we can represent our local memory by the function type $\PCtx \to S$, where $\PCtx$
-is our context of parameters and $S$ is the type of values in memory. So the whole return type of the handler in parameter passing style would be
-$(\PCtx \to S) \to R \times (\PCtx \to S)$. The implementation of the handler from here is straightforward apart from the implementation of the operator
-$\rf$ in which the continuation produces a return type with the parameter context extended by a fresh parameter, or $(\PCtx +1 \to S) \to R \times (\PCtx + 1 \to S)$.
-We can see how it is handled below.
-\begin{lstlisting}
-    handler {
-        return x  -> return (fun s -> return (x,s))
-        get(v; k) -> return (fun s -> k (s v) s)
-        set(v; k) -> return (fun s -> k () (fun a -> if a == fst v then snd v else s a)
-        ref(v; k) -> do a <- #new () in
-            return (fun s -> k a (fun b -> if a == b then return v else return s b))
-    }
-\end{lstlisting}
-
-\section{Type System}
-
-The type and effect system closely follows that of~\cite{pretnar_introduction_2015}. We have an extra parameter type that captures the current parameter context. 
-\begin{align*}
-    A, B &::= \PCtx \mid \Unit \mid A + B \mid A \times B \mid A \to \cC \mid \cC \Rightarrow \cD \\
-    \cC, \cD &::= A!\Sigma \\
-    \Sigma &::= \{\op_1,\dots,\op_n\}
-\end{align*}
-where $n\in\mathbb{N}$ represents the number of times we extend the parameter context within the typed term.
-
-\section{Reasoning with Equations}
-
-We may prove the equations hold in our handlers using equational reasoning. We begin with examples from the theory of substitution...
-
-\printbibliography
-
+\bibliography{library.bib}
+\bibliographystyle{alpha}
 \end{document}
+
