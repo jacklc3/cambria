@@ -80,8 +80,8 @@ pComputation cs = choice $ seq ++ infi ++ app ++ expr ++ [try (parens (pComputat
     expr = if cs > Expr  then [] else [pIf, pCase, pDo, pWith, pFun, pOp, pReturn]
 
 
-pValComp :: CompScope -> Parser Expression
-pValComp cs = choice
+pExpression :: CompScope -> Parser Expression
+pExpression cs = choice
   [ try $ V <$> pUnit
   , try pPair
   , pEither
@@ -91,7 +91,7 @@ pValComp cs = choice
   , V <$> pHandler
   , try $ C <$> pComputation cs
   , V <$> pVar
-  , parens (pValComp Seq)
+  , parens (pExpression Seq)
   ]
 
 pVar :: Parser Value
@@ -120,10 +120,10 @@ pFun = do
     desugarVars []     _ = error "fun with no arguments, this should have failed at the parser"
 
 pEither :: Parser Expression
-pEither = EEither <$> (L <$ symbol "inl" <|> R <$ symbol "inr") <*> pValComp Paren
+pEither = EEither <$> (L <$ symbol "inl" <|> R <$ symbol "inr") <*> pExpression Paren
 
 pPair :: Parser Expression
-pPair = parens $ EPair <$> pValComp Seq <* symbol "," <*> pValComp Seq
+pPair = parens $ EPair <$> pExpression Seq <* symbol "," <*> pExpression Seq
 
 pHandler :: Parser Value
 pHandler = VHandler <$> (symbol "handler" *> braces (do
@@ -149,10 +149,10 @@ pRetClause = do
 -- TODO: Make the order of operations matter
 pInfixOps :: [Text] -> Parser Computation
 pInfixOps ops = do
-    e  <- pValComp App
+    e  <- pExpression App
     op <- choice (fmap symbol ops)
-    e' <- pValComp App
-    es <- many (symbol op >> pValComp App)
+    e' <- pExpression App
+    es <- many (symbol op >> pExpression App)
     return $ foldInfix op (e:e':es)
   where
     foldInfix op (e1:e2:es@(_:_)) = foldInfix op (C (desugar [e1,e2] (sequenceInfix op)) : es)
@@ -168,7 +168,7 @@ pSeq = do
 
 pReturn :: Parser Computation
 pReturn = do
-  e <- symbol "return" *> pValComp Paren
+  e <- symbol "return" *> pExpression Paren
   return $ desugar [e] (\[v] -> CReturn v)
 
 pDo :: Parser Computation
@@ -188,14 +188,14 @@ pWith = do
 
 pIf :: Parser Computation
 pIf = do
-  e <- symbol "if" *> pValComp Infix
+  e <- symbol "if" *> pExpression Infix
   c1 <- symbol "then" *> pComputation Infix
   c2 <- symbol "else" *> pComputation Infix
   return $ desugar [e] (\[v] -> CIf v c1 c2)
 
 pCase :: Parser Computation
 pCase = do
-  e <- symbol "case" *> pValComp Infix <* symbol "of"
+  e <- symbol "case" *> pExpression Infix <* symbol "of"
   ((y1,c1),(y2,c2)) <- braces $ lr <|> rl
   return $ desugar [e] (\[v] -> CCase v y1 c1 y2 c2)
     where
@@ -209,13 +209,13 @@ pCase = do
 pOp :: Parser Computation
 pOp = do
   op <- symbol "#" *> pIdentifier
-  e <- pValComp Paren
+  e <- pExpression Paren
   return $ desugar [e] (\[v] -> COp op v)
 
 pApp :: Parser Computation
 pApp = do
-    f <- (try (V <$> pVar) <|> parens (pValComp Seq))
-    vs <- some (pValComp Paren)
+    f <- (try (V <$> pVar) <|> parens (pExpression Seq))
+    vs <- some (pExpression Paren)
     return $ desugarApp f vs
   where
     desugarApp f (e:es) = foldl' (\acc e' -> desugar [C acc, e'] appVec2) (desugar [f,e] appVec2) es
