@@ -242,11 +242,10 @@ This separation is crucial for reasoning about the order of evaluation in the pr
 
 The syntax is defined below. Values $v$ include variables, constants, functions, and handlers themselves.
 Computations $c$ include returning a value, calling an operation, sequencing, conditionals, application, and handling.
-
 \begin{alignat*}{3}
   &\text{Value} \quad & v &:= x \mid \true \mid \false \mid \fun x c \mid h \\
   &\text{Handler} \quad & h &:= \handler{ \ret{x} \mapsto c_r, \op_1(x;k) \mapsto c_1, \dots, \op_n(x;k) \mapsto c_n } \\
-  &\text{Computation} \quad & c &:= \ret{v} \mid \op(v; x.c) \mid \doin{x}{c_1}{c_2} \mid \ifelse{v}{c_1}{c_2} \mid \app{v_1}{v_2} \mid \with{h}{c} \\
+  &\text{Computation} \quad & c &:= \ret{v} \mid \op(v; x.c) \mid \doin{x}{c_1}{c_2} \mid \ifelse{v}{c_1}{c_2} \mid \app{v_1}{v_2} \mid \with{h}{c}
 \end{alignat*}
 
 An operation call $\op(v; x.c)$ passes a parameter $v$ to the operation $\op$ and continues with $c$ after completion, where the result is bound to $x$.
@@ -295,7 +294,6 @@ If an operation is not matched, it propagates outwards, but the handler remains 
 
 To ensure that programs are well-behaved, we have a type and effect system.
 Types are split into value types and computation types.
-
 \begin{alignat*}{3}
   &\text{Value Type} \quad & A,B &:= \bool \mid A \to \comp C \mid \comp C \Rightarrow \comp D \\
   &\text{Computation Type} \quad & \comp C,\comp D &:= A \bang \Sigma \\
@@ -304,7 +302,6 @@ Types are split into value types and computation types.
 
 A computation type $A\bang \Sigma$ describes a computation that, returns a value of type $A$ and may perform any of the operations in the effect set $\Sigma$.
 The effect set is an over-approximation. The typing judgements $\jv \Gamma v A$ and $\jc \Gamma c {\comp{C}}$ are defined by the following rules.
-
 \begin{mathpar}
   \inferrule{ }{\jv {\Gamma, x:A, \Gamma'} x A}
   \and
@@ -371,8 +368,8 @@ As a generic effect, an operator $\op: (n \mid m_1, \dots, m_p)$ has signature
   \eff\op : \Psi^n \to \Psi^{m_1} + \cdots + \Psi^{m_p}
 \]
 where we denote the type of parameter as a new base type $\Psi$. The intuition is that we must pass $n$ parameters to the operation call, and in each of the $p$ continuations,
-which can be differentiated via case analysis, $m_i$ fresh parameters are produced. We can integrate these generic effects with standard generic effects to express
-an operator $\op : (1 \mid 0, 0)$ as $\eff\op: \Psi \to \bool$ where $\true$ represents the first continuation and $\false$ the second.
+which can be distinguished via case analysis, $m_i$ fresh parameters are produced. We can integrate these generic effects with standard generic effects to express for instance
+an operator $\op : (1 \mid 0, 0)$ as $\eff\op: \Psi \to \bool$, where case analysis on the boolean distinguishes the resulting continuation.
 
 \subsection{Examples} \label{sec:examples}
 
@@ -387,10 +384,10 @@ The parameters of the theory represent the memory locations. The operators are d
   \centering
   \begin{tabular}{l l p{8cm}}
     \hline
-    \textbf{Operator} & \textbf{Generic Signature} & \textbf{Description} \\
+    \textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
     \hline
     $\get$    & $\Psi \to \bool$          & Takes one parameter (a location) and has returns the result of the stored value. \\
-    $\set$    & $\Psi \times \bool \to 1$ & Takes one parameter (a location) and a boolean. Writes the boolean to the location and resumes the unit. \\
+    $\set$    & $\Psi \times \bool \to 1$ & Takes one parameter (a location) and a boolean. Writes the boolean to the location and resumes the continuation. \\
     $\newref$ & $\bool \to \Psi$          & Creates a new location initialized to the input boolean. It returns the fresh parameter (the new location). \\
     $\eq$     & $\Psi\times \Psi \to 2$   & Takes two parameters (locations). Returns true if they are equal and false if they are not. \\
     \hline
@@ -399,19 +396,19 @@ The parameters of the theory represent the memory locations. The operators are d
   \label{tab:localstore}
 \end{table}
 
-The signature for $\newref_i: (0\mid 1)$ is particularly interesting.
+The signature for $\eff\newref: \bool\to\Psi$ is particularly interesting.
 It captures the act of \emph{creation}. The operation itself does not depend on any existing parameter, but it introduces a new one into the context of the computation that follows.
 A language to implement this theory must have a mechanism to create a fresh parameter and make it available to the continuation.
 
 \subsubsection{Substitution and Jumps}
 
-This theory models a form of control flow with jumps where the parameters represent code labels. The operators are defined in Table \ref{tab:subst}.
+This theory models a form of control flow with jumps, where the parameters represent code labels. The operators are defined in Table \ref{tab:subst}.
 
 \begin{table}[h!]
   \centering
   \begin{tabular}{l l p{8cm}}
     \hline
-    \textbf{Operator} & \textbf{Generic Signature} & \textbf{Description} \\
+    \textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
     \hline
     $\sub$ & $1 \to \Psi + 1$ & Takes no parameters. Binds one new parameter (a label) in its first continuation, representing the attachment of the label to that code point.
     The second continuation is for the code that follows the sub block. \\
@@ -422,7 +419,7 @@ This theory models a form of control flow with jumps where the parameters repres
   \label{tab:subst}
 \end{table}
 
-Here again, the signature for the theory of substitution shows how a new resource is bound and made available to a part of the subsequent computation.
+Here again the signature for the theory of substitution shows how a new resource is bound and made available to a part of the subsequent computation.
 
 \section{Extending Handlers with Parameters}
 
@@ -431,19 +428,17 @@ We now present an extension of the effects and handlers language, designed to su
 \subsection{Extended Syntax}
 
 First, we introduce a new primitive value type, $\Psi$, for the parameters.
-Second, we add an inbuilt operation $\new : 1 \to \Psi$, which evaluates to a fresh parameter.
-
+Second, we add an inbuilt operation $\eff\new : 1 \to \Psi$, which evaluates to a fresh parameter.
 \begin{alignat*}{3}
-  &\text{Value Type} \quad & v &:= \cdots \mid \Psi \\
+  &\text{Value Type} \quad & v &:= \cdots \mid \Psi
 \end{alignat*}
 
-The intention is that a programmer will use this inbuilt $\new$ operation to generate fresh names to represent their resource, which can be used to form other handlers.
+The intention is that a programmer will use this inbuilt $\eff\new$ operation to generate fresh names to represent their resource, which can be used to form other handlers.
 However, this is only an option. The programmer may also implement their own fresh name generation in a handler. For instance, using the thread ID from a process that spawns a new thread.
 
 \subsection{Extended Operational Semantics}
 
 To formally define the behaviour of $\new$, we must ensure that it generates a parameter that is unique, as shown in the following addition to the small step semantics.
-
 \begin{mathpar}
   \inferrule{ }{\new(v; y.c) \leadsto c[a / y]} (a \text{ fresh})
 \end{mathpar}
@@ -460,7 +455,7 @@ However, as practise has shown, this bug is usually implicitly captured by the t
 
 \section{Programming with Parametrized Handlers}
 
-We now demonstrate parametrised handlers can be used to implement handlers for the canonical parametrized theories from \Cref{sec:examples}.
+We now demonstrate implementations for handlers for the parametrized theories from \Cref{sec:examples}.
 
 \subsection{Example: Local Binary State}
 
@@ -491,13 +486,15 @@ The handler can be broken down into the following parts:
       The $\get$ clause looks up the parameter $a$ in the current state map and passes the result to its continuation $k$. The state map itself remains unchanged.
       The $\set$ clause constructs a new state map that is updated at parameter $\fst x$ (the parameter) to $\snd x$ (the update value) and passes this new map to its continuation.
     \item $\ret{x}$: The return clause, when the computation is finished, returns the final result $x$ wrapped in the state monad unit.
+    \item \textbf{Equality testing:} Note that rather than use an operation $\eff\eq: \Psi \times \Psi \to \bool$, we have implemented equality testing on the parameters in the language.
+      One could replace $a\equiv b$ with $\eff\eq(a,b)$ to allow for equality testing to be handled arbitrarily, but we have chosen the former option for simplicity.
 \end{itemize}
 
 \subsection{Example: Substitution and Jumps}
 
 The theory of substitution and jumps models a form of non-local control flow where parameters act as code labels.
 A handler for this theory must be able to create new labels and interpret jumps to them.
-This is instantiated by the handler returning a sum type, $X + \Psi$, where $X$ is the original return type, to indicate the code either terminates with a value, or jumps to another piece of code.
+This is instantiated by the handler returning a sum type, $X + \Psi$, where $X$ is the original return type, to indicate the code either terminates with a value or jumps to another piece of code.
 
 A handler is implemented as follows:
 
@@ -515,7 +512,7 @@ subst_handler = handler {
 The handler can be broken down into the following parts:
 \begin{itemize}
     \item $\ret{x}$: The return clause wraps a terminated value in an $\inl{}$.
-    \item $\var(v; k)$: The $\var$ clause, which represents an explicit jump, terminates the current computation and returns the code label $a$ wrapped in $\inr{}$.
+    \item $\var(a; k)$: The $\var$ clause, which represents an explicit jump, terminates the current computation and returns the code label $a$ wrapped in $\inr{}$.
       This signals to any enclosing handlers that a jump has occurred. The continuation $k$ cannot be used because it has domain $0$.
     \item $\sub(v; k)$: This clause first creates a fresh label $a$ with $\new$. It resumes the continuation $k$, with the new label.
       The core logic resides in the `case` statement, which inspects the result of the continuation:
@@ -531,12 +528,12 @@ The handler can be broken down into the following parts:
 \subsection{Equational Reasoning}
 
 The most critical next step is to formally connect the operational semantics of our handlers with the equational specifications of the theories they are meant to model.
-For example, using the language's semantics, one should prove that the substitution handler satisfies the equational laws~\cite{fiore_substitution_2014}, such as:
+For example, using the language's semantics, one should prove that the substitution handler satisfies the equational laws of the theory of substitution~\cite{fiore_substitution_2014}, such as:
 \[
   x:1 \mid - \vdash \sub(a.\var(a), x) = x
 \]
 
-\subsection{Advanced Theories and Applications}
+\subsection{Further Theories and Applications}
 
 The expressiveness of Cambria should be further tested by implementing handlers for more advanced parametrized theories.
 Interesting targets include:
