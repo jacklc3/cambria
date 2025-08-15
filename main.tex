@@ -184,7 +184,7 @@
 \newcommand{\doin}[3]{\mathsf{do}\, #1 \leftarrow #2\, \mathsf{in}\, #3}
 \newcommand{\ifelse}[3]{\mathsf{if}\, #1 \,\mathsf{then} \,#2\, \mathsf{else}\, #3}
 \newcommand{\with}[2]{\mathsf{with}\, #1 \,\mathsf{handle} \,#2}
-\newcommand{\app}[2]{{#1 \, #2}}
+\newcommand{\app}[2]{{#1 \ #2}}
 
 \newcommand{\jv}[3]{{#1 \vdash #2 : #3}}
 \newcommand{\jc}[3]{{#1 \vdash #2 : #3}}
@@ -316,7 +316,7 @@ The effect set is an over-approximation. The typing judgements $\jv \Gamma v A$ 
   \and
   \inferrule{\jc{\Gamma}{c_1}{A \bang \Sigma} \and \jc {\Gamma,x:A} {c_2} {B \bang \Sigma}}{\jc \Gamma {\doin{x}{c_1}{c_2}}{B\bang \Sigma}}
   \and
-  \inferrule{\jv{\Gamma}{v}{A_\op}}{\jc \Gamma {\app{\op}{v}}{B_\op\bang \Sigma}}(\op : A_\op \to B_\op \in \Sigma)
+  \inferrule{\jv{\Gamma}{v}{A_\op}}{\jc \Gamma {\app{\eff\op}{v}}{B_\op\bang \Sigma}}(\op : A_\op \to B_\op \in \Sigma)
   \and
   \inferrule{\jv{\Gamma}{h}{\comp C \Rightarrow \comp D} \and \jc{\Gamma}{c}{\comp C}}{\jc \Gamma {\with{h}{c}}{\comp D}}
   \and
@@ -477,7 +477,7 @@ state_handler = handler {
   return x  -> return (fun s -> return (x, s)),
   get(a; k) -> return (fun s -> k (s a) s),
   set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
-  ref(x; k) -> return (fun s -> do a <- #new () in k a (fun b -> if b == a then x else s b))
+  ref(x; k) -> return (fun s -> do a <- !new () in k a (fun b -> if b == a then x else s b))
 }
 \end{lstlisting}
 
@@ -505,7 +505,7 @@ A handler is implemented as follows:
 subst_handler = handler {
   return x  -> return (inl x),
   var(a; k) -> return (inr a),
-  sub(v; k) -> do a <- #new () in case k (inl a) of {
+  sub(v; k) -> do a <- !new () in case k (inl a) of {
     inl x -> return (inl x),
     inr b -> if b == a then k (inl ()) else return (inr b)
   }
