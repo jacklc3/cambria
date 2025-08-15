@@ -208,7 +208,7 @@ pCase = do
 
 pOp :: Parser Computation
 pOp = do
-  op <- symbol "#" *> pIdentifier
+  op <- symbol "!" *> pIdentifier
   e <- pExpression Paren
   return $ desugar [e] (\[v] -> COp op v)
 

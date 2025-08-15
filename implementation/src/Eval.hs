@@ -4,7 +4,6 @@ module Eval where
 
 import Ast
 import Environment (def, find)
-import qualified Data.Map as Map
 
 data Result
   = Pure Value

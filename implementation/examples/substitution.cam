@@ -1,15 +1,15 @@
 with handler {
   return x  -> return (inl x),
   var(a; k) -> return (inr a),
-  sub(v; k) -> do c <- #new () in
+  sub(v; k) -> do c <- !new () in
     case k (inl c) of {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
     }
 } handle (
-  case #sub () of {
-    inl a -> case #sub () of {
-      inl b -> #var a,
+  case !sub () of {
+    inl a -> case !sub () of {
+      inl b -> !var a,
       inr x -> return 2
     },
     inr x -> return 3

@@ -1,15 +1,13 @@
 do f <-
   with handler {
     return x  -> return (fun s -> return (x, s)),
-    get(a; k) -> return (fun s -> (k (s a)) s),
-    set(x; k) -> return (fun s ->
-      (k ()) (fun a -> if a == fst x then snd x else s a)),
-    ref(x; k) -> return (fun s ->
-      do a <- #new () in
-        k a (fun b -> if b == a then return x else s b))
+    get(a; k) -> return (fun s -> k (s a) s),
+    set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+    ref(x; k) -> return (fun s -> do a <- !new () in
+      k a (fun b -> if b == a then return x else s b))
   } handle (
-    do a <- #ref true in
-      do b <- #ref false in
-        (#set (a, #get b); #get a)
+    do a <- !ref true in
+      do b <- !ref false in
+        (!set (a, !get b); !get a)
   )
 in fst (f (fun b -> return ()))

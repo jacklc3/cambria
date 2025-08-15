@@ -8,7 +8,7 @@ type Ident     = String
 type Op        = String
 type Parameter = Unique
 data Env       = Env (Map Ident Value)
-data Side      = L | R deriving (Eq)
+data Side      = L | R
 
 data Value
   = VInt Integer
@@ -46,7 +46,8 @@ instance Eq Value where
   (VString s1) == (VString s2)       = s1 == s2
   VUnit == VUnit                     = True
   (VPair v1 v2) == (VPair v3 v4)     = v1 == v3 && v2 == v4
-  (VEither s1 v1) == (VEither s2 v2) = s1 == s2 && v1 == v2
+  (VEither L v1) == (VEither L v2)   = v1 == v2
+  (VEither R v1) == (VEither R v2)   = v1 == v2
   (VVar x1) == (VVar x2)             = x1 == x2
   (VParameter p1) == (VParameter p2) = p1 == p2
   _ == _ = False

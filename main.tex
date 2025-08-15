@@ -21,7 +21,7 @@
 \usepackage{listings}
 \lstset{
   backgroundcolor=\color{white},   % choose the background color; you must add \usepackage{color} or \usepackage{xcolor}; should come as last argument
-%  basicstyle=\footnotesize,        % the size of the fonts that are used for the code
+  basicstyle=\small\ttfamily,        % the size of the fonts that are used for the code
 %  breakatwhitespace=false,         % sets if automatic breaks should only happen at whitespace
 %  breaklines=true,                 % sets automatic line breaking
 %  captionpos=b,                    % sets the caption-position to bottom
@@ -37,10 +37,8 @@
   identifierstyle=\rmfamily\itshape,
   language=haskell,                 % the language of the code
   basicstyle=\sffamily\upshape,
-%  morekeywords=[2]{knight,bernoulli},            % if you want to add more keywords to the set
-%  keywordstyle=[2]\itshape\bfseries,       % keyword style
-%  morekeywords=[3]{Prob,uniform,bernoulli,normal,beta,exponential},            % if you want to add more keywords to the set
-%  keywordstyle=[3]\color{mygreen},       % keyword style
+  morekeywords=[2]{inl,inr,fun,handle,handler,with},            % if you want to add more keywords to the set
+  keywordstyle=[2]\sffamily,       % keyword style
 %  numbers=left,                    % where to put the line numbers; possible values are (none, left, right)
 %  numbersep=5pt,                   % how far the line numbers are from the code
 %  numberstyle=\tiny\color{mygray}, % the style that is used for the line-numbers
@@ -54,6 +52,7 @@
 %  title=\lstname                   % show the filename of files included with \lstinputlisting; also try caption instead of title
  literate={->}{$\rightarrow\;$}{2}
  {<-}{$\leftarrow\;$}{2}
+ {==}{$\equiv$}{1}
 }
 
 \newcommand{\mlstinline}[1]{\mbox{\lstinline|#1|}}
@@ -202,6 +201,8 @@
 \newcommand\inl[1]{{\mathsf{inl} \ #1}}
 \newcommand\inr[1]{{\mathsf{inr} \ #1}}
 
+\newcommand\eff{{!}}
+
 \title{Cambria: a language for parametrized handlers}
 \author{Jack Liell-Cock}
 \date{\today}
@@ -249,10 +250,10 @@ Computations $c$ include returning a value, calling an operation, sequencing, co
 \end{alignat*}
 
 An operation call $\op(v; x.c)$ passes a parameter $v$ to the operation $\op$ and continues with $c$ after completion, where the result is bound to $x$.
-In the actual syntax of the language, we only expose the generic effect $\op \ v$ which is syntactic sugar for $\op(v; x.\ret{x})$.
+In the actual syntax of the language, we only expose the generic effect $\eff\op \ v$ which is syntactic sugar for $\op(v; x.\ret{x})$.
 We can recover an arbitrary continuation using do binding.
 \[
-  \op(v; x.c) = \doin{x}{\op \ v}{c}
+  \op(v; x.c) = \doin{x}{\eff\op \ v}{c}
 \]
 
 \subsection{Operational Semantics}
@@ -265,7 +266,7 @@ If a call escapes the top level, the computation stops.
   \and
   \inferrule{ }{\doin{x}{\ret v}{c_2} \leadsto c_2[v / x]}
   \and
-  \inferrule{ }{\doin{x}{\op(v; y.c_1)}{c_2} \leadsto \op(v; y.\doin{x}{c_1}{c_2}}
+  \inferrule{ }{\doin{x}{\op(v; y.c_1)}{c_2} \leadsto \op(v; y.\doin{x}{c_1}{c_2})}
   \and
   \inferrule{ }{\ifelse \true {c_1} {c_2} \leadsto c_1}
   \and
@@ -292,12 +293,12 @@ If an operation is not matched, it propagates outwards, but the handler remains 
 
 \subsection{Type and Effect System}
 
-To ensure that programs are well-behaved (e.g., do not apply a boolean as a function), we have a type and effect system.
+To ensure that programs are well-behaved, we have a type and effect system.
 Types are split into value types and computation types.
 
 \begin{alignat*}{3}
-  &\text{Value Type} \quad & v &:= \bool \mid A \to \comp C \mid \comp C \Rightarrow \comp D \\
-  &\text{Computation Type} \quad & c &:= A \bang \Sigma \\
+  &\text{Value Type} \quad & A,B &:= \bool \mid A \to \comp C \mid \comp C \Rightarrow \comp D \\
+  &\text{Computation Type} \quad & \comp C,\comp D &:= A \bang \Sigma \\
   &\text{Effect Set} \quad & \Sigma &:= \{\op_1 : A_1 \to B_1, \dots , \op_n : A_n \to B_n \}
 \end{alignat*}
 
@@ -332,10 +333,9 @@ as they will be propagated outwards. This system guarantees that well-typed prog
 
 \section{An Introduction to Parametrized Algebraic Theories}
 
-To address the problem of instances of effects, we turn to the denotational framework of Parametrized Algebraic Theories (PATs)~\cite{staton_instances_2013, staton_algebraic_2013}.
-
+To address the problem of instances of effects, we turn to the framework of parametrized algebraic theories (PATs)~\cite{staton_instances_2013, staton_algebraic_2013}.
 The core motivation for PATs is to provide a formal account of computational effects that involve multiple, dynamically created instances of a resource.
-Consider the effect of global binary state. In the standard algebraic approach, we can define operations $\get: 1 \to \bool$ and $\set: \bool \to 1$.
+In the standard algebraic approach for global binary state, we can define operations $\get: 1 \to \bool$ and $\set: \bool \to 1$.
 A handler can implement these by passing a single boolean value around~\cite{pretnar_introduction_2015}.
 
 But what about two or more independent cells?
@@ -350,7 +350,7 @@ Following the definitions in~\cite{staton_instances_2013, staton_algebraic_2013}
 
 In PATs, an operator $\op$ is assigned a signature of the form $\op:(n\mid m_1,\dots ,m_p)$. This signature has two components:
 $n \in \BN$ is the number of parameters the operation $\op$ \emph{uses}, while each
-$m_1,\dots ,m_p \in \BN$ indicates a different continuation, with the $i$-th continuation binding $m_i$ \emph{new} parameters local to that branch.
+$m_1,\dots ,m_p \in \BN$ indicates a different continuation, with the $i$-th continuation binding $m_i$ \emph{fresh} parameters local to that branch.
 This distinction between using existing parameters and binding new ones allows the theory to formally capture the manipulation of existing resources and the creation of fresh ones.
 
 \subsubsection{Parametrized Contexts and Terms}
@@ -366,9 +366,17 @@ The rules for forming terms then naturally follow this structure. For an operato
 \end{displaymath}
 where $\vec{a}$ is a vector of $n$ parameters from $\Delta$, and each $t_i$ is a term in a context $\Gamma\mid\Delta$ with $\Delta$ extended by $m_i$ new parameters $\vec{b}_i$.
 
-\subsection{Canonical Examples} \label{sec:examples}
+As a generic effect, an operator $\op: (n \mid m_1, \dots, m_p)$ has signature
+\[
+  \eff\op : \Psi^n \to \Psi^{m_1} + \cdots + \Psi^{m_p}
+\]
+where we denote the type of parameter as a new base type $\Psi$. The intuition is that we must pass $n$ parameters to the operation call, and in each of the $p$ continuations,
+which can be differentiated via case analysis, $m_i$ fresh parameters are produced. We can integrate these generic effects with standard generic effects to express
+an operator $\op : (1 \mid 0, 0)$ as $\eff\op: \Psi \to \bool$ where $\true$ represents the first continuation and $\false$ the second.
 
-To make this formalism concrete, we consider two canonical examples of PATs.
+\subsection{Examples} \label{sec:examples}
+
+To make this formalism concrete, we consider two examples of PATs.
 
 \subsubsection{Local Binary State}
 
@@ -379,12 +387,12 @@ The parameters of the theory represent the memory locations. The operators are d
   \centering
   \begin{tabular}{l l p{8cm}}
     \hline
-    \textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
+    \textbf{Operator} & \textbf{Generic Signature} & \textbf{Description} \\
     \hline
-    $\get$      & $(1\mid 0,0)$ & Takes one parameter (a location) and has two continuations. One for when the stored value is 0, one for when it is 1. \\
-    $\set_i$    & $(1\mid 0)$   & Takes one parameter (a location). Writes value $i \in \{0,1\}$ to the location and resumes the only continuation. \\
-    $\newref_i$ & $(0\mid 1)$   & Creates a new location initialized to $i \in \{0,1\}$. Its single continuation binds one new parameter (the new location). \\
-    $\eq$       & $(2\mid 0,0)$ & Takes two parameters (locations). Has two continuations, one for when they are equal, one for when they are not. \\
+    $\get$    & $\Psi \to \bool$          & Takes one parameter (a location) and has returns the result of the stored value. \\
+    $\set$    & $\Psi \times \bool \to 1$ & Takes one parameter (a location) and a boolean. Writes the boolean to the location and resumes the unit. \\
+    $\newref$ & $\bool \to \Psi$          & Creates a new location initialized to the input boolean. It returns the fresh parameter (the new location). \\
+    $\eq$     & $\Psi\times \Psi \to 2$   & Takes two parameters (locations). Returns true if they are equal and false if they are not. \\
     \hline
   \end{tabular}
   \caption{Operators for the Theory of Local Store}
@@ -397,17 +405,17 @@ A language to implement this theory must have a mechanism to create a fresh para
 
 \subsubsection{Substitution and Jumps}
 
-This theory models a form of control flow with labels and jumps with the parameters representing code labels. The operators are defined in Table \ref{tab:subst}.
+This theory models a form of control flow with jumps where the parameters represent code labels. The operators are defined in Table \ref{tab:subst}.
 
 \begin{table}[h!]
   \centering
   \begin{tabular}{l l p{8cm}}
     \hline
-    \textbf{Operator} & \textbf{Signature} & \textbf{Description} \\
+    \textbf{Operator} & \textbf{Generic Signature} & \textbf{Description} \\
     \hline
-    $\sub$ & $(0\mid 1,0)$ & Takes no parameters. Binds one new parameter (a label) in its first continuation, representing the attachment of the label to that code point.
+    $\sub$ & $1 \to \Psi + 1$ & Takes no parameters. Binds one new parameter (a label) in its first continuation, representing the attachment of the label to that code point.
     The second continuation is for the code that follows the sub block. \\
-    $\var$ & $(1\mid )$    & Takes one parameter (a label) and performs a jump to that label. It has no continuations because we jump to a new section of code. \\
+    $\var$ & $\Psi \to 0$     & Takes one parameter (a label) and performs a jump to that label. It has no continuations because we jump to a new section of code. \\
     \hline
   \end{tabular}
   \caption{Operators for the Theory of Substitution and Jumps [1]}
@@ -430,6 +438,7 @@ Second, we add an inbuilt operation $\new : 1 \to \Psi$, which evaluates to a fr
 \end{alignat*}
 
 The intention is that a programmer will use this inbuilt $\new$ operation to generate fresh names to represent their resource, which can be used to form other handlers.
+However, this is only an option. The programmer may also implement their own fresh name generation in a handler. For instance, using the thread ID from a process that spawns a new thread.
 
 \subsection{Extended Operational Semantics}
 
@@ -440,13 +449,14 @@ To formally define the behaviour of $\new$, we must ensure that it generates a p
 \end{mathpar}
 
 This rule states that evaluating $\new$ reduces to returning a fresh parameter $a$, which we can assume is drawn from an countable set.
+Note that we ignore the value $v$ because it will be of unit type.
 
 \subsection{An Extended Type and Effect System}
 
-Given we are simply adding a base type to the type and effect system, provided the semantics of $\new$ generates a fresh parameter there are no additional updates we need to the effect system.
-Implementing the feature only requires using a gensym library, such as the \texttt{SymbolGen} monad or \texttt{Unique} data type in Haskell.
+Given we are simply adding a base type to the type and effect system, provided the semantics of $\new$ generates a fresh parameter, there are no additional updates we need to the effect system.
+Implementing this feature requires only a gensym library, such as the \texttt{SymbolGen} monad or \texttt{Unique} data type in Haskell.
 As we do not track the scope of newly generated parameters in the handler, we cannot guarantee that the newly generated parameters are not leaked into continuations.
-However, as practise has shown, this bug is usually implicitly captured by the type system, and the lack of added complexity for tracking the parameters provides even greater expressiveness.
+However, as practise has shown, this bug is usually implicitly captured by the type system, and the mitigation of complexity for tracking the parameters provides even greater expressiveness.
 
 \section{Programming with Parametrized Handlers}
 
@@ -457,19 +467,17 @@ We now demonstrate parametrised handlers can be used to implement handlers for t
 The theory of local binary state models dynamically allocated single-bit memory cells.
 A handler can implement this by adopting a parameter-passing style, a technique also used for simple global state~\cite{pretnar_introduction_2015}.
 However, in our parametrized setting, the state that is passed is not a single value but a \emph{function} from parameters to their stored values,
-e.g., a map $s: \Psi \rightarrow \comp \bool$. The $\new$ construct permits the dynamic extension the domain of the state map.
+e.g. a function $s: \Psi \rightarrow \comp \bool$. The $\new$ construct permits dynamically extending the domain of the state map.
+Another implementation could use a map type from parameters to booleans.
 
-The handler implementation is as follows:
+A handler implementation is as follows:
 
-\begin{lstlisting}[language=Haskell, basicstyle=\small\ttfamily]
+\begin{lstlisting}
 state_handler = handler {
-  return x -> (fun s -> return (x, s)),
-  get(a; k) -> (fun s -> (k (s a)) s),
-  set(x; k) -> (fun s ->
-    (k ()) (fun a -> if a == fst x then snd x else s a)),
-  ref(x; k) -> fun s ->
-    do a <- #new () in
-      (k a) (fun b -> if b == a then x else s b)
+  return x  -> return (fun s -> return (x, s)),
+  get(a; k) -> return (fun s -> k (s a) s),
+  set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+  ref(x; k) -> return (fun s -> do a <- #new () in k a (fun b -> if b == a then x else s b))
 }
 \end{lstlisting}
 
@@ -491,32 +499,30 @@ The theory of substitution and jumps models a form of non-local control flow whe
 A handler for this theory must be able to create new labels and interpret jumps to them.
 This is instantiated by the handler returning a sum type, $X + \Psi$, where $X$ is the original return type, to indicate the code either terminates with a value, or jumps to another piece of code.
 
-The handler is implemented as follows:
+A handler is implemented as follows:
 
-\begin{lstlisting}[language=Haskell, basicstyle=\small\ttfamily]
+\begin{lstlisting}
 subst_handler = handler {
-  return x -> return (inl x),
+  return x  -> return (inl x),
   var(a; k) -> return (inr a),
-  sub(v; k) ->
-    do a <- #new() in
-      case k (inl a) of {
-        inl x -> return (inl x);
-        inr b -> if b == a then return (inl ()) else return (inr b)
-      }
+  sub(v; k) -> do a <- #new () in case k (inl a) of {
+    inl x -> return (inl x),
+    inr b -> if b == a then k (inl ()) else return (inr b)
+  }
 }
 \end{lstlisting}
 
 The handler can be broken down into the following parts:
 \begin{itemize}
-    \item $\ret{x}$: The return clause wraps a terminated value in an $\inl{}$
-    \item $\var(v; k)$: The $'var$ clause, which represents an explicit jump, terminates the current computation and returns the code label $a$ wrapped in $\inr{}$.
+    \item $\ret{x}$: The return clause wraps a terminated value in an $\inl{}$.
+    \item $\var(v; k)$: The $\var$ clause, which represents an explicit jump, terminates the current computation and returns the code label $a$ wrapped in $\inr{}$.
       This signals to any enclosing handlers that a jump has occurred. The continuation $k$ cannot be used because it has domain $0$.
-    \item $\sub(v; k)$: This clause first creates a fresh label $a$ with $\new$. It then resumes the continuation $k$, with the new label.
+    \item $\sub(v; k)$: This clause first creates a fresh label $a$ with $\new$. It resumes the continuation $k$, with the new label.
       The core logic resides in the `case` statement, which inspects the result of the continuation:
       \begin{itemize}
           \item If the continuation returns a value $\inl x$, the block has completed without a jump, and the value is propagated.
-          \item If the continuation returns a label $\inr b$, it means a $\var$ call occurred. If the label matches the newly created label, the jump is caught and the jump continuation is run.
-            If the jump was to a different label, the label is propagated upwards.
+          \item If the continuation returns a label $\inr b$, it means a jump call occurred. If the label matches the newly created label, the jump is caught and the latter continuation is run.
+            If the jump was to a different label, it is propagated upwards.
       \end{itemize}
 \end{itemize}
 
@@ -533,17 +539,23 @@ For example, using the language's semantics, one should prove that the substitut
 \subsection{Advanced Theories and Applications}
 
 The expressiveness of Cambria should be further tested by implementing handlers for more advanced parametrized theories.
-Interesting targets include a fragment of the $\pi$-calculus, where parameters represent channel names, or Staton's algebraic formulation of quantum computation,
-where parameters represent qubits. The current barrier is the lack of language features implemented in Cambria.
+Interesting targets include:
+\begin{itemize}
+  \item A fragment of the $\pi$-calculus, where parameters represent channel names~\cite{staton_instances_2013}.
+  \item The algebraic formulation of quantum computation, where parameters represent qubits~\cite{staton_algebraic_2015}.
+  \item The Beta-Bernoulli process~\cite{staton_beta_2018}.
+  \item Dynamic threads (draft coming soon)
+\end{itemize}
+The current barrier is the lack of language features implemented in Cambria, such as recursion and ADTs.
 
 \subsection{Connection to Scoped Effects}
 
 Recent research has established a connection between PATs and \emph{scoped effects}~\cite{lindley_scoped_2024}.
-Scoped effects, which are used to model features like transaction rollback or backtracking with `once',
-can be modelled by PATs where parameters are used linearly and non-commutatively.
-It would be interesting to see if Cambria could be augmented to track parameter usage more precisely to enforce for safe implementations of scoped effects.
+Scoped effects model effects that are not necessarily algebraic, such as transaction rollback, catching exceptions, or backtracking with \emph{once}.
+These effects can be encoded as PATs where parameters are used linearly and non-commutatively.
+It would be interesting to see if Cambria could be augmented to track parameter usage more precisely to enforce safe implementations of scoped effects.
 
 \bibliography{library.bib}
 \bibliographystyle{alpha}
-\end{document}
 
+\end{document}
