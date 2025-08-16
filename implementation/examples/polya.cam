@@ -1,0 +1,25 @@
+do comment <- return "Polyas urn implementation of Beta/Bernoulli, via local state" in
+do f <- with handler {
+    return x  -> return (fun s -> return (x, s)),
+    get(a; k) -> return (fun s -> k (s a) s),
+    set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+    ref(x; k) -> return (fun s -> do a <- !new () in
+      k a (fun b -> if b == a then return x else s b))
+} handle
+(
+do boolToInt <- return (fun b -> if b then return 1 else return 0) in
+with handler {
+  return x -> return x,
+  beta(ij; k) -> k(!ref(ij)),
+  bernoulli(a; k) -> do ij <- !get a in
+                     do b <- !flipratio ij in 
+		     do n <- boolToInt b in
+		     (!set(a,(fst ij+n,snd ij+(1-n))) ; k b)
+} handle (
+  do comment <- return "Make a new urn, and draw ten times, reporting the number of trues." in
+  do a1 <- !beta(1,1) in
+  (fun f -> boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()) + boolToInt(f()))
+  (fun z -> !bernoulli a1)
+)
+)
+in fst (f (fun b -> return ()))
