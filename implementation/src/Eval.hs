@@ -22,7 +22,7 @@ eval env = \case
       VClosure x c cEnv ->
         let newEnv = def x (evalValue env v) cEnv
         in  eval newEnv c
-      VPrimative f ->  eval env (f (evalValue env v))
+      VPrimitive f ->  eval env (f (evalValue env v))
       _            -> error $ "Non-function in application: " ++ show f
   CIf b c1 c2 ->
     case evalValue env b of
