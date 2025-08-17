@@ -16,8 +16,9 @@ handlerIO =
   , ("print", \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
   , ("read",  \_ k           -> getLine    >>= return . CApp k . VString)
   , ("flip",  \_ k           -> randomIO   >>= return . CApp k . VBool)
-  , ("flipratio",  \(VPair (VInt i) (VInt j)) k
-        -> (randomIO :: IO Double) >>= \r -> return $ CApp k $ VBool $ r <  ((fromIntegral i) / (fromIntegral $ i+j)))
+  , ("bernoulli",  \(VDouble n) k
+        -> (randomIO :: IO Double) >>= \r -> return $ CApp k $ VBool $ r < n)
+  , ("uniform",  \_ k  -> (randomIO :: IO Double)  >>= return . CApp k . VDouble)
   ]
 
 -- Catches any inbuilt effects at the top level and handles them

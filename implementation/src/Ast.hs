@@ -12,6 +12,7 @@ data Side      = L | R
 
 data Value
   = VInt Integer
+  | VDouble Double
   | VBool Bool
   | VString String
   | VUnit
@@ -27,6 +28,7 @@ data Value
 
 instance Show Value where
   show (VInt i)         = show i
+  show (VDouble n)      = show n
   show (VBool b)        = show b
   show (VString s)      = show s
   show VUnit            = "()"
@@ -42,6 +44,7 @@ instance Show Value where
 
 instance Eq Value where
   (VInt i1) == (VInt i2)             = i1 == i2
+  (VDouble n1) == (VDouble n2)       = n1 == n2
   (VBool b1) == (VBool b2)           = b1 == b2
   (VString s1) == (VString s2)       = s1 == s2
   VUnit == VUnit                     = True

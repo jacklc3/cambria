@@ -75,7 +75,7 @@ pComputation :: CompScope -> Parser Computation
 pComputation cs = choice $ seq ++ infi ++ app ++ expr ++ [try (parens (pComputation Seq))]
   where
     seq  = if cs > Seq   then [] else [try pSeq]
-    infi = if cs > Infix then [] else [try (pInfixOps ["++", "*", "+", "-", "=="])]
+    infi = if cs > Infix then [] else [try (pInfixOps ["++", "*", "+", "-", "/", "=="])]
     app  = if cs > App   then [] else [try pApp]
     expr = if cs > Expr  then [] else [pIf, pCase, pDo, pWith, pFun, pOp, pReturn]
 

@@ -18,6 +18,7 @@ initialEnv = Env $ Map.fromList
   [ ("+", primBinOpInt (\x y -> VInt (x + y)))
   , ("-", primBinOpInt (\x y -> VInt (x - y)))
   , ("*", primBinOpInt (\x y -> VInt (x * y)))
+  , ("/", primBinOpInt (\x y -> VDouble ((fromIntegral x) / (fromIntegral y))))
   , ("++", primBinOpStr (\x y -> VString (x ++ y)))
   , ("max", primBinOpInt (\x y -> VInt (max x y)))
   , ("fst", VPrimitive (\(VPair x _) -> CReturn x))
