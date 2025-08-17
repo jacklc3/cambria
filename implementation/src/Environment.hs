@@ -1,6 +1,7 @@
 module Environment where
 
 import Ast
+import Data.Unique (hashUnique)
 import qualified Data.Map as Map
 
 find :: Ident -> Env -> Value
@@ -22,6 +23,7 @@ initialEnv = Env $ Map.fromList
   , ("fst", VPrimitive (\(VPair x _) -> CReturn x))
   , ("snd", VPrimitive (\(VPair _ x) -> CReturn x))
   , ("==", primBinOpVal (\x y -> VBool (x == y)))
+  , ("hash", VPrimitive (\(VParameter a) -> CReturn $ VString $ show $ hashUnique a))
   ]
 
 primBinOpInt :: (Integer -> Integer -> Value) -> Value
