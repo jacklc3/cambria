@@ -1,0 +1,37 @@
+do comment <- return "Erdos-Renyi graphon" in
+do lookup <- fun g -> fun ab -> do a <- fst ab in do b <- snd ab in
+             if a==b then return false else 
+             if g==() then return () else
+	     if (fst (fst g))==(a,b) then return (snd (fst g)) else
+	     if (fst (fst g))==(b,a) then return (snd (fst g)) else
+	     lookup (snd g) (a,b) in
+do f <- with handler {
+    return x  -> return (fun s -> return (x, s)),
+    get(a; k) -> return (fun s -> k (s a) s),
+    set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+    ref(x; k) -> return (fun s -> do a <- !new () in
+      k a (fun b -> if b == a then return x else s b))
+} handle
+(
+with handler {
+  return x -> return x,
+  newgraph(z; k) -> k(!ref(())),
+  newnode(z; k) -> k(!new()),
+  isedge(gab; k) ->
+         do g <- fst gab in do a <- fst (snd gab) in do b <- snd (snd gab) in 
+         do e <- lookup (!get g) (a,b) in
+	 if e == () then
+	 ( do e <- !bernoulli (1/2) in
+	   do z <- !set(g,(((a,b),e),(!get g))) in 
+	   return e)
+	 else
+	   return e
+} handle (
+  do comment <- return "Make a new graph, pick two nodes, and check an edge between then." in
+  do g <- !newgraph() in
+  do a <- !newnode(g) in
+  do b <- !newnode(g) in
+  !isedge(g,(a,b))
+)
+)
+in fst (f (fun b -> return ()))
