@@ -1,0 +1,33 @@
+do comment <- return "Graphviz handler for DAG generic effects" in
+do for <- return rec for fl ->
+  do f <- fst fl in
+  do l <- snd fl in
+  if l == () then return () else (f (fst l) ; for (f,snd l))
+in
+do concat <- return rec concat vv ->
+  do v1 <- fst vv in
+  do v2 <- snd vv in
+  if v1 == () then return v2 else return (fst v1, concat (snd v1, v2))
+in
+with handler {
+  return x -> return x,
+  act(as; k) ->
+    do a <- fst as in
+    do s <- snd as in
+    do b <- !new () in
+    (!print("n"++(hash b)++" [label=\""++s++"\"]; ") ;
+    for (fun a -> !print("n"++(hash a)++" -> n"++(hash b)++"; "),a) ;
+    k (b, ())),
+  zero(z; k) -> k (),
+  plus(v; k) -> k (concat v)
+} handle (
+  do z  <- !zero () in
+  do hi <- !act (z,"hello") in
+  do o  <- !act (hi,"world") in
+  do a  <- !act (z,"a") in
+  do b  <- !act (z,"b") in
+  do ab <- !plus (a,b) in
+  do c  <- !act (ab,"c") in
+  do d  <- !act (b,"d") in
+  return ()
+)

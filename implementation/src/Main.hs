@@ -16,9 +16,9 @@ handlerIO =
   , ("print", \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
   , ("read",  \_ k           -> getLine    >>= return . CApp k . VString)
   , ("flip",  \_ k           -> randomIO   >>= return . CApp k . VBool)
-  , ("bernoulli",  \(VDouble n) k
-        -> (randomIO :: IO Double) >>= \r -> return $ CApp k $ VBool $ r < n)
-  , ("uniform",  \_ k  -> (randomIO :: IO Double)  >>= return . CApp k . VDouble)
+  , ("bernoulli", \(VDouble n) k
+        -> (randomIO :: IO Double) >>= return . CApp k . VBool . (< n))
+  , ("uniform", \_ k  -> (randomIO :: IO Double)  >>= return . CApp k . VDouble)
   ]
 
 -- Catches any inbuilt effects at the top level and handles them
@@ -28,7 +28,7 @@ evalIO env c =
     Pure v        -> return $ Pure v
     Impure op v f ->
       case lookup op handlerIO of
-        Just k  -> k v f >>= (\r -> evalIO env r)
+        Just k  -> k v f >>= evalIO env
         Nothing -> return $ Impure op v f
 
 main :: IO ()
@@ -40,6 +40,7 @@ main = do
       case parseProgram filename content of
         Left err  -> putStr (errorBundlePretty err)
         Right ast -> do
+          putStrLn "Parsed!"
           result <- evalIO initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"

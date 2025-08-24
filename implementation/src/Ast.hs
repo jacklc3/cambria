@@ -20,6 +20,7 @@ data Value
   | VEither Side Value
   | VVar Ident
   | VFun Ident Computation
+  | VRec Ident Ident Computation
   | VHandler Handler
   | VParameter Parameter
     -- Runtime-only values
@@ -37,6 +38,7 @@ instance Show Value where
   show (VEither R v)    = "inr " ++ show v
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
+  show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VHandler h)     = show h
   show (VPrimitive _)   = "<primative>"
   show (VClosure _ _ _) = "<closure>"
@@ -66,7 +68,7 @@ data Computation
 
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v
-  show (COp op v)     = op ++ "(" ++ show v ++ ")"
+  show (COp op v)     = "!" ++ op ++ " " ++ show v
   show (CDo x c1 c2) = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
   show (CIf v c1 c2)  = "if " ++ show v ++ " then " ++ show c1 ++ " else " ++ show c2
   show (CCase v x1 c1 x2 c2) =

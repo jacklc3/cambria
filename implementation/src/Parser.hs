@@ -41,7 +41,7 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "fun", "handler", "return", "do", "in",
     "if", "then", "else", "with", "handle", "inl", "inr",
-    "case", "of"
+    "case", "of", "rec"
   ]
 
 pIdentifier :: Parser String
@@ -77,7 +77,7 @@ pComputation cs = choice $ seq ++ infi ++ app ++ expr ++ [try (parens (pComputat
     seq  = if cs > Seq   then [] else [try pSeq]
     infi = if cs > Infix then [] else [try (pInfixOps ["++", "*", "+", "-", "/", "=="])]
     app  = if cs > App   then [] else [try pApp]
-    expr = if cs > Expr  then [] else [pIf, pCase, pDo, pWith, pFun, pOp, pReturn]
+    expr = if cs > Expr  then [] else [pIf, pCase, pDo, pWith, pOp, pReturn]
 
 
 pExpression :: CompScope -> Parser Expression
@@ -89,6 +89,8 @@ pExpression cs = choice
   , V <$> pInteger
   , V <$> pString
   , V <$> pHandler
+  , V <$> pFun
+  , V <$> pRec
   , try $ C <$> pComputation cs
   , V <$> pVar
   , parens (pExpression Seq)
@@ -109,15 +111,24 @@ pInteger = VInt <$> lexeme L.decimal
 pString :: Parser Value
 pString = VString <$> lexeme (char '"' *> manyTill L.charLiteral (char '"'))
 
-pFun :: Parser Computation
+pFun :: Parser Value
 pFun = do
-    xs <- symbol "fun" *> some pIdentifier
+    (x:xs) <- symbol "fun" *> some pIdentifier
     c <- symbol "->" *> pComputation Seq
-    return $ CReturn $ desugarVars xs c
+    return $ VFun x (desugarVars xs c)
   where
-    desugarVars [x]    c = VFun x c
-    desugarVars (x:xs) c = VFun x (CReturn (desugarVars xs c))
-    desugarVars []     _ = error "fun with no arguments, this should have failed at the parser"
+    desugarVars []     c = c
+    desugarVars (x:xs) c = CReturn (VFun x (desugarVars xs c))
+
+pRec :: Parser Value
+pRec = do
+    f <- symbol "rec" *> pIdentifier
+    (x:xs) <- some pIdentifier
+    c <- symbol "->" *> pComputation Seq
+    return $ VRec f x (desugarVars xs c)
+  where
+    desugarVars []     c = c
+    desugarVars (x:xs) c = CReturn (VFun x (desugarVars xs c))
 
 pEither :: Parser Expression
 pEither = EEither <$> (L <$ symbol "inl" <|> R <$ symbol "inr") <*> pExpression Paren

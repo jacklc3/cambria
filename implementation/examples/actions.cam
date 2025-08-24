@@ -1,23 +1,23 @@
 do comment <- return "Graphviz handler for DAG generic effects" in
-do for <- fun fl ->
-  do f <- fst fl in
+do for <- return (rec for fl ->
+  do g <- fst fl in
   do l <- snd fl in
-  if l==() then return () else (f (fst l) ; for (f,snd l))
+  if l == () then return () else (g (fst l) ; for (g, snd l)))
 in
 with handler {
-    return x -> return x,
-    act(as; k) ->
-      do a <- fst as in 
-      do s <- snd as in
-      do b <- !new() in
-      (!print("n"++(hash b)++" [label=\""++s++"\"]; ") ;
-      for (fun a -> !print("n"++(hash a)++" -> n"++(hash b)++"; "),a) ;
-      k b)
-  } handle (
-    do hi <- !act((),"hello") in
-    do o <- !act((hi,()),"world") in 
-    do a <- !act((),"a") in
-    do b <- !act((),"b") in
-    do c <- !act((a,(b,())),"c") in
-    do d <- !act((b,()),"d") in return()
-  )
+  return x -> return x,
+  act(as; k) ->
+    do a <- fst as in
+    do s <- snd as in
+    do b <- !new() in
+    (!print("n"++(hash b)++" [label=\""++s++"\"]; ") ;
+    for (fun a -> !print("n"++(hash a)++" -> n"++(hash b)++"; "), a);
+    k b)
+} handle (
+  do hi <- !act((),"hello") in
+  do o  <- !act((hi,()),"world") in
+  do a  <- !act((),"a") in
+  do b  <- !act((),"b") in
+  do c  <- !act((a,(b,())),"c") in
+  do d  <- !act((b,()),"d") in return()
+)

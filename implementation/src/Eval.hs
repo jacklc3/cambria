@@ -34,8 +34,6 @@ eval env = \case
       VEither L v -> eval (def x1 v env) c1
       VEither R v -> eval (def x2 v env) c2
       v           -> error $ "Non-either in case analysis: " ++ show v
-  CDo f (CReturn (VFun x c1)) c2 -> -- Allow recursive def
-    let env' = def f (VClosure x c1 env') env in eval env' c2
   CDo x c1 c2 ->
     case eval env c1 of
       Pure v               -> eval (def x v env) c2
@@ -68,4 +66,5 @@ evalValue env = \case
   VPair v1 v2 -> VPair (evalValue env v1) (evalValue env v2)
   VEither s v -> VEither s (evalValue env v)
   VFun x c    -> VClosure x c env
+  VRec f x c  -> let env' = def f (VClosure x c env') env in VClosure x c env'
   v           -> v
