@@ -10,8 +10,8 @@ data Result
   | Impure Op Value Value
 
 instance Show Result where
-  show (Pure v)         = "Pure " ++ show v
-  show (Impure op v f)  = "Impure " ++ op ++ " " ++ show v
+  show (Pure v)         = "Pure: " ++ show v
+  show (Impure op v f)  = "Impure: !" ++ op ++ " " ++ show v
 
 eval :: Env -> Computation -> Result
 eval env = \case

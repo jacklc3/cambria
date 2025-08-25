@@ -2,13 +2,13 @@ module Ast where
 
 import Data.List (intersperse)
 import Data.Map (Map)
-import Data.Unique (Unique)
+import Data.Unique (Unique, hashUnique)
 
-type Ident     = String
-type Op        = String
-type Parameter = Unique
-data Env       = Env (Map Ident Value)
-data Side      = L | R
+type Ident = String
+type Op    = String
+type Name  = Unique
+data Env   = Env (Map Ident Value)
+data Side  = L | R
 
 data Value
   = VInt Integer
@@ -16,13 +16,14 @@ data Value
   | VBool Bool
   | VString String
   | VUnit
+  | VName Name
   | VPair Value Value
   | VEither Side Value
+  | VHandler Handler
+    -- Parsetime-only values
   | VVar Ident
   | VFun Ident Computation
   | VRec Ident Ident Computation
-  | VHandler Handler
-  | VParameter Parameter
     -- Runtime-only values
   | VPrimitive (Value -> Computation)
   | VClosure Ident Computation Env
@@ -33,29 +34,29 @@ instance Show Value where
   show (VBool b)        = show b
   show (VString s)      = show s
   show VUnit            = "()"
+  show (VName a)        = "<a" ++ show (hashUnique a) ++ ">"
   show (VPair v1 v2)    = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
   show (VEither L v)    = "inl " ++ show v
   show (VEither R v)    = "inr " ++ show v
+  show (VHandler h)     = show h
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
-  show (VHandler h)     = show h
   show (VPrimitive _)   = "<primative>"
   show (VClosure _ _ _) = "<closure>"
-  show (VParameter _)   = "<parameter>"
 
 instance Eq Value where
-  (VInt i1) == (VInt i2)             = i1 == i2
-  (VDouble n1) == (VDouble n2)       = n1 == n2
-  (VBool b1) == (VBool b2)           = b1 == b2
-  (VString s1) == (VString s2)       = s1 == s2
-  VUnit == VUnit                     = True
-  (VPair v1 v2) == (VPair v3 v4)     = v1 == v3 && v2 == v4
-  (VEither L v1) == (VEither L v2)   = v1 == v2
-  (VEither R v1) == (VEither R v2)   = v1 == v2
-  (VVar x1) == (VVar x2)             = x1 == x2
-  (VParameter p1) == (VParameter p2) = p1 == p2
-  _ == _ = False
+  (VInt i1) == (VInt i2)           = i1 == i2
+  (VDouble n1) == (VDouble n2)     = n1 == n2
+  (VBool b1) == (VBool b2)         = b1 == b2
+  (VString s1) == (VString s2)     = s1 == s2
+  VUnit == VUnit                   = True
+  (VName a1) == (VName a2)         = a1 == a2
+  (VPair v1 v2) == (VPair v3 v4)   = v1 == v3 && v2 == v4
+  (VEither L v1) == (VEither L v2) = v1 == v2
+  (VEither R v1) == (VEither R v2) = v1 == v2
+  (VVar x1) == (VVar x2)           = x1 == x2
+  _ == _                           = False
 
 data Computation
   = CReturn Value

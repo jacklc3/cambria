@@ -169,7 +169,7 @@ pInfixOps ops = do
     foldInfix op (e1:e2:es@(_:_)) = foldInfix op (C (desugar [e1,e2] (sequenceInfix op)) : es)
     foldInfix op [e1,e2]          = desugar [e1,e2] (sequenceInfix op)
     foldInfix _  _                = error "infix operator with less than 2 arguments, this should have failed at the parser"
-    sequenceInfix op [v1, v2]     = CDo "_f" (CApp (VVar (unpack op)) v1) (CApp (VVar "_f") v2)
+    sequenceInfix op [v1, v2]     = CApp (VVar (unpack op)) (VPair v1 v2)
 
 pSeq :: Parser Computation
 pSeq = do

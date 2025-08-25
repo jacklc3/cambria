@@ -12,13 +12,12 @@ import Text.Megaparsec.Error (errorBundlePretty)
 
 handlerIO :: [(Op, Value -> Value -> IO Computation)]
 handlerIO =
-  [ ("new",   \_ k           -> newUnique  >>= return . CApp k . VParameter)
-  , ("print", \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
-  , ("read",  \_ k           -> getLine    >>= return . CApp k . VString)
-  , ("flip",  \_ k           -> randomIO   >>= return . CApp k . VBool)
-  , ("bernoulli", \(VDouble n) k
-        -> (randomIO :: IO Double) >>= return . CApp k . VBool . (< n))
-  , ("uniform", \_ k  -> (randomIO :: IO Double)  >>= return . CApp k . VDouble)
+  [ ("new",       \_           k -> newUnique  >>= return . CApp k . VName)
+  , ("print",     \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
+  , ("read",      \_           k -> getLine    >>= return . CApp k . VString)
+  , ("flip",      \_           k -> randomIO   >>= return . CApp k . VBool)
+  , ("bernoulli", \(VDouble n) k -> randomIO   >>= return . CApp k . VBool . (< n))
+  , ("uniform",   \_           k -> randomIO   >>= return . CApp k . VDouble)
   ]
 
 -- Catches any inbuilt effects at the top level and handles them

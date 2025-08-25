@@ -1,1 +1,1 @@
-do f <- (do x <- return 2 in fun y -> return x) in f 3
+do f <- (do x <- return 2 in return fun y -> return x) in f 3
