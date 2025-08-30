@@ -8,7 +8,7 @@ type Ident = String
 type Op    = String
 type Name  = Unique
 data Env   = Env (Map Ident Value)
-data Side  = L | R
+data Side  = L | R deriving (Show)
 
 data Value
   = VInt Integer
@@ -16,7 +16,6 @@ data Value
   | VBool Bool
   | VString String
   | VUnit
-  | VName Name
   | VPair Value Value
   | VEither Side Value
   | VHandler Handler
@@ -25,6 +24,7 @@ data Value
   | VFun Ident Computation
   | VRec Ident Ident Computation
     -- Runtime-only values
+  | VName Name
   | VPrimitive (Value -> Computation)
   | VClosure Ident Computation Env
 
@@ -80,6 +80,7 @@ instance Show Computation where
 
 data RetClause = RetClause Ident Computation
 data OpClause = OpClause Ident Ident Computation
+data FinClause = FinClause Ident Computation
 data Handler = Handler {
   retClause :: RetClause,
   opClauses :: [(Op, OpClause)]

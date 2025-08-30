@@ -2,13 +2,12 @@ module Main where
 
 import Ast
 import Environment (initialEnv)
-import Parser (parseProgram)
+import Parser.Parser (parseExpr)
 import Eval (Result(..), eval)
 
 import Data.Unique (newUnique)
 import System.Environment (getArgs)
 import System.Random (randomIO)
-import Text.Megaparsec.Error (errorBundlePretty)
 
 handlerIO :: [(Op, Value -> Value -> IO Computation)]
 handlerIO =
@@ -36,10 +35,15 @@ main = do
   case args of
     [filename] -> do
       content <- readFile filename
-      case parseProgram filename content of
-        Left err  -> putStr (errorBundlePretty err)
+      case parseExpr content of
+        Left err  -> putStr err
         Right ast -> do
           putStrLn "Parsed!"
+          print ast
+
+  {-
+          "Parsed!"
           result <- evalIO initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"
+    -}
