@@ -5,13 +5,12 @@ do for <- return (rec for fl ->
   if l == () then return () else (g (fst l) ; for (g, snd l)))
 in
 with handler {
-  return x -> return x,
   act(as; k) ->
     do a <- fst as in
     do s <- snd as in
     do b <- !new() in
-    (!print("n"++(hash b)++" [label=\""++s++"\"]; ") ;
-    for (fun a -> !print("n"++(hash a)++" -> n"++(hash b)++"; "), a);
+    (!print ("n" ++ hash b ++ " [label=\"" ++ s ++ "\"];");
+    for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ ";"), a);
     k b)
 } handle (
   do hi <- !act((),"hello") in

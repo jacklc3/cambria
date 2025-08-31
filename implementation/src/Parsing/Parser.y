@@ -18,51 +18,52 @@ import Control.Monad.Except
 %error { parseError }
 
 %token
-  fun                        { TokFun }
-  rec                        { TokRec }
-  handler                    { TokHandler }
-  return                     { TokReturn }
-  finally                    { TokFinally }
-  do                         { TokDo }
-  in                         { TokIn }
-  if                         { TokIf }
-  then                       { TokThen }
-  else                       { TokElse }
-  with                       { TokWith }
-  handle                     { TokHandle }
-  inl                        { TokInl }
-  inr                        { TokInr }
-  case                       { TokCase }
-  of                         { TokOf }
+  fun                        { Token _ TokFun }
+  rec                        { Token _ TokRec }
+  handler                    { Token _ TokHandler }
+  return                     { Token _ TokReturn }
+  finally                    { Token _ TokFinally }
+  do                         { Token _ TokDo }
+  in                         { Token _ TokIn }
+  if                         { Token _ TokIf }
+  then                       { Token _ TokThen }
+  else                       { Token _ TokElse }
+  with                       { Token _ TokWith }
+  handle                     { Token _ TokHandle }
+  inl                        { Token _ TokInl }
+  inr                        { Token _ TokInr }
+  case                       { Token _ TokCase }
+  of                         { Token _ TokOf }
 
-  '()'                       { TokUnit }
-  '=='                       { TokEq }
-  '->'                       { TokArrow }
-  '<-'                       { TokLeftArrow }
-  '+'                        { TokPlus }
-  '-'                        { TokMinus }
-  '*'                        { TokAsterisk }
-  '/'                        { TokSlash }
-  '('                        { TokLParen }
-  ')'                        { TokRParen }
-  '{'                        { TokLBrace }
-  '}'                        { TokRBrace }
-  ','                        { TokComma }
-  '!'                        { TokExclam }
-  '_'                        { TokUnderscore }
-  ';'                        { TokSemiColon }
-  '++'                       { TokConcat }
+  '()'                       { Token _ TokUnit }
+  '=='                       { Token _ TokEq }
+  '->'                       { Token _ TokArrow }
+  '<-'                       { Token _ TokLeftArrow }
+  '+'                        { Token _ TokPlus }
+  '-'                        { Token _ TokMinus }
+  '*'                        { Token _ TokAsterisk }
+  '/'                        { Token _ TokSlash }
+  '('                        { Token _ TokLParen }
+  ')'                        { Token _ TokRParen }
+  '{'                        { Token _ TokLBrace }
+  '}'                        { Token _ TokRBrace }
+  ','                        { Token _ TokComma }
+  '!'                        { Token _ TokExclam }
+  '_'                        { Token _ TokUnderscore }
+  ';'                        { Token _ TokSemiColon }
+  '++'                       { Token _ TokConcat }
 
-  int                        { TokInt $$ }
-  bool                       { TokBool $$ }
-  string                     { TokString $$ }
-  ident                      { TokIdent $$ }
+  int                        { Token _ (TokInt $$) }
+  bool                       { Token _ (TokBool $$) }
+  string                     { Token _ (TokString $$) }
+  ident                      { Token _ (TokIdent $$) }
 
 %right ';'
 %nonassoc '=='
 %left '++'
 %left '+' '-'
 %left '*' '/'
+%nonassoc APP
 
 %%
 
@@ -113,11 +114,11 @@ handlerClause :: { HandlerClause }
 
 guardedExpr :: { SugaredExpr }
   : value                                 { $1 }
-  | '(' expr ')'                          { $2 }
   | var                                   { SEVar $1 }
+  | '(' expr ')'                          { $2 }
 
 guardedExprs :: { [SugaredExpr] }
-  : guardedExprs guardedExpr              { $2 : $1 }
+  : guardedExprs guardedExpr    { $2 : $1 }
   | guardedExpr                           { [$1] }
 
 comp :: { SugaredComp }
@@ -128,10 +129,9 @@ comp :: { SugaredComp }
   | expr '-'  expr                        { SCApp (SEVar "-") [SEPair $1 $3] }
   | expr '*'  expr                        { SCApp (SEVar "*") [SEPair $1 $3] }
   | expr '/'  expr                        { SCApp (SEVar "/") [SEPair $1 $3] }
-  | var guardedExprs                      { SCApp (SEVar $1) (reverse $2) }
-  | '(' expr ')' guardedExprs             { SCApp $2 (reverse $4) }
+  | guardedExpr guardedExprs %prec APP    { SCApp $1 (reverse $2) }
   | return expr                           { SCReturn $2 }
-  | '!' op expr                           { SCOp $2 $3 }
+  | '!' op guardedExpr %prec APP          { SCOp $2 $3 }
   | do nvar '<-' comp in comp             { SCDo $2 $4 $6 }
   | if expr then comp else comp           { SCIf $2 $4 $6 }
   | caseMatch                             { $1 }
@@ -151,8 +151,11 @@ inrMatch :: { (Ident, SugaredComp) }
 {
 
 parseError :: [Token] -> Except String a
-parseError (l:ls) = throwError (show l)
-parseError [] = throwError "Unexpected end of input"
+parseError (Token (AlexPn _ line col) tok:_) =
+  throwError $ "Parse error at " ++ show line ++
+  ":" ++ show col ++ ", with token: " ++ show tok
+parseError [] =
+  throwError "Unexpected end of input"
 
 parseExpr :: String -> Either String SugaredExpr
 parseExpr input =

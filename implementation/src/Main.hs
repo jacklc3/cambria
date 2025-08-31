@@ -40,7 +40,6 @@ main = do
         Left err  -> putStr err
         Right sugaredAst -> do
           let ast = desugar sugaredAst
-          print ast
           result <- evalIO initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"
