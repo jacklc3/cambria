@@ -1,6 +1,6 @@
 module Environment where
 
-import Ast
+import Syntax
 
 import Data.Unique (hashUnique)
 import qualified Data.Map as Map

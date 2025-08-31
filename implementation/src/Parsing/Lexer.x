@@ -1,5 +1,5 @@
 {
-module Parser.Lexer (
+module Parsing.Lexer (
   Token(..),
   scanTokens
 ) where

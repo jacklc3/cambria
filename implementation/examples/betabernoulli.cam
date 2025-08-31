@@ -1,16 +1,15 @@
-do comment <- return "Real number implementation of Beta/Bernoulli, without state" in
-do comment <- return "Equivalent to polya.cam" in
+-- Real number implementation of Beta/Bernoulli, without state
+-- Equivalent to polya.cam
 do boolToInt <- return (fun b -> if b then return 1 else return 0) in
 do countSuccesses <- return rec countSuccesses n f ->
    if n == 0 then return 0 else do i <- countSuccesses (n-1) f in i + boolToInt (f ())
 in
 with handler {
-  return x -> return x,
-  newproc(z; k) -> k (!uniform ()),
+  newproc(_; k) -> k (!uniform ()),
   sample(a; k) -> k (!bernoulli a)
 } handle (
-  do comment <- return "Make a new urn, and draw ten times, reporting the number of trues." in
-  do a1 <- !newproc() in
-  countSuccesses 10 (fun z -> !sample a1)
+  -- Make a new urn, and draw ten times, reporting the number of trues
+  do a1 <- !newproc () in
+  countSuccesses 10 (fun _ -> !sample a1)
 )
 

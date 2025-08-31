@@ -1,5 +1,4 @@
 with handler {
-  return x -> return x,
   decide(v; k) -> max (k true, k false)
 } handle (
   do x1 <- if !decide () then return 15 else return 30 in

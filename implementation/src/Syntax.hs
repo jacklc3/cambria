@@ -1,4 +1,4 @@
-module Ast where
+module Syntax where
 
 import Data.List (intersperse)
 import Data.Map (Map)
@@ -83,12 +83,18 @@ data OpClause = OpClause Ident Ident Computation
 data FinClause = FinClause Ident Computation
 data Handler = Handler {
   retClause :: RetClause,
-  opClauses :: [(Op, OpClause)]
+  opClauses :: [(Op, OpClause)],
+  finClause :: Maybe FinClause
 }
 
 instance Show Handler where
-  show (Handler (RetClause xr cr) ops) =
-    let retStr = "return " ++ xr ++ " -> " ++ show cr
-        opStrs = map (\(op, OpClause x k c) ->
-          op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) ops
-    in  "handler { " ++ (concat $ intersperse ", " (retStr : opStrs)) ++ " }"
+  show (Handler (RetClause xr cr) ocs fc) =
+    let
+      retStr = "return " ++ xr ++ " -> " ++ show cr
+      opStrs = map (\(op, OpClause x k c) ->
+        op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) ocs
+      finStr = case fc of
+        Just (FinClause xf cf) -> ", finally " ++ xf ++ " -> " ++ show cf
+        Nothing -> ""
+    in
+      "handler { " ++ (concat $ intersperse ", " (retStr : opStrs)) ++ finStr ++ " }"

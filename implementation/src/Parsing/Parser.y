@@ -1,14 +1,12 @@
 {
 
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
-module Parser.Parser (
+module Parsing.Parser (
   parseExpr,
 ) where
 
-import Parser.Lexer
-import Parser.SugaredAst
-import Ast (Ident, Op, Side(..))
+import Parsing.Lexer
+import Parsing.SugaredSyntax
+import Syntax (Ident, Op, Side(..))
 
 import Control.Monad.Except
 
@@ -60,7 +58,7 @@ import Control.Monad.Except
   string                     { TokString $$ }
   ident                      { TokIdent $$ }
 
-%left ';'
+%right ';'
 %nonassoc '=='
 %left '++'
 %left '+' '-'
@@ -98,11 +96,14 @@ value :: { SugaredExpr }
   | inr expr                              { SEEither R $2 }
   | fun nvars '->' comp                   { SEFun (reverse $2) $4 }
   | rec nvar nvars '->' comp              { SERec $2 (reverse $3) $5 }
-  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
+  | handler '{' nhandlerClauses '}'       { SEHandler (reverse $3) }
 
 handlerClauses :: { [HandlerClause] }
   : handlerClauses ',' handlerClause      { $3 : $1 }
   | handlerClause                         { [$1] }
+
+nhandlerClauses :: { [HandlerClause] }
+  : handlerClauses                        { $1 }
   | {- empty -}                           { [] }
 
 handlerClause :: { HandlerClause }
@@ -151,7 +152,7 @@ inrMatch :: { (Ident, SugaredComp) }
 
 parseError :: [Token] -> Except String a
 parseError (l:ls) = throwError (show l)
-parseError [] = throwError "Unexpected end of Input"
+parseError [] = throwError "Unexpected end of input"
 
 parseExpr :: String -> Either String SugaredExpr
 parseExpr input =

@@ -1,11 +1,14 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Parser.Desugar where
+module Parsing.Desugar (
+  desugar
+) where
+
+import Syntax
+import Parsing.SugaredSyntax
 
 import Control.Monad.State
-
-import Ast
-import Parser.SugaredAst
+import Control.Monad (foldM)
 
 type Fresh a = State Integer a
 
@@ -86,4 +89,24 @@ desugarVars :: [Ident] -> Computation -> Computation
 desugarVars xs c = foldr (\x c' -> CReturn (VFun x c')) c xs
 
 desugarHandler :: [HandlerClause] -> Fresh Handler
-desugarHandler cs = undefined
+desugarHandler cs = do
+  (rc, ocs, fc) <- foldM f (Nothing,[],Nothing) cs
+  rc' <- case rc of
+    Just rc -> return rc
+    Nothing -> do
+      x <- newVar
+      return $ RetClause x (CReturn (VVar x))
+  return $ Handler rc' (reverse ocs) fc
+  where
+    f :: (Maybe RetClause, [(Op,OpClause)], Maybe FinClause) -> HandlerClause -> Fresh (Maybe RetClause, [(Op, OpClause)], Maybe FinClause)
+    f (Nothing, ocs, fc) (RC x c) = do
+      c' <- desugarComp c
+      return (Just (RetClause x c'), ocs, fc)
+    f (Just rc, ocs, fc) (RC _ _) = return (Just rc, ocs, fc)
+    f (rc, ocs, Nothing) (FC x c) = do
+      c' <- desugarComp c
+      return (rc, ocs, Just (FinClause x c'))
+    f (rc, ocs, Just fc) (FC _ _) = return (rc, ocs, Just fc)
+    f (rc, ocs, fc) (OC op x k c) = do
+      c' <- desugarComp c
+      return (rc, (op, OpClause x k c'):ocs, fc)

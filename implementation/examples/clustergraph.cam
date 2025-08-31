@@ -1,15 +1,14 @@
-do comment <- return "Two cluster graph" in
-do comment <- return "See also erdosrenyi.cam" in
+-- Two cluster graph
+-- See also erdosrenyi.cam
 with handler {
-  return x -> return x,
-  newgraph(z; k) -> k (!new ()),
+  newgraph(_; k) -> k (!new ()),
   newnode(g; k) -> k (!flip ()),
   isedge(gab; k) ->
     do a <- fst (snd gab) in
     do b <- snd (snd gab) in
     if a == b then return false else return true
 } handle (
-  do comment <- return "Make a new graph, pick two nodes, and check an edge between then." in
+  -- Make a new graph, pick two nodes, and check an edge between then
   do g <- !newgraph () in
   do a <- !newnode g in
   do b <- !newnode g in

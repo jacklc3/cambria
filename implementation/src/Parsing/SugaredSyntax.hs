@@ -1,6 +1,6 @@
-module Parser.SugaredAst where
+module Parsing.SugaredSyntax where
 
-import Ast (Ident, Op, Side(..))
+import Syntax (Ident, Op, Side(..))
 
 data SugaredExpr
   = SEVar Ident
@@ -28,6 +28,6 @@ data SugaredComp
 
 data HandlerClause
   = RC Ident SugaredComp
-  | OC Ident Ident Ident SugaredComp
+  | OC Op Ident Ident SugaredComp
   | FC Ident SugaredComp
   deriving (Show)

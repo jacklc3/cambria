@@ -1,8 +1,9 @@
 module Main where
 
-import Ast
+import Syntax
 import Environment (initialEnv)
-import Parser.Parser (parseExpr)
+import Parsing.Parser (parseExpr)
+import Parsing.Desugar (desugar)
 import Eval (Result(..), eval)
 
 import Data.Unique (newUnique)
@@ -37,13 +38,9 @@ main = do
       content <- readFile filename
       case parseExpr content of
         Left err  -> putStr err
-        Right ast -> do
-          putStrLn "Parsed!"
+        Right sugaredAst -> do
+          let ast = desugar sugaredAst
           print ast
-
-  {-
-          "Parsed!"
           result <- evalIO initialEnv ast
           print result
     _ -> putStrLn "Usage: run-handler <filename>"
-    -}

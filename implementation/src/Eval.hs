@@ -2,7 +2,7 @@
 
 module Eval where
 
-import Ast
+import Syntax
 import Environment (def, find)
 
 data Result
@@ -44,19 +44,23 @@ eval env = \case
   COp op v ->
     Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
   CHandle (VHandler h) c ->
-    case eval env c of
-      Pure v ->
-        let RetClause x cr = retClause h
-        in  eval (def x v env) cr
-      Impure op v f ->
-        case lookup op (opClauses h) of
-          Just (OpClause x k cop) ->
-            let newEnv = def x v $ def k (deepHandle f) env
-            in  eval newEnv cop
-          Nothing -> Impure op v (deepHandle f)
-        where
-          deepHandle (VClosure y c env) = VClosure y (CHandle (VHandler h) c) env
-          deepHandle v                  = error $ "Non-closure in impure continuation: " ++ show v
+    case finClause h of
+      Just (FinClause x c') ->
+        eval env (CDo x (CHandle (VHandler h{ finClause = Nothing }) c) c')
+      Nothing ->
+        case eval env c of
+          Pure v ->
+            let RetClause x cr = retClause h
+            in  eval (def x v env) cr
+          Impure op v f ->
+            case lookup op (opClauses h) of
+              Just (OpClause x k cop) ->
+                let newEnv = def x v $ def k (deepHandle f) env
+                in  eval newEnv cop
+              Nothing -> Impure op v (deepHandle f)
+            where
+              deepHandle (VClosure y c env) = VClosure y (CHandle (VHandler h) c) env
+              deepHandle v                  = error $ "Non-closure in impure continuation: " ++ show v
   CHandle v c ->
     error $ "Non-handler in handle statement: " ++ show v
 
