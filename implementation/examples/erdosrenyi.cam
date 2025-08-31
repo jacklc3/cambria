@@ -15,7 +15,6 @@ with handler {
   finally s -> s (fun _ -> return ())
 } handle (
   with handler {
-    return x -> return x,
     newgraph(z; k) -> k (!ref ()),
     newnode(z; k) -> k (!new()),
     isedge(gab; k) ->
