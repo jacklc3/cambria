@@ -60,7 +60,7 @@ tokens :-
   false                      { \p _ -> Token p (TokBool False) }
   $alpha[$alpha$digit\_\']*  { \p s -> Token p (TokIdent s) }
   \"(\\.|[^\"])*\"           { \p s -> Token p (tokString s) }
-  !$alpha[$alpha$digit\_\']* { \p s -> Token p (TokOp s) }
+  !$alpha[$alpha$digit\_\']* { \p s -> Token p (TokOp (tail s)) }
 
 {
 

@@ -1,10 +1,10 @@
 -- Erdos-Renyi graphon
-do lookup <- return rec lookup g a b ->
+do lookup <- return (rec lookup g a b ->
   if a == b then return false else
   if g == () then return () else
   if (fst (fst g)) == (a,b) then return (snd (fst g)) else
   if (fst (fst g)) == (b,a) then return (snd (fst g)) else
-  lookup (snd g) a b
+  lookup (snd g) a b)
 in
 with handler {
   return x  -> return (fun _ -> return x),

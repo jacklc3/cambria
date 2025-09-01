@@ -48,7 +48,6 @@ import Control.Monad.Except
   '{'                        { Token _ TokLBrace }
   '}'                        { Token _ TokRBrace }
   ','                        { Token _ TokComma }
-  '!'                        { Token _ TokExclam }
   '_'                        { Token _ TokUnderscore }
   ';'                        { Token _ TokSemiColon }
   '++'                       { Token _ TokConcat }
@@ -56,7 +55,7 @@ import Control.Monad.Except
   int                        { Token _ (TokInt $$) }
   bool                       { Token _ (TokBool $$) }
   string                     { Token _ (TokString $$) }
-  ident                      { Token _ (TokIdent $$) }
+  var                        { Token _ (TokIdent $$) }
   op                         { Token _ (TokOp $$) }
 
 %right ';'
@@ -72,10 +71,6 @@ expr :: { SugaredExpr }
   : value                                 { $1 }
   | comp                                  { SEComp $1 }
   | '(' expr ')'                          { $2 }
-  | var                                   { SEVar $1 }
-
-var :: { Ident }
-  : ident                                 { $1 }
 
 nvar :: { Ident }
   : var                                   { $1 }
@@ -95,19 +90,17 @@ value :: { SugaredExpr }
   | inr expr                              { SEEither R $2 }
   | fun nvars '->' comp                   { SEFun (reverse $2) $4 }
   | rec nvar nvars '->' comp              { SERec $2 (reverse $3) $5 }
-  | handler '{' nhandlerClauses '}'       { SEHandler (reverse $3) }
+  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
+  | var                                   { SEVar $1 }
 
 handlerClauses :: { [HandlerClause] }
   : handlerClauses ',' handlerClause      { $3 : $1 }
   | handlerClause                         { [$1] }
-
-nhandlerClauses :: { [HandlerClause] }
-  : handlerClauses                        { $1 }
   | {- empty -}                           { [] }
 
 handlerClause :: { HandlerClause }
   : return nvar '->' comp                 { RC $2 $4 }
-  | ident '(' nvar ';' nvar ')' '->' comp { OC $1 $3 $5 $8 }
+  | var '(' nvar ';' nvar ')' '->' comp   { OC $1 $3 $5 $8 }
   | finally nvar '->' comp                { FC $2 $4 }
 
 guardedExpr :: { SugaredExpr }
@@ -116,12 +109,12 @@ guardedExpr :: { SugaredExpr }
   | int                                   { SEInt $1 }
   | string                                { SEString $1 }
   | '(' expr ',' expr ')'                 { SEPair $2 $4 }
-  | handler '{' nhandlerClauses '}'       { SEHandler (reverse $3) }
+  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
   | var                                   { SEVar $1 }
   | '(' expr ')'                          { $2 }
 
 guardedExprs :: { [SugaredExpr] }
-  : guardedExprs guardedExpr    { $2 : $1 }
+  : guardedExprs guardedExpr              { $2 : $1 }
   | guardedExpr                           { [$1] }
 
 comp :: { SugaredComp }
@@ -134,16 +127,16 @@ comp :: { SugaredComp }
   | expr '/'  expr                        { SCApp (SEVar "/") [SEPair $1 $3] }
   | guardedExpr guardedExprs %prec APP    { SCApp $1 (reverse $2) }
   | return expr                           { SCReturn $2 }
-  | op guardedExpr %prec APP              { SCOp (tail $1) $2 }
+  | op guardedExpr %prec APP              { SCOp $1 $2 }
   | do nvar '<-' comp in comp             { SCDo $2 $4 $6 }
   | if expr then comp else comp           { SCIf $2 $4 $6 }
-  | caseMatch                             { $1 }
+  | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
   | with expr handle comp                 { SCWith $2 $4 }
   | '(' comp ')'                          { $2 }
 
-caseMatch :: { SugaredComp }
-  : case expr of '{' inlMatch ',' inrMatch '}'     { SCCase $2 $5 $7 }
-  | case expr of '{' inrMatch ',' inlMatch '}'     { SCCase $2 $7 $5 }
+eitherMatch :: { ((Ident, SugaredComp), (Ident, SugaredComp)) }
+  : inlMatch ',' inrMatch                 { ($1, $3) }
+  | inrMatch ',' inlMatch                 { ($3, $1) }
 
 inlMatch :: { (Ident, SugaredComp) }
   : inl nvar '->' comp                    { ($2, $4) }
