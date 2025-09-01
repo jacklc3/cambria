@@ -16,6 +16,7 @@ import Control.Monad.Except
 %tokentype { Token }
 %monad { Except String } { (>>=) } { return }
 %error { parseError }
+%expect 1
 
 %token
   fun                        { Token _ TokFun }
@@ -72,6 +73,20 @@ expr :: { SugaredExpr }
   | comp                                  { SEComp $1 }
   | '(' expr ')'                          { $2 }
 
+exprInfix :: { SugaredExpr }
+  : atom                                  { $1 }
+  | compInfix                             { SEComp $1 }
+  | '(' expr ')'                          { $2 }
+
+exprApp :: { SugaredExpr }
+  : atom                                  { $1 }
+  | compApp                               { SEComp $1 }
+  | '(' expr ')'                          { $2 }
+
+exprAtom :: { SugaredExpr }
+  : atom                                  { $1 }
+  | '(' expr ')'                          { $2 }
+
 nvar :: { Ident }
   : var                                   { $1 }
   | '_'                                   { "_" }
@@ -81,16 +96,19 @@ nvars :: { [Ident] }
   | nvar                                  { [$1] }
 
 value :: { SugaredExpr }
+  : atom                                  { $1 }
+  | inl exprAtom                          { SEEither L $2 }
+  | inr exprAtom                          { SEEither R $2 }
+  | fun nvars '->' comp                   { SEFun (reverse $2) $4 }
+  | rec nvar nvars '->' comp              { SERec $2 (reverse $3) $5 }
+  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
+
+atom :: { SugaredExpr }
   : '()'                                  { SEUnit }
   | bool                                  { SEBool $1 }
   | int                                   { SEInt $1 }
   | string                                { SEString $1 }
   | '(' expr ',' expr ')'                 { SEPair $2 $4 }
-  | inl expr                              { SEEither L $2 }
-  | inr expr                              { SEEither R $2 }
-  | fun nvars '->' comp                   { SEFun (reverse $2) $4 }
-  | rec nvar nvars '->' comp              { SERec $2 (reverse $3) $5 }
-  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
   | var                                   { SEVar $1 }
 
 handlerClauses :: { [HandlerClause] }
@@ -103,35 +121,30 @@ handlerClause :: { HandlerClause }
   | var '(' nvar ';' nvar ')' '->' comp   { OC $1 $3 $5 $8 }
   | finally nvar '->' comp                { FC $2 $4 }
 
-guardedExpr :: { SugaredExpr }
-  : '()'                                  { SEUnit }
-  | bool                                  { SEBool $1 }
-  | int                                   { SEInt $1 }
-  | string                                { SEString $1 }
-  | '(' expr ',' expr ')'                 { SEPair $2 $4 }
-  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
-  | var                                   { SEVar $1 }
-  | '(' expr ')'                          { $2 }
-
-guardedExprs :: { [SugaredExpr] }
-  : guardedExprs guardedExpr              { $2 : $1 }
-  | guardedExpr                           { [$1] }
-
 comp :: { SugaredComp }
-  : comp ';'  comp                        { SCDo "_" $1 $3 }
-  | expr '==' expr                        { SCApp (SEVar "==") [SEPair $1 $3] }
-  | expr '++' expr                        { SCApp (SEVar "++") [SEPair $1 $3] }
-  | expr '+'  expr                        { SCApp (SEVar "+") [SEPair $1 $3] }
-  | expr '-'  expr                        { SCApp (SEVar "-") [SEPair $1 $3] }
-  | expr '*'  expr                        { SCApp (SEVar "*") [SEPair $1 $3] }
-  | expr '/'  expr                        { SCApp (SEVar "/") [SEPair $1 $3] }
-  | guardedExpr guardedExprs %prec APP    { SCApp $1 (reverse $2) }
-  | return expr                           { SCReturn $2 }
-  | op guardedExpr %prec APP              { SCOp $1 $2 }
-  | do nvar '<-' comp in comp             { SCDo $2 $4 $6 }
-  | if expr then comp else comp           { SCIf $2 $4 $6 }
+  : compTerm ';' comp                     { SCDo "_" $1 $3 }
+  | compTerm %prec ';'                    { $1 }
+
+compTerm :: { SugaredComp }
+  : return expr                           { SCReturn $2 }
+  | op exprAtom %prec APP                 { SCOp $1 $2 }
+  | do nvar '<-' comp in compTerm         { SCDo $2 $4 $6 }
+  | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
-  | with expr handle comp                 { SCWith $2 $4 }
+  | with expr handle compTerm             { SCWith $2 $4 }
+  | compInfix                             { $1 }
+
+compInfix :: { SugaredComp }
+  : exprInfix '==' exprInfix              { SCApp (SEVar "==") (SEPair $1 $3) }
+  | exprInfix '++' exprInfix              { SCApp (SEVar "++") (SEPair $1 $3) }
+  | exprInfix '+'  exprInfix              { SCApp (SEVar "+") (SEPair $1 $3) }
+  | exprInfix '-'  exprInfix              { SCApp (SEVar "-") (SEPair $1 $3) }
+  | exprInfix '*'  exprInfix              { SCApp (SEVar "*") (SEPair $1 $3) }
+  | exprInfix '/'  exprInfix              { SCApp (SEVar "/") (SEPair $1 $3) }
+  | compApp                               { $1 }
+
+compApp :: { SugaredComp }
+  : exprApp exprAtom %prec APP            { SCApp $1 $2 }
   | '(' comp ')'                          { $2 }
 
 eitherMatch :: { ((Ident, SugaredComp), (Ident, SugaredComp)) }

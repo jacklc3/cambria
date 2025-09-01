@@ -40,8 +40,7 @@ desugarComp = \case
     c1' <- desugarComp c1
     c2' <- desugarComp c2
     desugarExpr (\v -> CCase v x1 c1' x2 c2') e
-  SCApp e [e'] -> desugarApp CApp e e'
-  SCApp e (e':es) -> desugarComp (SCApp (SEComp (SCApp e [e'])) es)
+  SCApp e e' -> desugarApp CApp e e'
   SCWith e c -> do
     c' <- desugarComp c
     desugarExpr (\v -> CHandle v c') e

@@ -22,7 +22,7 @@ data SugaredComp
   | SCDo Ident SugaredComp SugaredComp
   | SCIf SugaredExpr SugaredComp SugaredComp
   | SCCase SugaredExpr (Ident, SugaredComp) (Ident, SugaredComp)
-  | SCApp SugaredExpr [SugaredExpr]
+  | SCApp SugaredExpr SugaredExpr
   | SCWith SugaredExpr SugaredComp
   deriving (Show)
 

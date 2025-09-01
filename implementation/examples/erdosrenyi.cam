@@ -16,7 +16,7 @@ with handler {
 } handle (
   with handler {
     newgraph(z; k) -> k (!ref ()),
-    newnode(z; k) -> k (!new()),
+    newnode(z; k) -> k (!new ()),
     isedge(gab; k) ->
       do g <- fst gab in
       do a <- fst (snd gab) in
