@@ -57,6 +57,7 @@ import Control.Monad.Except
   bool                       { Token _ (TokBool $$) }
   string                     { Token _ (TokString $$) }
   ident                      { Token _ (TokIdent $$) }
+  op                         { Token _ (TokOp $$) }
 
 %right ';'
 %nonassoc '=='
@@ -74,9 +75,6 @@ expr :: { SugaredExpr }
   | var                                   { SEVar $1 }
 
 var :: { Ident }
-  : ident                                 { $1 }
-
-op :: { Op }
   : ident                                 { $1 }
 
 nvar :: { Ident }
@@ -109,11 +107,16 @@ nhandlerClauses :: { [HandlerClause] }
 
 handlerClause :: { HandlerClause }
   : return nvar '->' comp                 { RC $2 $4 }
-  | op '(' nvar ';' nvar ')' '->' comp    { OC $1 $3 $5 $8 }
+  | ident '(' nvar ';' nvar ')' '->' comp { OC $1 $3 $5 $8 }
   | finally nvar '->' comp                { FC $2 $4 }
 
 guardedExpr :: { SugaredExpr }
-  : value                                 { $1 }
+  : '()'                                  { SEUnit }
+  | bool                                  { SEBool $1 }
+  | int                                   { SEInt $1 }
+  | string                                { SEString $1 }
+  | '(' expr ',' expr ')'                 { SEPair $2 $4 }
+  | handler '{' nhandlerClauses '}'       { SEHandler (reverse $3) }
   | var                                   { SEVar $1 }
   | '(' expr ')'                          { $2 }
 
@@ -131,7 +134,7 @@ comp :: { SugaredComp }
   | expr '/'  expr                        { SCApp (SEVar "/") [SEPair $1 $3] }
   | guardedExpr guardedExprs %prec APP    { SCApp $1 (reverse $2) }
   | return expr                           { SCReturn $2 }
-  | '!' op guardedExpr %prec APP          { SCOp $2 $3 }
+  | op guardedExpr %prec APP              { SCOp (tail $1) $2 }
   | do nvar '<-' comp in comp             { SCDo $2 $4 $6 }
   | if expr then comp else comp           { SCIf $2 $4 $6 }
   | caseMatch                             { $1 }

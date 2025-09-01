@@ -45,6 +45,7 @@ eval env = \case
     Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
   CHandle (VHandler h) c ->
     case finClause h of
+      -- Encode finally clause in a do action if it exists
       Just (FinClause x c') ->
         eval env (CDo x (CHandle (VHandler h{ finClause = Nothing }) c) c')
       Nothing ->
