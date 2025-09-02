@@ -16,6 +16,7 @@ import Control.Monad.Except
 %tokentype { Token }
 %monad { Except String } { (>>=) } { return }
 %error { parseError }
+%error.expected
 %expect 1
 
 %token
@@ -79,7 +80,7 @@ exprInfix :: { SugaredExpr }
   | '(' expr ')'                          { $2 }
 
 exprApp :: { SugaredExpr }
-  : atom                                  { $1 }
+  : var                                   { SEVar $1 }
   | compApp                               { SEComp $1 }
   | '(' expr ')'                          { $2 }
 
@@ -159,12 +160,14 @@ inrMatch :: { (Ident, SugaredComp) }
 
 {
 
-parseError :: [Token] -> Except String a
-parseError (Token (AlexPn _ line col) tok:_) =
-  throwError $ "Parse error at " ++ show line ++
-  ":" ++ show col ++ ", with token: " ++ show tok
-parseError [] =
-  throwError "Unexpected end of input"
+parseError :: [Token] -> [String] -> Except String a
+parseError (Token (AlexPn _ line col) tok:_) expected =
+  throwError $ "Parse error at line " ++ show line ++ ", column " ++ show col ++ ".\n" ++
+               "Unexpected token: " ++ show tok ++ "\n" ++
+               "Expected one of: " ++ unwords  expected ++ "\n"
+parseError [] expected =
+  throwError $ "Unexpected end of input.\n" ++
+               "Expected one of: " ++ unwords expected ++ "\n"
 
 parseExpr :: String -> Either String SugaredExpr
 parseExpr input =

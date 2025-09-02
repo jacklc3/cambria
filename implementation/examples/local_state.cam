@@ -7,6 +7,6 @@ with handler {
   finally s -> s (fun _ -> return ())
 } handle (
   do a <- !ref true in
-    do b <- !ref false in
-      (!set (a, !get b); !get a)
+  do b <- !ref false in
+  (!set (a, !get b); !get a)
 )
