@@ -54,8 +54,8 @@ import Control.Monad.Except
   ';'                        { Token _ TokSemiColon }
   '++'                       { Token _ TokConcat }
 
-  int                        { Token _ (TokInt $$) }
-  bool                       { Token _ (TokBool $$) }
+  integer                    { Token _ (TokInt $$) }
+  boolean                    { Token _ (TokBool $$) }
   string                     { Token _ (TokString $$) }
   var                        { Token _ (TokIdent $$) }
   op                         { Token _ (TokOp $$) }
@@ -106,8 +106,8 @@ value :: { SugaredExpr }
 
 atom :: { SugaredExpr }
   : '()'                                  { SEUnit }
-  | bool                                  { SEBool $1 }
-  | int                                   { SEInt $1 }
+  | boolean                               { SEBool $1 }
+  | integer                               { SEInt $1 }
   | string                                { SEString $1 }
   | '(' expr ',' expr ')'                 { SEPair $2 $4 }
   | var                                   { SEVar $1 }
