@@ -11,7 +11,7 @@ data Result
 
 instance Show Result where
   show (Pure v)         = "Pure: " ++ show v
-  show (Impure op v f)  = "Impure: !" ++ op ++ " " ++ show v
+  show (Impure op v _)  = "Impure: !" ++ op ++ " " ++ show v
 
 eval :: Env -> Computation -> Result
 eval env = \case

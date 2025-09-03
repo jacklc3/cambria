@@ -164,14 +164,12 @@ parseError :: [Token] -> [String] -> Except String a
 parseError (Token (AlexPn _ line col) tok:_) expected =
   throwError $ "Parse error at line " ++ show line ++ ", column " ++ show col ++ ".\n" ++
                "Unexpected token: " ++ show tok ++ "\n" ++
-               "Expected one of: " ++ unwords  expected ++ "\n"
+               "Expected one of: " ++ unwords  expected
 parseError [] expected =
   throwError $ "Unexpected end of input.\n" ++
-               "Expected one of: " ++ unwords expected ++ "\n"
+               "Expected one of: " ++ unwords expected
 
 parseExpr :: String -> Either String SugaredExpr
-parseExpr input =
-  let tokenStream = scanTokens input in
-  runExcept (expr tokenStream)
+parseExpr = runExcept . expr . scanTokens
 
 }

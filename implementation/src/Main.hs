@@ -37,7 +37,7 @@ main = do
     [filename] -> do
       content <- readFile filename
       case parseExpr content of
-        Left err  -> putStr err
+        Left err  -> putStrLn err
         Right sugaredAst -> do
           let ast = desugar sugaredAst
           result <- evalIO initialEnv ast
