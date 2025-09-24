@@ -10,7 +10,7 @@ import Control.Monad.State
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Ast
+import Syntax
 import Inference.Types
 import Inference.Substitutable
 import Inference.Unify
@@ -30,7 +30,7 @@ type TypeError = String
 runInfer :: Context -> Infer Type -> Either TypeError Scheme
 runInfer ctx m =
   let
-    (res, _) = runState (runReaderT m ctx) (InferState 0)
+    (res, _) = fst (runStateT (runReaderT m ctx) (InferState 0))
   in case res of
     Left err -> Left err
     Right ty -> Right $ generalize ctx ty

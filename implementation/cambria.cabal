@@ -33,6 +33,7 @@ executable cambria
     Syntax
     Environment
     Eval
+    Parsing.BaseToken
     Parsing.Parser
     Parsing.Lexer
     Parsing.SugaredSyntax

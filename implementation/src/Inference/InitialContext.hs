@@ -3,10 +3,9 @@ module Inference.InitialContext where
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Ast (Ident, Op)
+import Syntax (Ident, Op)
 import Inference.Types
 
--- Predefined operation signatures (Sigma from the paper)
 initialOpSigs :: Map.Map Op Scheme
 initialOpSigs = Map.fromList [
     ("print", Forall [] [] (VType $ TFun TString (TComp TUnit (EffectSet (Set.singleton "print") Nothing)))),

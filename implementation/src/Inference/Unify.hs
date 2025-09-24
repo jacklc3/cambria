@@ -3,7 +3,7 @@ module Inference.Unify where
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Ast (Op)
+import Syntax (Op)
 import Control.Monad.Except
 import Inference.Types
 import Inference.Substitutable

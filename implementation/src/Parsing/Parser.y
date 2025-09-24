@@ -1,15 +1,14 @@
 {
-
 module Parsing.Parser (
   parseExpr,
 ) where
 
+import Parsing.BaseToken
 import Parsing.Lexer
 import Parsing.SugaredSyntax
 import Syntax (Ident, Op, Side(..))
 
 import Control.Monad.Except
-
 }
 
 %name expr
@@ -102,7 +101,7 @@ value :: { SugaredExpr }
   | inr exprAtom                          { SEEither R $2 }
   | fun nvars '->' comp                   { SEFun (reverse $2) $4 }
   | rec nvar nvars '->' comp              { SERec $2 (reverse $3) $5 }
-  | handler '{' handlerClauses '}'        { SEHandler (reverse $3) }
+  | handler '{' handlerClauses '}'        { SEHandler $3 }
 
 atom :: { SugaredExpr }
   : '()'                                  { SEUnit }
@@ -170,6 +169,6 @@ parseError [] expected =
                "Expected one of: " ++ unwords expected
 
 parseExpr :: String -> Either String SugaredExpr
-parseExpr = runExcept . expr . scanTokens
+parseExpr = runExcept . expr . alexScanTokens
 
 }

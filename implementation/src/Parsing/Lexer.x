@@ -1,5 +1,7 @@
 {
 module Parsing.Lexer where
+
+import Parsing.BaseToken
 }
 
 %wrapper "posn"
@@ -65,67 +67,15 @@ tokens :-
 {
 
 tokString :: String -> BaseToken
-tokString s = TokString $ unescape (init (tail s))
+tokString = TokString . unescape . init . tail
+  where
+    unescape [] = []
+    unescape ('\\' : 'n' : cs)   = '\n' : unescape cs
+    unescape ('\\' : 't' : cs)   = '\t' : unescape cs
+    unescape ('\\' : '"' : cs)   = '"'  : unescape cs
+    unescape ('\\' : '\\' : cs)  = '\\' : unescape cs
+    unescape (c:cs)              = c    : unescape cs
 
-unescape :: String -> String
-unescape [] = []
-unescape ('\\' : 'n' : cs) = '\n' : unescape cs
-unescape ('\\' : 't' : cs) = '\t' : unescape cs
-unescape ('\\' : '"' : cs) = '"'  : unescape cs
-unescape ('\\' : '\\' : cs) = '\\' : unescape cs
-unescape (c : cs) = c : unescape cs
-
-data BaseToken
-  = TokInt Integer
-  | TokBool Bool
-  | TokString String
-  | TokIdent String
-  | TokOp String
-  | TokFun
-  | TokRec
-  | TokHandler
-  | TokReturn
-  | TokFinally
-  | TokDo
-  | TokIn
-  | TokIf
-  | TokThen
-  | TokElse
-  | TokWith
-  | TokHandle
-  | TokInl
-  | TokInr
-  | TokCase
-  | TokOf
-  | TokUnit
-  | TokAnd
-  | TokOr
-  | TokEq
-  | TokNEq
-  | TokLTE
-  | TokGTE
-  | TokLT
-  | TokGT
-  | TokArrow
-  | TokLeftArrow
-  | TokEquals
-  | TokPlus
-  | TokMinus
-  | TokAsterisk
-  | TokSlash
-  | TokLParen
-  | TokRParen
-  | TokLBrace
-  | TokRBrace
-  | TokComma
-  | TokExclam
-  | TokUnderscore
-  | TokSemiColon
-  | TokConcat
-  deriving (Eq, Show)
-
-data Token = Token AlexPosn BaseToken deriving (Eq, Show)
-
-scanTokens = alexScanTokens
+data Token = Token AlexPosn BaseToken
 
 }

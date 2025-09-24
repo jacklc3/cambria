@@ -3,7 +3,7 @@ module Inference.Types where
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Ast (Op)
+import Syntax (Op)
 
 type TVar = Int
 type EVar = Int
