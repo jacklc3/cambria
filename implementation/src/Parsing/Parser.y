@@ -127,7 +127,6 @@ comp :: { SugaredComp }
 
 compTerm :: { SugaredComp }
   : return expr                           { SCReturn $2 }
-  | op exprAtom %prec APP                 { SCOp $1 $2 }
   | do nvar '<-' comp in compTerm         { SCDo $2 $4 $6 }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
@@ -145,6 +144,7 @@ compInfix :: { SugaredComp }
 
 compApp :: { SugaredComp }
   : exprApp exprAtom %prec APP            { SCApp $1 $2 }
+  | op exprAtom %prec APP                 { SCOp $1 $2 }
   | '(' comp ')'                          { $2 }
 
 eitherMatch :: { ((Ident, SugaredComp), (Ident, SugaredComp)) }
