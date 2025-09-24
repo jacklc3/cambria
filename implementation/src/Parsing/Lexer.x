@@ -1,7 +1,7 @@
 {
 module Parsing.Lexer where
 
-import Parsing.BaseToken
+import Parsing.Token
 }
 
 %wrapper "posn"
@@ -66,7 +66,7 @@ tokens :-
 
 {
 
-tokString :: String -> BaseToken
+tokString :: String -> TokenKind
 tokString = TokString . unescape . init . tail
   where
     unescape [] = []
@@ -76,6 +76,6 @@ tokString = TokString . unescape . init . tail
     unescape ('\\' : '\\' : cs)  = '\\' : unescape cs
     unescape (c:cs)              = c    : unescape cs
 
-data Token = Token AlexPosn BaseToken
+data Token = Token AlexPosn TokenKind
 
 }

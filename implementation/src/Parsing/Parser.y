@@ -3,7 +3,7 @@ module Parsing.Parser (
   parseExpr,
 ) where
 
-import Parsing.BaseToken
+import Parsing.Token
 import Parsing.Lexer
 import Parsing.SugaredSyntax
 import Syntax (Ident, Op, Side(..))

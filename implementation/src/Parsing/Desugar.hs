@@ -96,13 +96,13 @@ desugarHandler cs = do
       x <- newVar
       return $ RetClause x (CReturn (VVar x))
   return $ Handler rc' ocs fc
-  where
-    f (_, ocs, fc) (RC x c) = do
-      c' <- desugarComp c
-      return (Just (RetClause x c'), ocs, fc)
-    f (rc, ocs, fc) (OC op x k c) = do
-      c' <- desugarComp c
-      return (rc, (op, OpClause x k c'):ocs, fc)
-    f (rc, ocs, _) (FC x c) = do
-      c' <- desugarComp c
-      return (rc, ocs, Just (FinClause x c'))
+    where
+      f (_, ocs, fc) (RC x c) = do
+        c' <- desugarComp c
+        return (Just (RetClause x c'), ocs, fc)
+      f (rc, ocs, fc) (OC op x k c) = do
+        c' <- desugarComp c
+        return (rc, (op, OpClause x k c'):ocs, fc)
+      f (rc, ocs, _) (FC x c) = do
+        c' <- desugarComp c
+        return (rc, ocs, Just (FinClause x c'))
