@@ -14,7 +14,6 @@ data SugaredExpr
   | SEFun [Ident] SugaredComp
   | SERec Ident [Ident] SugaredComp
   | SEComp SugaredComp
-  deriving (Show)
 
 data SugaredComp
   = SCReturn SugaredExpr
@@ -24,10 +23,8 @@ data SugaredComp
   | SCCase SugaredExpr (Ident, SugaredComp) (Ident, SugaredComp)
   | SCApp SugaredExpr SugaredExpr
   | SCWith SugaredExpr SugaredComp
-  deriving (Show)
 
 data HandlerClause
   = RC Ident SugaredComp
   | OC Op Ident Ident SugaredComp
   | FC Ident SugaredComp
-  deriving (Show)

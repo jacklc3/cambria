@@ -1,6 +1,6 @@
 {
 module Parsing.Parser (
-  parseExpr,
+  parse,
 ) where
 
 import Parsing.Token
@@ -19,45 +19,45 @@ import Control.Monad.Except
 %expect 1
 
 %token
-  fun                        { Token _ TokFun }
-  rec                        { Token _ TokRec }
-  handler                    { Token _ TokHandler }
-  return                     { Token _ TokReturn }
-  finally                    { Token _ TokFinally }
-  do                         { Token _ TokDo }
-  in                         { Token _ TokIn }
-  if                         { Token _ TokIf }
-  then                       { Token _ TokThen }
-  else                       { Token _ TokElse }
-  with                       { Token _ TokWith }
-  handle                     { Token _ TokHandle }
-  inl                        { Token _ TokInl }
-  inr                        { Token _ TokInr }
-  case                       { Token _ TokCase }
-  of                         { Token _ TokOf }
+  fun                        { Token _ _ TokFun }
+  rec                        { Token _ _ TokRec }
+  handler                    { Token _ _ TokHandler }
+  return                     { Token _ _ TokReturn }
+  finally                    { Token _ _ TokFinally }
+  do                         { Token _ _ TokDo }
+  in                         { Token _ _ TokIn }
+  if                         { Token _ _ TokIf }
+  then                       { Token _ _ TokThen }
+  else                       { Token _ _ TokElse }
+  with                       { Token _ _ TokWith }
+  handle                     { Token _ _ TokHandle }
+  inl                        { Token _ _ TokInl }
+  inr                        { Token _ _ TokInr }
+  case                       { Token _ _ TokCase }
+  of                         { Token _ _ TokOf }
 
-  '()'                       { Token _ TokUnit }
-  '=='                       { Token _ TokEq }
-  '->'                       { Token _ TokArrow }
-  '<-'                       { Token _ TokLeftArrow }
-  '+'                        { Token _ TokPlus }
-  '-'                        { Token _ TokMinus }
-  '*'                        { Token _ TokAsterisk }
-  '/'                        { Token _ TokSlash }
-  '('                        { Token _ TokLParen }
-  ')'                        { Token _ TokRParen }
-  '{'                        { Token _ TokLBrace }
-  '}'                        { Token _ TokRBrace }
-  ','                        { Token _ TokComma }
-  '_'                        { Token _ TokUnderscore }
-  ';'                        { Token _ TokSemiColon }
-  '++'                       { Token _ TokConcat }
+  '()'                       { Token _ _ TokUnit }
+  '=='                       { Token _ _ TokEq }
+  '->'                       { Token _ _ TokArrow }
+  '<-'                       { Token _ _ TokLeftArrow }
+  '+'                        { Token _ _ TokPlus }
+  '-'                        { Token _ _ TokMinus }
+  '*'                        { Token _ _ TokAsterisk }
+  '/'                        { Token _ _ TokSlash }
+  '('                        { Token _ _ TokLParen }
+  ')'                        { Token _ _ TokRParen }
+  '{'                        { Token _ _ TokLBrace }
+  '}'                        { Token _ _ TokRBrace }
+  ','                        { Token _ _ TokComma }
+  '_'                        { Token _ _ TokUnderscore }
+  ';'                        { Token _ _ TokSemiColon }
+  '++'                       { Token _ _ TokConcat }
 
-  integer                    { Token _ (TokInt $$) }
-  boolean                    { Token _ (TokBool $$) }
-  string                     { Token _ (TokString $$) }
-  var                        { Token _ (TokIdent $$) }
-  op                         { Token _ (TokOp $$) }
+  integer                    { Token _ _ (TokInt $$) }
+  boolean                    { Token _ _ (TokBool $$) }
+  string                     { Token _ _ (TokString $$) }
+  var                        { Token _ _ (TokIdent $$) }
+  op                         { Token _ _ (TokOp $$) }
 
 %right ';'
 %nonassoc '=='
@@ -160,15 +160,15 @@ inrMatch :: { (Ident, SugaredComp) }
 {
 
 parseError :: [Token] -> [String] -> Except String a
-parseError (Token (AlexPn _ line col) tok:_) expected =
+parseError (Token (AlexPn _ line col) s _:_) expected =
   throwError $ "Parse error at line " ++ show line ++ ", column " ++ show col ++ ".\n" ++
-               "Unexpected token: " ++ show tok ++ "\n" ++
+               "Unexpected token: " ++ s ++ "\n" ++
                "Expected one of: " ++ unwords  expected
 parseError [] expected =
   throwError $ "Unexpected end of input.\n" ++
                "Expected one of: " ++ unwords expected
 
-parseExpr :: String -> Either String SugaredExpr
-parseExpr = runExcept . expr . alexScanTokens
+parse :: String -> Either String SugaredExpr
+parse = runExcept . expr . alexScanTokens
 
 }

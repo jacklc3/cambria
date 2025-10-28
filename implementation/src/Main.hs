@@ -1,10 +1,15 @@
 module Main where
 
-import Syntax
 import Environment (initialEnv)
-import Parsing.Parser (parseExpr)
-import Parsing.Desugar (desugar)
 import Eval (Result(..), eval)
+import Syntax
+
+import Parsing.Parser (parse)
+import Parsing.Desugar (desugar)
+
+import Inference.Infer
+import Inference.Types
+import Inference.Initialisation
 
 import Data.Unique (newUnique)
 import System.Environment (getArgs)
@@ -36,7 +41,7 @@ main = do
   case args of
     [filename] -> do
       content <- readFile filename
-      case parseExpr content of
+      case parse content of
         Left err  -> putStrLn err
         Right sugaredAst -> do
           let ast = desugar sugaredAst

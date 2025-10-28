@@ -8,7 +8,7 @@ type Ident = String
 type Op    = String
 type Name  = Unique
 data Env   = Env (Map Ident Value)
-data Side  = L | R deriving (Show)
+data Side  = L | R
 
 data Value
   = VInt Integer

@@ -14,68 +14,69 @@ tokens :-
   $whitechar+                ;
   "--".*                     ;
 
-  fun                        { \p _ -> Token p TokFun }
-  rec                        { \p _ -> Token p TokRec }
-  handler                    { \p _ -> Token p TokHandler }
-  return                     { \p _ -> Token p TokReturn }
-  finally                    { \p _ -> Token p TokFinally }
-  do                         { \p _ -> Token p TokDo }
-  in                         { \p _ -> Token p TokIn }
-  if                         { \p _ -> Token p TokIf }
-  then                       { \p _ -> Token p TokThen }
-  else                       { \p _ -> Token p TokElse }
-  with                       { \p _ -> Token p TokWith }
-  handle                     { \p _ -> Token p TokHandle }
-  inl                        { \p _ -> Token p TokInl }
-  inr                        { \p _ -> Token p TokInr }
-  case                       { \p _ -> Token p TokCase }
-  of                         { \p _ -> Token p TokOf }
+  fun                        { \p s -> Token p s TokFun }
+  rec                        { \p s -> Token p s TokRec }
+  handler                    { \p s -> Token p s TokHandler }
+  return                     { \p s -> Token p s TokReturn }
+  finally                    { \p s -> Token p s TokFinally }
+  do                         { \p s -> Token p s TokDo }
+  in                         { \p s -> Token p s TokIn }
+  if                         { \p s -> Token p s TokIf }
+  then                       { \p s -> Token p s TokThen }
+  else                       { \p s -> Token p s TokElse }
+  with                       { \p s -> Token p s TokWith }
+  handle                     { \p s -> Token p s TokHandle }
+  inl                        { \p s -> Token p s TokInl }
+  inr                        { \p s -> Token p s TokInr }
+  case                       { \p s -> Token p s TokCase }
+  of                         { \p s -> Token p s TokOf }
 
-  "()"                       { \p _ -> Token p TokUnit }
-  "&&"                       { \p _ -> Token p TokAnd }
-  "||"                       { \p _ -> Token p TokOr }
-  "=="                       { \p _ -> Token p TokEq }
-  "/="                       { \p _ -> Token p TokNEq }
-  "<="                       { \p _ -> Token p TokLTE }
-  ">="                       { \p _ -> Token p TokGTE }
-  "<"                        { \p _ -> Token p TokLT }
-  ">"                        { \p _ -> Token p TokGT }
-  "->"                       { \p _ -> Token p TokArrow }
-  "<-"                       { \p _ -> Token p TokLeftArrow }
-  "="                        { \p _ -> Token p TokEquals }
-  "+"                        { \p _ -> Token p TokPlus }
-  "-"                        { \p _ -> Token p TokMinus }
-  "*"                        { \p _ -> Token p TokAsterisk }
-  "/"                        { \p _ -> Token p TokSlash }
-  "("                        { \p _ -> Token p TokLParen }
-  ")"                        { \p _ -> Token p TokRParen }
-  "{"                        { \p _ -> Token p TokLBrace }
-  "}"                        { \p _ -> Token p TokRBrace }
-  ","                        { \p _ -> Token p TokComma }
-  "!"                        { \p _ -> Token p TokExclam }
-  "_"                        { \p _ -> Token p TokUnderscore }
-  ";"                        { \p _ -> Token p TokSemiColon }
-  "++"                       { \p _ -> Token p TokConcat }
+  "()"                       { \p s -> Token p (quotes s) TokUnit }
+  "&&"                       { \p s -> Token p (quotes s) TokAnd }
+  "||"                       { \p s -> Token p (quotes s) TokOr }
+  "=="                       { \p s -> Token p (quotes s) TokEq }
+  "/="                       { \p s -> Token p (quotes s) TokNEq }
+  "<="                       { \p s -> Token p (quotes s) TokLTE }
+  ">="                       { \p s -> Token p (quotes s) TokGTE }
+  "<"                        { \p s -> Token p (quotes s) TokLT }
+  ">"                        { \p s -> Token p (quotes s) TokGT }
+  "->"                       { \p s -> Token p (quotes s) TokArrow }
+  "<-"                       { \p s -> Token p (quotes s) TokLeftArrow }
+  "="                        { \p s -> Token p (quotes s) TokEquals }
+  "+"                        { \p s -> Token p (quotes s) TokPlus }
+  "-"                        { \p s -> Token p (quotes s) TokMinus }
+  "*"                        { \p s -> Token p (quotes s) TokAsterisk }
+  "/"                        { \p s -> Token p (quotes s) TokSlash }
+  "("                        { \p s -> Token p (quotes s) TokLParen }
+  ")"                        { \p s -> Token p (quotes s) TokRParen }
+  "{"                        { \p s -> Token p (quotes s) TokLBrace }
+  "}"                        { \p s -> Token p (quotes s) TokRBrace }
+  ","                        { \p s -> Token p (quotes s) TokComma }
+  "!"                        { \p s -> Token p (quotes s) TokExclam }
+  "_"                        { \p s -> Token p (quotes s) TokUnderscore }
+  ";"                        { \p s -> Token p (quotes s) TokSemiColon }
+  "++"                       { \p s -> Token p (quotes s) TokConcat }
 
-  $digit+                    { \p s -> Token p (TokInt (read s)) }
-  true                       { \p _ -> Token p (TokBool True) }
-  false                      { \p _ -> Token p (TokBool False) }
-  $alpha[$alpha$digit\_\']*  { \p s -> Token p (TokIdent s) }
-  \"(\\.|[^\"])*\"           { \p s -> Token p (tokString s) }
-  !$alpha[$alpha$digit\_\']* { \p s -> Token p (TokOp (tail s)) }
+  $digit+                    { \p s -> Token p s (TokInt (read s)) }
+  true                       { \p s -> Token p s (TokBool True) }
+  false                      { \p s -> Token p s (TokBool False) }
+  $alpha[$alpha$digit\_\']*  { \p s -> Token p s (TokIdent s) }
+  \"(\\.|[^\"])*\"           { \p s -> Token p s (TokString (unescape (init (tail s)))) }
+  !$alpha[$alpha$digit\_\']* { \p s -> Token p s (TokOp (tail s)) }
 
 {
 
-tokString :: String -> TokenKind
-tokString = TokString . unescape . init . tail
-  where
-    unescape [] = []
-    unescape ('\\' : 'n' : cs)   = '\n' : unescape cs
-    unescape ('\\' : 't' : cs)   = '\t' : unescape cs
-    unescape ('\\' : '"' : cs)   = '"'  : unescape cs
-    unescape ('\\' : '\\' : cs)  = '\\' : unescape cs
-    unescape (c:cs)              = c    : unescape cs
+quotes :: String -> String
+quotes s = "'" ++ s ++ "'"
 
-data Token = Token AlexPosn TokenKind
+unescape :: String -> String
+unescape []                  = []
+unescape ('\\' : 'n' : cs)   = '\n' : unescape cs
+unescape ('\\' : 't' : cs)   = '\t' : unescape cs
+unescape ('\\' : '"' : cs)   = '"'  : unescape cs
+unescape ('\\' : '\\' : cs)  = '\\' : unescape cs
+unescape (c:cs)              = c    : unescape cs
+
+data Token = Token AlexPosn String TokenKind
 
 }
