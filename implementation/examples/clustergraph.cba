@@ -1,5 +1,5 @@
 -- Two cluster graph
--- See also erdosrenyi.cam
+-- See also erdosrenyi.cba
 with handler {
   newgraph(_; k) -> k (!new ()),
   newnode(g; k) -> k (!flip ()),

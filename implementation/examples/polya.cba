@@ -1,5 +1,5 @@
 -- Polyas urn implementation of Beta/Bernoulli, via local state
--- Equivalent to betabernoulli.cam
+-- Equivalent to betabernoulli.cba
 do boolToInt <- return (fun b -> if b then return 1 else return 0) in
 do countSuccesses <- return rec countSuccesses n f ->
    if n == 0 then return 0 else do i <- countSuccesses (n-1) f in i + boolToInt (f ())
