@@ -15,9 +15,9 @@ runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) 0)
 
 type Effects = Map.Map Op Arity
 
-data Arity = Arity Type Type deriving (Eq, Show)
+data Arity = Arity ValueType ValueType deriving (Eq, Show)
 
-data Type
+data ValueType
   = TVar Ident
   | TUnit
   | TInt
@@ -25,24 +25,32 @@ data Type
   | TDouble
   | TString
   | TName
-  | TPair Type Type
-  | TEither Type Type
-  | TFun Type Type Effects
-  | THandler Type Effects Type Effects
+  | TPair ValueType ValueType
+  | TEither ValueType ValueType
+  | TFun ValueType CompType
+  | THandler CompType CompType
   deriving (Eq)
 
-instance Show Type where
+data CompType = TComp ValueType Effects
+  deriving (Eq)
+
+instance Show ValueType where
   show (TVar a) = a
+  show TUnit = "Unit"
   show TInt = "Int"
   show TBool = "Bool"
+  show TDouble = "Double"
   show TString = "Str"
-  show TUnit = "Unit"
+  show TName = "Name"
   show (TPair t1 t2) = show t1 ++ " x " ++ show t2
   show (TEither t1 t2) = show t1 ++ " + " ++ show t2
-  show (TFun t1 t2 e2) = show t1 ++ " -> " ++ show t2 ++ "!" ++ show e2
-  show (THandler t1 e1 t2 e2) = show t1 ++ "!" ++ show e1 ++ " => " ++ show t2 ++ "!" ++ show e2
+  show (TFun t1 t2) = show t1 ++ " -> " ++ show t2
+  show (THandler t1 t2) = show t1 ++ " => " ++ show t2
 
-data Scheme = Forall (Set.Set Ident) Type
+instance Show CompType where
+  show (TComp t e) = show t ++ "!" ++ show e
+
+data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 data Context = Context {
