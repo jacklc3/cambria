@@ -1,61 +1,51 @@
 module Inference.Types where
 
+import Control.Monad.Except
+import Control.Monad.State
+import Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Syntax (Op)
+import Syntax (Ident, Op)
 
-type TVar = Int
-type EVar = Int
+type Infer a = ReaderT Context (StateT Int (Except String)) a
 
-data EffectSet = EffectSet (Set.Set Op) (Maybe EVar)
-  deriving (Eq, Ord)
+runInfer :: Context -> Infer a -> Either String a
+runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) 0)
 
-data TValue
-  = TVar TVar
+type Effects = Map.Map Op Arity
+
+data Arity = Arity Type Type deriving (Eq, Show)
+
+data Type
+  = TVar Ident
+  | TUnit
   | TInt
   | TBool
+  | TDouble
   | TString
-  | TUnit
-  | TPair TValue TValue
-  | TEither TValue TValue
-  | TFun TValue TComp
-  | THandler TComp TComp
-  deriving (Eq, Ord)
-
-data TComp = TComp TValue EffectSet
-  deriving (Eq, Ord)
-
-data Type = VType TValue | CType TComp
-  deriving (Eq, Ord)
-
-data Scheme = Forall [TVar] [EVar] Type
-
-instance Show EffectSet where
-  show (EffectSet ops Nothing) = "{" ++ Set.foldr (\o acc -> o ++ "," ++ acc) "" ops ++ "}"
-  show (EffectSet ops (Just ev)) = "{" ++ Set.foldr (\o acc -> o ++ "," ++ acc) "" ops ++ "|" ++ show ev ++ "}"
-
-instance Show TValue where
-  show (TVar a) = "t" ++ show a
-  show TInt = "Int"
-  show TBool = "Bool"
-  show TString = "String"
-  show TUnit = "()"
-  show (TPair t1 t2) = show t1 ++ " x " ++ show t2
-  show (TEither t1 t2) = show t1 ++ " + " ++ show t2
-  show (TFun t1 t2) = show t1 ++ " -> " ++ show t2
-  show (THandler c1 c2) = show c1 ++ " => " ++ show c2
-
-instance Show TComp where
-  show (TComp t e) = show t ++ "!" ++ show e
+  | TName
+  | TPair Type Type
+  | TEither Type Type
+  | TFun Type Type Effects
+  | THandler Type Effects Type Effects
+  deriving (Eq)
 
 instance Show Type where
-  show (VType t) = show t
-  show (CType t) = show t
+  show (TVar a) = a
+  show TInt = "Int"
+  show TBool = "Bool"
+  show TString = "Str"
+  show TUnit = "Unit"
+  show (TPair t1 t2) = show t1 ++ " x " ++ show t2
+  show (TEither t1 t2) = show t1 ++ " + " ++ show t2
+  show (TFun t1 t2 e2) = show t1 ++ " -> " ++ show t2 ++ "!" ++ show e2
+  show (THandler t1 e1 t2 e2) = show t1 ++ "!" ++ show e1 ++ " => " ++ show t2 ++ "!" ++ show e2
 
-instance Show Scheme where
-  show (Forall tvs evs t) =
-    let
-      tvarStr = if null tvs then "" else "forall " ++ unwords (map (\v -> "t" ++ show v) tvs)
-      evarStr = if null evs then "" else "forall " ++ unwords (map (\v -> "e" ++ show v) evs)
-    in tvarStr ++ " " ++ evarStr ++ ". " ++ show t
+data Scheme = Forall (Set.Set Ident) Type
+  deriving (Eq, Show)
+
+data Context = Context {
+  vars    :: Map.Map Ident Scheme,
+  effects :: Effects
+} deriving (Show)

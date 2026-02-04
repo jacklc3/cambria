@@ -28,8 +28,8 @@ executable cambria
     Parsing.Desugar
     Inference.Types
     Inference.Infer
-    Inference.Substitutable
     Inference.Initialisation
+    Inference.Substitutable
     Inference.Unify
 
   build-depends:

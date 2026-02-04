@@ -1,5 +1,9 @@
 module Main where
 
+import Data.Unique (newUnique)
+import System.Environment (getArgs)
+import System.Random (randomIO)
+
 import Environment (initialEnv)
 import Eval (Result(..), eval)
 import Syntax
@@ -7,13 +11,7 @@ import Syntax
 import Parsing.Parser (parse)
 import Parsing.Desugar (desugar)
 
-import Inference.Infer
-import Inference.Types
-import Inference.Initialisation
-
-import Data.Unique (newUnique)
-import System.Environment (getArgs)
-import System.Random (randomIO)
+import Inference.Infer (infer)
 
 handlerIO :: [(Op, Value -> Value -> IO Computation)]
 handlerIO =
@@ -42,9 +40,13 @@ main = do
     [filename] -> do
       content <- readFile filename
       case parse content of
-        Left err  -> putStrLn err
+        Left err -> putStrLn err
         Right sugaredAst -> do
           let ast = desugar sugaredAst
-          result <- evalIO initialEnv ast
-          print result
+          case infer ast of
+            Left err -> putStrLn err
+            Right t -> do
+              putStrLn $ "Type inferred: " ++ show t
+              result <- evalIO initialEnv ast
+              print result
     _ -> putStrLn "Usage: run-handler <filename>"

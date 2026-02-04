@@ -1,11 +1,11 @@
 module Environment where
 
-import Syntax
-
 import Data.Unique (hashUnique)
 import qualified Data.Map as Map
 import System.IO.Unsafe (unsafePerformIO)
 import Control.Exception (catch, PatternMatchFail)
+
+import Syntax
 
 find :: Ident -> Env -> Value
 find x (Env env) =
