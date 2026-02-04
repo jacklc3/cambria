@@ -3,7 +3,7 @@
 
 module Inference.Infer where
 
-import Control.Monad (unless, forM_)
+import Control.Monad (unless, forM_, forM)
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Reader
@@ -67,9 +67,9 @@ inferComp = \case
     tf <- inferValue f
     case tf of
       TFun t1 t2 -> do
-        checkEffects t2
         tv <- inferValue v
         s <- unify t1 tv
+        -- No checkEffects here; we propagate the effects of t2 up.
         return $ apply s t2
       _ -> throwError $ "Applying non-function type: " ++ show tf
   COp op v -> do
@@ -77,31 +77,29 @@ inferComp = \case
     checkValue v tIn
     return (TComp tOut (Map.singleton op ar))
   CDo x c1 c2 -> do
-    t1@(TComp tv _) <- inferComp c1
-    checkEffects t1
-    extend x (Forall Set.empty tv) (inferComp c2)
+    t1@(TComp tv e1) <- inferComp c1
+    t2@(TComp tr e2) <- extend x (Forall Set.empty tv) (inferComp c2)
+    return (TComp tr (e1 `Map.union` e2))
   CIf v c1 c2 -> do
     checkValue v TBool
-    t1 <- inferComp c1
-    t2 <- inferComp c2
-    s <- unify t1 t2
-    return $ apply s t1
+    t1@(TComp tr1 e1) <- inferComp c1
+    t2@(TComp tr2 e2) <- inferComp c2
+    s <- unify t1 t2 -- Unification ignores effects
+    return (TComp (apply s tr1) (e1 `Map.union` e2))
   CCase v x1 c1 x2 c2 -> do
     tv <- inferValue v
     case tv of
       TEither tl tr -> do
-        t1 <- extend x1 (Forall Set.empty tl) (inferComp c1)
-        t2 <- extend x2 (Forall Set.empty tr) (inferComp c2)
+        t1@(TComp tr1 e1) <- extend x1 (Forall Set.empty tl) (inferComp c1)
+        t2@(TComp tr2 e2) <- extend x2 (Forall Set.empty tr) (inferComp c2)
         s <- unify t1 t2
-        return $ apply s t1
+        return (TComp (apply s tr1) (e1 `Map.union` e2))
       _ -> throwError $ "Case analysis on non-either type: " ++ show tv
   CHandle v c -> do
     tv <- inferValue v
     case tv of
-      THandler (TComp t1 e1) t2 -> do
-        checkEffects t2
-        effects <- asks effects
-        checkComp (TComp t1 (e1 `Map.union` effects)) c
+      THandler t1 t2 -> do
+        checkComp t1 c
         return t2
       _ -> throwError $ "Handling with non-handler type: " ++ show tv
 
@@ -115,15 +113,22 @@ checkComp (TComp t es) c = forceEffects es $ case c of
   CHandle v c' -> do
     tv <- inferValue v
     case tv of
-      THandler (TComp t1 e1) t2 -> do
-        checkEffects t2
+      THandler t1 t2 -> do
         unify t2 (TComp t es)
-        checkComp (TComp t1 (e1 `Map.union` es)) c
+        checkEffects t2
+        -- The handled computation c' is allowed to use:
+        -- 1. The effects handled by t1 (hInEffs)
+        -- 2. The ambient effects es
+        let (TComp tv1 hInEffs) = t1
+        let expandedEffects = hInEffs `Map.union` es
+        checkComp (TComp tv1 expandedEffects) c'
       _ -> throwError $ "Handling with non-handler type: " ++ show tv
   _ -> do
     t' <- inferComp c
     unify (TComp t es) t'
-    return ()
+    checkEffects t'
+    where
+      valType (TComp v _) = v
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -160,19 +165,38 @@ inferValue = \case
     s <- unify tBody (TComp t2 Map.empty)
     return $ apply s tf
   VHandler (Handler (RetClause xr cr) opClauses finallyClause) -> do
-    effects <- asks effects
-    hInType <- fresh 
-    hOutType <- fresh
-    TComp tr er <- extend xr (Forall Set.empty hInType) (inferComp cr)
-    opTypes <- mapM (\(op, OpClause x k cop) -> do
-      opInType <- fresh
-      opOutType <- fresh
-      top <- extend x (Forall Set.empty opInType) $
-        extend k (Forall Set.empty (TFun opOutType (TComp hOutType Map.empty))) $
+    hInVal <- fresh
+    hOutVal <- fresh
+
+    TComp tr er <- extend xr (Forall Set.empty hInVal) (inferComp cr)
+    unify tr hOutVal
+    opResults <- forM opClauses $ \(op, OpClause x k cop) -> do
+      opIn <- fresh
+      opOut <- fresh
+      let tk = TFun opOut (TComp hOutVal Map.empty)
+      TComp top eop <- extend x (Forall Set.empty opIn) $
+        extend k (Forall Set.empty tk) $
           inferComp cop
-      unify top (TComp hOutType Map.empty)
-      return $ (op, opInType, opOutType)) opClauses
-    return $ THandler (TComp hInType effects) (TComp hOutType effects)
+      unify top hOutVal
+      return (op, Arity opIn opOut, eop)
+
+    (finEff, finalVal) <- case finallyClause of
+        Nothing -> return (Map.empty, hOutVal)
+        Just (FinClause xf cf) -> do
+            -- Finally transforms the handler result (hOutVal) into the final result
+            TComp tf ef <- extend xf (Forall Set.empty hOutVal) (inferComp cf)
+            return (ef, tf)
+    -- Collect all handled operations (Input Effects)
+    let handledOps = Map.fromList [ (op, ar) | (op, ar, _) <- opResults ]
+    -- Collect all used operations (Output Effects)
+    let opEffs = foldr Map.union Map.empty (map (\(_,_,e) -> e) opResults)
+    let outEffects = er `Map.union` opEffs `Map.union` finEff
+    -- hInComp: The computation type this handler can handle
+    let hInComp = TComp hInVal handledOps
+    -- hOutComp: The computation type this handler produces
+    let hOutComp = TComp finalVal outEffects
+    return $ THandler hInComp hOutComp
+
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 

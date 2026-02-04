@@ -39,9 +39,7 @@ instance Unifiable ValueType where
   unify t1 t2 = throwError $ "Type mismatch: " ++ show t1 ++ " vs " ++ show t2
 
 instance Unifiable CompType where
-  unify (TComp t es) (TComp t' es')
-    | es `agree` es' = unify t t'
-    | otherwise = throwError $ "Effect mismatch: " ++ show es ++ " vs " ++ show es'
+  unify (TComp t _) (TComp t' _) = unify t t'
 
 bind :: Ident -> ValueType -> Infer Subst
 bind u t
