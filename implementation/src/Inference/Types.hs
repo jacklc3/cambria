@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Inference.Types where
 
 import Control.Monad.Except
@@ -5,6 +7,9 @@ import Control.Monad.State
 import Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
+import Data.List (intercalate)
+import Data.Semigroup (Semigroup)
+import Data.Monoid (Monoid)
 
 import Syntax (Ident, Op)
 
@@ -12,10 +17,6 @@ type Infer a = ReaderT Context (StateT Int (Except String)) a
 
 runInfer :: Context -> Infer a -> Either String a
 runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) 0)
-
-type Effects = Map.Map Op Arity
-
-data Arity = Arity ValueType ValueType deriving (Eq, Show)
 
 data ValueType
   = TVar Ident
@@ -34,6 +35,10 @@ data ValueType
 data CompType = TComp ValueType Effects
   deriving (Eq)
 
+type Effects = Map.Map Op Arity
+
+data Arity = Arity ValueType ValueType deriving (Eq, Show)
+
 instance Show ValueType where
   show (TVar a) = a
   show TUnit = "Unit"
@@ -48,7 +53,11 @@ instance Show ValueType where
   show (THandler t1 t2) = show t1 ++ " => " ++ show t2
 
 instance Show CompType where
-  show (TComp t e) = show t ++ "!" ++ show e
+  show (TComp t es) = show t ++ "!" ++ showEffects es
+    where
+      showEffects es = "{" ++
+        intercalate "," (Map.foldrWithKey (\op (Arity tIn tOut) acc ->
+          (" " ++ op ++ " : " ++ show tIn ++ " ~> " ++ show tOut ++ " ") : acc) [] es) ++ "}"
 
 data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)

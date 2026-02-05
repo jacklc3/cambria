@@ -3,7 +3,7 @@
 
 module Inference.Infer where
 
-import Control.Monad (forM_, forM, foldM)
+import Control.Monad (foldM, unless)
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Reader
@@ -53,7 +53,7 @@ inferComp :: Computation -> Infer CompType
 inferComp = \case
   CReturn v -> do
     tv <- inferValue v
-    return $ TComp tv Map.empty
+    return $ TComp tv mempty
   CApp f v -> do
     tf <- inferValue f
     case tf of
@@ -69,13 +69,13 @@ inferComp = \case
   CDo x c1 c2 -> do
     TComp tv e1 <- inferComp c1
     TComp tr e2 <- extend x (Forall Set.empty tv) (inferComp c2)
-    return (TComp tr (e1 `Map.union` e2))
+    return (TComp tr (e1 <> e2))
   CIf v c1 c2 -> do
     checkValue v TBool
     t1@(TComp tr1 e1) <- inferComp c1
     t2@(TComp tr2 e2) <- inferComp c2
     s <- unify t1 t2
-    return $ apply s (TComp tr1 (e1 `Map.union` e2))
+    return $ apply s (TComp tr1 (e1 <> e2))
   CCase v x1 c1 x2 c2 -> do
     tv <- inferValue v
     case tv of
@@ -83,7 +83,7 @@ inferComp = \case
         t1@(TComp tr1 e1) <- extend x1 (Forall Set.empty tl) (inferComp c1)
         t2@(TComp tr2 e2) <- extend x2 (Forall Set.empty tr) (inferComp c2)
         s <- unify t1 t2
-        return $ apply s (TComp tr1 (e1 `Map.union` e2))
+        return $ apply s (TComp tr1 (e1 <> e2))
       _ -> throwError $ "Case analysis on non-either type: " ++ show tv
   CHandle v c -> do
     tv <- inferValue v
@@ -96,21 +96,20 @@ inferComp = \case
         -- Effects that pass through (not handled by this handler)
         let passThrough = apply s cEffs `Map.difference` apply s hInEffs
         -- Final effects = pass through + handler's output effects
-        let outEffs = passThrough `Map.union` apply s hOutEffs
+        let outEffs = passThrough <> apply s hOutEffs
         return $ TComp (apply s hOutVal) outEffs
       _ -> throwError $ "Handling with non-handler type: " ++ show tv
 
 checkComp :: CompType -> Computation -> Infer ()
-checkComp (TComp expectedVal allowedEffs) c = do
-  TComp actualVal usedEffs <- inferComp c
-  unify expectedVal actualVal
-  -- Verify each used effect is allowed (with matching arity via unification)
-  forM_ (Map.toList usedEffs) $ \(op, usedArity) ->
-    case Map.lookup op allowedEffs of
-      Nothing -> throwError $ "Effect " ++ op ++ " is not allowed in this context. Allowed: " ++ show (Map.keys allowedEffs)
-      Just allowedArity -> do
-        unify usedArity allowedArity
-        return ()
+checkComp t c = do
+  t' <- inferComp c
+  s <- unify t t'
+  checkEffectUsage (apply s t') (apply s t)
+
+checkEffectUsage :: CompType -> CompType -> Infer ()
+checkEffectUsage t1@(TComp _ e1) t2@(TComp _ e2) = do
+  unless (e1 `Map.isSubmapOf` e2)
+    $ throwError $ "Computation " ++ show t1 ++ " incompatible with " ++ show t2
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -140,11 +139,11 @@ inferValue = \case
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
-    let tf = TFun t1 (TComp t2 Map.empty)
+    let tf = TFun t1 (TComp t2 mempty)
     tBody <- extend f (Forall Set.empty tf)
       $ extend x (Forall Set.empty t1)
       $ inferComp c
-    s <- unify tBody (TComp t2 Map.empty)
+    s <- unify tBody (TComp t2 mempty)
     return $ apply s tf
   VHandler (Handler (RetClause xr cr) opClauses finallyClause) -> do
     -- Create fresh type variables for handler input and intermediate output
@@ -172,7 +171,7 @@ inferValue = \case
 
           -- The continuation k has type: opOut -> Comp hOutValCurr {}
           -- (continuation returns to handler output with no additional effects)
-          let kType = TFun opOut (TComp hOutValCurr Map.empty)
+          let kType = TFun opOut (TComp hOutValCurr mempty)
 
           -- Infer the operation body
           TComp opBodyOut opBodyEffs <-
@@ -182,16 +181,16 @@ inferValue = \case
 
           -- The body output should match the handler output
           s' <- unify opBodyOut hOutValCurr
-          let sCombined = s' `Map.union` s
+          let sCombined = s' <> s
 
           -- Apply the combined substitution to the arity
           let arity = Arity (apply sCombined opIn) (apply sCombined opOut)
           let ops' = Map.insert opName arity ops
-          let effs' = effs `Map.union` (apply sCombined opBodyEffs)
+          let effs' = effs <> (apply sCombined opBodyEffs)
 
           return (ops', effs', sCombined)
 
-    (handledOps, opEffs, s2) <- foldM processOpClause (Map.empty, Map.empty, s1) opClauses
+    (handledOps, opEffs, s2) <- foldM processOpClause (mempty, mempty, s1) opClauses
 
     -- Apply accumulated substitution
     let hInVal2 = apply s2 hInVal1
@@ -200,14 +199,14 @@ inferValue = \case
 
     -- 3. Process finally clause
     (finalOutVal, finEffs, s3) <- case finallyClause of
-        Nothing -> return (hOutVal2, Map.empty, s2)
+        Nothing -> return (hOutVal2, mempty, s2)
         Just (FinClause xf cf) -> do
             -- Finally transforms the handler intermediate output (hOutVal2) into final result
             TComp finOut finEffs <- extend xf (Forall Set.empty hOutVal2) (inferComp cf)
             return (finOut, finEffs, s2)
 
     -- Apply final substitution to all effects
-    let allOutEffs = apply s3 retEffs2 `Map.union` apply s3 opEffs `Map.union` finEffs
+    let allOutEffs = apply s3 retEffs2 <> apply s3 opEffs <> finEffs
 
     -- hInComp: The computation type this handler can handle
     let hInComp = TComp (apply s3 hInVal2) (apply s3 handledOps)

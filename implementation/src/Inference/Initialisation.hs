@@ -8,16 +8,16 @@ import Inference.Types
 -- | Primitive function types
 primitives :: [(String, Scheme)]
 primitives =
-  [ ("+",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt Map.empty)))
-  , ("-",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt Map.empty)))
-  , ("*",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt Map.empty)))
-  , ("max",  Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt Map.empty)))
-  , ("/",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TDouble Map.empty)))
-  , ("++",   Forall Set.empty (TFun (TPair TString TString) (TComp TString Map.empty)))
-  , ("hash", Forall Set.empty (TFun TName (TComp TString Map.empty)))
-  , ("==",   Forall (Set.fromList ["a"]) (TFun (TPair (TVar "a") (TVar "a")) (TComp TBool Map.empty)))
-  , ("fst",  Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "a") Map.empty)))
-  , ("snd",  Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "b") Map.empty)))
+  [ ("+",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt mempty)))
+  , ("-",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt mempty)))
+  , ("*",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt mempty)))
+  , ("max",  Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt mempty)))
+  , ("/",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TDouble mempty)))
+  , ("++",   Forall Set.empty (TFun (TPair TString TString) (TComp TString mempty)))
+  , ("hash", Forall Set.empty (TFun TName (TComp TString mempty)))
+  , ("==",   Forall (Set.fromList ["a"]) (TFun (TPair (TVar "a") (TVar "a")) (TComp TBool mempty)))
+  , ("fst",  Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "a") mempty)))
+  , ("snd",  Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "b") mempty)))
   ]
 
 primitiveOps :: [(String, Arity)]
