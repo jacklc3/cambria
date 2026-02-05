@@ -49,6 +49,10 @@ instantiate (Forall as t) = do
 extend :: Ident -> Scheme -> Infer a -> Infer a
 extend x sc = local (\ctx -> ctx{ vars = Map.insert x sc (vars ctx) })
 
+-- | Extend the context with additional effect operations
+extendEffects :: Effects -> Infer a -> Infer a
+extendEffects effs = local (\ctx -> ctx{ effects = effs <> effects ctx })
+
 inferComp :: Computation -> Infer CompType
 inferComp = \case
   CReturn v -> do
@@ -63,9 +67,12 @@ inferComp = \case
         return $ apply s t2
       _ -> throwError $ "Applying non-function type: " ++ show tf
   COp op v -> do
-    ar@(Arity tIn tOut) <- findOp op
-    checkValue v tIn
-    return (TComp tOut (Map.singleton op ar))
+    Arity tIn tOut <- findOp op
+    tv <- inferValue v
+    s <- unify tv tIn
+    -- Apply substitution to get the actual arity used
+    let ar' = Arity (apply s tIn) (apply s tOut)
+    return (TComp (apply s tOut) (Map.singleton op ar'))
   CDo x c1 c2 -> do
     TComp tv e1 <- inferComp c1
     TComp tr e2 <- extend x (Forall Set.empty tv) (inferComp c2)
@@ -89,8 +96,9 @@ inferComp = \case
     tv <- inferValue v
     case tv of
       THandler (TComp hInVal hInEffs) (TComp hOutVal hOutEffs) -> do
-        -- Infer the handled computation (collecting effects upward)
-        cType@(TComp _ cEffs) <- inferComp c
+        -- Infer the handled computation with handler's operations in scope
+        -- This allows the computation to use operations defined by the handler
+        cType@(TComp _ cEffs) <- extendEffects hInEffs (inferComp c)
         -- Unify computation type with handler's expected input (value + effect arities)
         s <- unify cType (TComp hInVal hInEffs)
         -- Effects that pass through (not handled by this handler)
