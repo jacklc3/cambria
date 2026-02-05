@@ -1,5 +1,6 @@
 module Inference.Unify where
 
+import Control.Monad (foldM)
 import Control.Monad.Except
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -47,6 +48,24 @@ bind u t
   | t == TVar u = return Map.empty
   | u `Set.member` ftv t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
   | otherwise = return $ Map.singleton u t
+
+instance Unifiable Arity where
+  unify (Arity t1 t2) (Arity t1' t2') = do
+    s1 <- unify t1 t1'
+    s2 <- unify (apply s1 t2) (apply s1 t2')
+    return (s2 `Map.union` s1)
+
+-- | Unify the arities of operations that appear in both effect maps
+unifyEffectArities :: Effects -> Effects -> Infer Subst
+unifyEffectArities effs1 effs2 = do
+  let commonOps = Map.keys $ Map.intersection effs1 effs2
+  foldM unifyOp Map.empty commonOps
+  where
+    unifyOp s op = do
+      let Just ar1 = Map.lookup op effs1
+      let Just ar2 = Map.lookup op effs2
+      s' <- unify (apply s ar1) (apply s ar2)
+      return (s' `Map.union` s)
 
 agree :: (Ord k, Eq v) => Map.Map k v -> Map.Map k v -> Bool
 agree m1 m2 = and (Map.intersectionWith (==) m1 m2)

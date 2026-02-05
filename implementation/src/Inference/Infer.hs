@@ -3,7 +3,7 @@
 
 module Inference.Infer where
 
-import Control.Monad (unless, forM_, forM)
+import Control.Monad (forM_, forM, foldM)
 import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Reader
@@ -13,7 +13,7 @@ import qualified Data.Set as Set
 import Syntax
 import Inference.Types
 import Inference.Substitutable
-import Inference.Unify
+import Inference.Unify (unify, unifyEffectArities)
 import Inference.Initialisation (initialCtx)
 
 infer :: Computation -> Either String CompType
@@ -48,15 +48,6 @@ instantiate (Forall as t) = do
 
 extend :: Ident -> Scheme -> Infer a -> Infer a
 extend x sc = local (\ctx -> ctx{ vars = Map.insert x sc (vars ctx) })
-
-forceEffects :: Effects -> Infer a -> Infer a
-forceEffects es = local (\ctx -> ctx{ effects = es })
-
-checkEffects :: CompType -> Infer ()
-checkEffects (TComp _ es) = do
-  effects <- asks effects
-  unless (es `Map.isSubmapOf` effects) $
-    throwError $ "Invoked effects " ++ show es ++ " superscedes available effects " ++ show effects
 
 inferComp :: Computation -> Infer CompType
 inferComp = \case
@@ -98,37 +89,37 @@ inferComp = \case
   CHandle v c -> do
     tv <- inferValue v
     case tv of
-      THandler t1 t2 -> do
-        checkComp t1 c
-        return t2
+      THandler (TComp hInVal hInEffs) (TComp hOutVal hOutEffs) -> do
+        -- Infer the handled computation (collecting effects upward)
+        TComp cVal cEffs <- inferComp c
+        -- Unify the computation's value type with handler's expected input type
+        s1 <- unify cVal hInVal
+        -- For effects that appear in both, unify their arities
+        s2 <- unifyEffectArities (apply s1 cEffs) (apply s1 hInEffs)
+        let s = s2 `Map.union` s1
+        -- Effects that pass through (not handled by this handler)
+        let passThrough = apply s cEffs `Map.difference` apply s hInEffs
+        -- Final effects = pass through + handler's output effects
+        let outEffs = passThrough `Map.union` apply s hOutEffs
+        return $ TComp (apply s hOutVal) outEffs
       _ -> throwError $ "Handling with non-handler type: " ++ show tv
 
+-- | Check that a computation has the expected type and only uses allowed effects.
+-- This is the "checking" direction of bidirectional type checking.
+-- Effects are verified after inference - used effects must be a subset of allowed effects.
 checkComp :: CompType -> Computation -> Infer ()
-checkComp (TComp t es) c = forceEffects es $ case c of
-  CReturn v -> checkValue v t
-  CDo x c1 c2 -> do
-    t1@(TComp tv _) <- inferComp c1
-    checkEffects t1
-    extend x (Forall Set.empty tv) (checkComp (TComp t es) c2)
-  CHandle v c' -> do
-    tv <- inferValue v
-    case tv of
-      THandler t1 t2 -> do
-        unify t2 (TComp t es)
-        checkEffects t2
-        -- The handled computation c' is allowed to use:
-        -- 1. The effects handled by t1 (hInEffs)
-        -- 2. The ambient effects es
-        let (TComp tv1 hInEffs) = t1
-        let expandedEffects = hInEffs `Map.union` es
-        checkComp (TComp tv1 expandedEffects) c'
-      _ -> throwError $ "Handling with non-handler type: " ++ show tv
-  _ -> do
-    t' <- inferComp c
-    unify (TComp t es) t'
-    checkEffects t'
-    where
-      valType (TComp v _) = v
+checkComp (TComp expectedVal allowedEffs) c = do
+  -- Infer the computation's type (collecting effects upward)
+  TComp actualVal usedEffs <- inferComp c
+  -- Unify value types
+  _ <- unify expectedVal actualVal
+  -- Verify each used effect is allowed (with matching arity via unification)
+  forM_ (Map.toList usedEffs) $ \(op, usedArity) ->
+    case Map.lookup op allowedEffs of
+      Nothing -> throwError $ "Effect " ++ op ++ " is not allowed in this context. Allowed: " ++ show (Map.keys allowedEffs)
+      Just allowedArity -> do
+        _ <- unify usedArity allowedArity
+        return ()
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -165,36 +156,73 @@ inferValue = \case
     s <- unify tBody (TComp t2 Map.empty)
     return $ apply s tf
   VHandler (Handler (RetClause xr cr) opClauses finallyClause) -> do
-    hInVal <- fresh
-    hOutVal <- fresh
+    -- Create fresh type variables for handler input and intermediate output
+    hInVal <- fresh   -- Type of values entering the handler (return clause input)
+    hOutVal <- fresh  -- Type of values after return/op clauses (before finally)
 
-    TComp tr er <- extend xr (Forall Set.empty hInVal) (inferComp cr)
-    unify tr hOutVal
-    opResults <- forM opClauses $ \(op, OpClause x k cop) -> do
-      opIn <- fresh
-      opOut <- fresh
-      let tk = TFun opOut (TComp hOutVal Map.empty)
-      TComp top eop <- extend x (Forall Set.empty opIn) $
-        extend k (Forall Set.empty tk) $
-          inferComp cop
-      unify top hOutVal
-      return (op, Arity opIn opOut, eop)
+    -- 1. Infer return clause
+    -- xr has type hInVal, body should produce hOutVal
+    TComp retOutVal retEffs <- extend xr (Forall Set.empty hInVal) (inferComp cr)
+    s1 <- unify retOutVal hOutVal
 
-    (finEff, finalVal) <- case finallyClause of
-        Nothing -> return (Map.empty, hOutVal)
+    -- Apply substitution to track the refined types
+    let hInVal1 = apply s1 hInVal
+    let hOutVal1 = apply s1 hOutVal
+    let retEffs1 = apply s1 retEffs
+
+    -- 2. Process each operation clause, accumulating substitutions
+    let processOpClause (ops, effs, s) (opName, OpClause x k cop) = do
+          -- Apply current substitution to get the current handler output type
+          let hOutValCurr = apply s hOutVal1
+
+          -- Create fresh type variables for this operation's arity
+          opIn <- fresh
+          opOut <- fresh
+
+          -- The continuation k has type: opOut -> Comp hOutValCurr {}
+          -- (continuation returns to handler output with no additional effects)
+          let kType = TFun opOut (TComp hOutValCurr Map.empty)
+
+          -- Infer the operation body
+          TComp opBodyOut opBodyEffs <-
+            extend x (Forall Set.empty opIn) $
+            extend k (Forall Set.empty kType) $
+            inferComp cop
+
+          -- The body output should match the handler output
+          s' <- unify opBodyOut hOutValCurr
+          let sCombined = s' `Map.union` s
+
+          -- Apply the combined substitution to the arity
+          let arity = Arity (apply sCombined opIn) (apply sCombined opOut)
+          let ops' = Map.insert opName arity ops
+          let effs' = effs `Map.union` (apply sCombined opBodyEffs)
+
+          return (ops', effs', sCombined)
+
+    (handledOps, opEffs, s2) <- foldM processOpClause (Map.empty, Map.empty, s1) opClauses
+
+    -- Apply accumulated substitution
+    let hInVal2 = apply s2 hInVal1
+    let hOutVal2 = apply s2 hOutVal1
+    let retEffs2 = apply s2 retEffs1
+
+    -- 3. Process finally clause
+    (finalOutVal, finEffs, s3) <- case finallyClause of
+        Nothing -> return (hOutVal2, Map.empty, s2)
         Just (FinClause xf cf) -> do
-            -- Finally transforms the handler result (hOutVal) into the final result
-            TComp tf ef <- extend xf (Forall Set.empty hOutVal) (inferComp cf)
-            return (ef, tf)
-    -- Collect all handled operations (Input Effects)
-    let handledOps = Map.fromList [ (op, ar) | (op, ar, _) <- opResults ]
-    -- Collect all used operations (Output Effects)
-    let opEffs = foldr Map.union Map.empty (map (\(_,_,e) -> e) opResults)
-    let outEffects = er `Map.union` opEffs `Map.union` finEff
+            -- Finally transforms the handler intermediate output (hOutVal2) into final result
+            TComp finOut finEffs <- extend xf (Forall Set.empty hOutVal2) (inferComp cf)
+            return (finOut, finEffs, s2)
+
+    -- Apply final substitution to all effects
+    let allOutEffs = apply s3 retEffs2 `Map.union` apply s3 opEffs `Map.union` finEffs
+
     -- hInComp: The computation type this handler can handle
-    let hInComp = TComp hInVal handledOps
+    let hInComp = TComp (apply s3 hInVal2) (apply s3 handledOps)
     -- hOutComp: The computation type this handler produces
-    let hOutComp = TComp finalVal outEffects
+    let hOutComp = TComp finalOutVal allOutEffs
+
     return $ THandler hInComp hOutComp
 
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
