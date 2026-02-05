@@ -55,7 +55,6 @@ instance Unifiable Arity where
     s2 <- unify (apply s1 t2) (apply s1 t2')
     return (s2 `Map.union` s1)
 
--- | Unify the arities of operations that appear in both effect maps
 unifyEffectArities :: Effects -> Effects -> Infer Subst
 unifyEffectArities effs1 effs2 = do
   let commonOps = Map.keys $ Map.intersection effs1 effs2
@@ -66,6 +65,3 @@ unifyEffectArities effs1 effs2 = do
       let Just ar2 = Map.lookup op effs2
       s' <- unify (apply s ar1) (apply s ar2)
       return (s' `Map.union` s)
-
-agree :: (Ord k, Eq v) => Map.Map k v -> Map.Map k v -> Bool
-agree m1 m2 = and (Map.intersectionWith (==) m1 m2)

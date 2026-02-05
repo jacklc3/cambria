@@ -25,15 +25,15 @@ fresh = do
   modify succ
   return $ TVar $ "t" ++ show n
 
-lookupVar :: Ident -> Infer ValueType
-lookupVar x = do
+findVar :: Ident -> Infer ValueType
+findVar x = do
   vars <- asks vars
   case Map.lookup x vars of
     Just scheme -> instantiate scheme
     Nothing     -> throwError $ "Unbound variable: " ++ x
 
-lookupOp :: Op -> Infer Arity
-lookupOp op = do
+findOp :: Op -> Infer Arity
+findOp op = do
   effects <- asks effects
   case Map.lookup op effects of
     Just arity -> return arity
@@ -60,16 +60,15 @@ inferComp = \case
       TFun t1 t2 -> do
         tv <- inferValue v
         s <- unify t1 tv
-        -- No checkEffects here; we propagate the effects of t2 up.
         return $ apply s t2
       _ -> throwError $ "Applying non-function type: " ++ show tf
   COp op v -> do
-    ar@(Arity tIn tOut) <- lookupOp op
+    ar@(Arity tIn tOut) <- findOp op
     checkValue v tIn
     return (TComp tOut (Map.singleton op ar))
   CDo x c1 c2 -> do
-    t1@(TComp tv e1) <- inferComp c1
-    t2@(TComp tr e2) <- extend x (Forall Set.empty tv) (inferComp c2)
+    TComp tv e1 <- inferComp c1
+    TComp tr e2 <- extend x (Forall Set.empty tv) (inferComp c2)
     return (TComp tr (e1 `Map.union` e2))
   CIf v c1 c2 -> do
     checkValue v TBool
@@ -104,26 +103,21 @@ inferComp = \case
         return $ TComp (apply s hOutVal) outEffs
       _ -> throwError $ "Handling with non-handler type: " ++ show tv
 
--- | Check that a computation has the expected type and only uses allowed effects.
--- This is the "checking" direction of bidirectional type checking.
--- Effects are verified after inference - used effects must be a subset of allowed effects.
 checkComp :: CompType -> Computation -> Infer ()
 checkComp (TComp expectedVal allowedEffs) c = do
-  -- Infer the computation's type (collecting effects upward)
   TComp actualVal usedEffs <- inferComp c
-  -- Unify value types
-  _ <- unify expectedVal actualVal
+  unify expectedVal actualVal
   -- Verify each used effect is allowed (with matching arity via unification)
   forM_ (Map.toList usedEffs) $ \(op, usedArity) ->
     case Map.lookup op allowedEffs of
       Nothing -> throwError $ "Effect " ++ op ++ " is not allowed in this context. Allowed: " ++ show (Map.keys allowedEffs)
       Just allowedArity -> do
-        _ <- unify usedArity allowedArity
+        unify usedArity allowedArity
         return ()
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
-  VVar x    -> lookupVar x
+  VVar x    -> findVar x
   VInt _    -> return TInt
   VBool _   -> return TBool
   VString _ -> return TString

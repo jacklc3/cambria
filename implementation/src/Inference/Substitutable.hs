@@ -40,21 +40,21 @@ instance Substitutable ValueType where
   ftv (TVar a)             = Set.singleton a
 
 instance Substitutable Arity where
-  apply s (Arity t1 t2) = Arity (apply s t1) (apply s t2)
-  ftv (Arity t1 t2) = ftv t1 `Set.union` ftv t2
+  apply s (Arity t1 t2)    = Arity (apply s t1) (apply s t2)
+  ftv (Arity t1 t2)        = ftv t1 `Set.union` ftv t2
 
 instance Substitutable Effects where
-  apply s = Map.map (apply s)
-  ftv = foldMap ftv
+  apply s                  = Map.map (apply s)
+  ftv                      = foldMap ftv
 
 instance Substitutable CompType where
   apply s (TComp t es)     = TComp (apply s t) (apply s es)
   ftv (TComp t es)         = ftv t `Set.union` ftv es
 
 instance Substitutable Scheme where
-  apply s (Forall as t) = Forall as (apply (s `Map.withoutKeys` as) t)
-  ftv (Forall as t) = ftv t `Set.difference` as
+  apply s (Forall as t)    = Forall as (apply (s `Map.withoutKeys` as) t)
+  ftv (Forall as t)        = ftv t `Set.difference` as
 
 instance Substitutable Context where
-  apply s (Context vs es) = Context (Map.map (apply s) vs) es
-  ftv (Context vs _) = foldMap ftv vs
+  apply s (Context vs es)  = Context (Map.map (apply s) vs) es
+  ftv (Context vs _)       = foldMap ftv vs
