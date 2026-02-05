@@ -41,7 +41,10 @@ instance Unifiable ValueType where
   unify t1 t2 = throwError $ "Type mismatch: " ++ show t1 ++ " vs " ++ show t2
 
 instance Unifiable CompType where
-  unify (TComp t _) (TComp t' _) = unify t t'
+  unify (TComp t es) (TComp t' es') = do
+    s1 <- unify t t'
+    s2 <- unifyEffectArities (apply s1 es) (apply s1 es')
+    return (s2 `Map.union` s1)
 
 bind :: Ident -> ValueType -> Infer Subst
 bind u t

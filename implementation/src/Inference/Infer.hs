@@ -13,7 +13,7 @@ import qualified Data.Set as Set
 import Syntax
 import Inference.Types
 import Inference.Substitutable
-import Inference.Unify (unify, unifyEffectArities)
+import Inference.Unify (unify)
 import Inference.Initialisation (initialCtx)
 
 infer :: Computation -> Either String CompType
@@ -74,8 +74,8 @@ inferComp = \case
     checkValue v TBool
     t1@(TComp tr1 e1) <- inferComp c1
     t2@(TComp tr2 e2) <- inferComp c2
-    s <- unify t1 t2 -- Unification ignores effects
-    return (TComp (apply s tr1) (e1 `Map.union` e2))
+    s <- unify t1 t2
+    return $ apply s (TComp tr1 (e1 `Map.union` e2))
   CCase v x1 c1 x2 c2 -> do
     tv <- inferValue v
     case tv of
@@ -83,19 +83,16 @@ inferComp = \case
         t1@(TComp tr1 e1) <- extend x1 (Forall Set.empty tl) (inferComp c1)
         t2@(TComp tr2 e2) <- extend x2 (Forall Set.empty tr) (inferComp c2)
         s <- unify t1 t2
-        return (TComp (apply s tr1) (e1 `Map.union` e2))
+        return $ apply s (TComp tr1 (e1 `Map.union` e2))
       _ -> throwError $ "Case analysis on non-either type: " ++ show tv
   CHandle v c -> do
     tv <- inferValue v
     case tv of
       THandler (TComp hInVal hInEffs) (TComp hOutVal hOutEffs) -> do
         -- Infer the handled computation (collecting effects upward)
-        TComp cVal cEffs <- inferComp c
-        -- Unify the computation's value type with handler's expected input type
-        s1 <- unify cVal hInVal
-        -- For effects that appear in both, unify their arities
-        s2 <- unifyEffectArities (apply s1 cEffs) (apply s1 hInEffs)
-        let s = s2 `Map.union` s1
+        cType@(TComp _ cEffs) <- inferComp c
+        -- Unify computation type with handler's expected input (value + effect arities)
+        s <- unify cType (TComp hInVal hInEffs)
         -- Effects that pass through (not handled by this handler)
         let passThrough = apply s cEffs `Map.difference` apply s hInEffs
         -- Final effects = pass through + handler's output effects
