@@ -5,7 +5,6 @@ import qualified Data.Set as Set
 
 import Inference.Types
 
--- | Primitive function types
 primitives :: [(String, Scheme)]
 primitives =
   [ ("+",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt mempty)))

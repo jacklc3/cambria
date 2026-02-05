@@ -32,12 +32,17 @@ data ValueType
   | THandler CompType CompType
   deriving (Eq)
 
-data CompType = TComp ValueType Effects
-  deriving (Eq)
+data CompType = TComp {
+  value :: ValueType,
+  effects :: Effects
+} deriving (Eq)
 
 type Effects = Map.Map Op Arity
 
-data Arity = Arity ValueType ValueType deriving (Eq, Show)
+data Arity = Arity {
+  input  :: ValueType,
+  output :: ValueType
+} deriving (Eq)
 
 instance Show ValueType where
   show (TVar a) = a
@@ -56,13 +61,16 @@ instance Show CompType where
   show (TComp t es) = show t ++ "!" ++ showEffects es
     where
       showEffects es = "{" ++
-        intercalate "," (Map.foldrWithKey (\op (Arity tIn tOut) acc ->
-          (" " ++ op ++ " : " ++ show tIn ++ " ~> " ++ show tOut ++ " ") : acc) [] es) ++ "}"
+        intercalate "," (Map.foldrWithKey (\op ar acc ->
+          (" " ++ op ++ " : " ++ show ar ++ " ") : acc) [] es) ++ "}"
+
+instance Show Arity where
+  show (Arity input output) = show input ++ " ~> " ++ show output
 
 data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 data Context = Context {
-  vars    :: Map.Map Ident Scheme,
-  effects :: Effects
+  variables :: Map.Map Ident Scheme,
+  abilities :: Effects
 } deriving (Show)

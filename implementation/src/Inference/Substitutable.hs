@@ -27,21 +27,21 @@ instance Substitutable ValueType where
   apply s (THandler t1 t2) = THandler (apply s t1) (apply s t2)
   apply s t@(TVar a)       = Map.findWithDefault t a s
 
-  ftv TUnit                = Set.empty
-  ftv TInt                 = Set.empty
-  ftv TBool                = Set.empty
-  ftv TDouble              = Set.empty
-  ftv TString              = Set.empty
-  ftv TName                = Set.empty
-  ftv (TPair t1 t2)        = ftv t1 `Set.union` ftv t2
-  ftv (TEither t1 t2)      = ftv t1 `Set.union` ftv t2
-  ftv (TFun t1 t2)         = ftv t1 `Set.union` ftv t2
-  ftv (THandler t1 t2)     = ftv t1 `Set.union` ftv t2
+  ftv TUnit                = mempty
+  ftv TInt                 = mempty
+  ftv TBool                = mempty
+  ftv TDouble              = mempty
+  ftv TString              = mempty
+  ftv TName                = mempty
+  ftv (TPair t1 t2)        = ftv t1 <> ftv t2
+  ftv (TEither t1 t2)      = ftv t1 <> ftv t2
+  ftv (TFun t1 t2)         = ftv t1 <> ftv t2
+  ftv (THandler t1 t2)     = ftv t1 <> ftv t2
   ftv (TVar a)             = Set.singleton a
 
 instance Substitutable Arity where
   apply s (Arity t1 t2)    = Arity (apply s t1) (apply s t2)
-  ftv (Arity t1 t2)        = ftv t1 `Set.union` ftv t2
+  ftv (Arity t1 t2)        = ftv t1 <> ftv t2
 
 instance Substitutable Effects where
   apply s                  = Map.map (apply s)
@@ -49,11 +49,11 @@ instance Substitutable Effects where
 
 instance Substitutable CompType where
   apply s (TComp t es)     = TComp (apply s t) (apply s es)
-  ftv (TComp t es)         = ftv t `Set.union` ftv es
+  ftv (TComp t es)         = ftv t <> ftv es
 
 instance Substitutable Scheme where
   apply s (Forall as t)    = Forall as (apply (s `Map.withoutKeys` as) t)
-  ftv (Forall as t)        = ftv t `Set.difference` as
+  ftv (Forall as t)        = ftv t Set.\\ as
 
 instance Substitutable Context where
   apply s (Context vs es)  = Context (Map.map (apply s) vs) es

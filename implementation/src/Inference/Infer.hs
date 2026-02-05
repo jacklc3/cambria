@@ -25,16 +25,16 @@ fresh = do
   modify succ
   return $ TVar $ "t" ++ show n
 
-findVar :: Ident -> Infer ValueType
-findVar x = do
-  vars <- asks vars
-  case Map.lookup x vars of
+lookupVar :: Ident -> Infer ValueType
+lookupVar x = do
+  variables <- asks variables
+  case Map.lookup x variables of
     Just scheme -> instantiate scheme
     Nothing     -> throwError $ "Unbound variable: " ++ x
 
-findOp :: Op -> Infer Arity
-findOp op = do
-  effects <- asks effects
+lookupOp :: Op -> Infer Arity
+lookupOp op = do
+  effects <- asks abilities
   case Map.lookup op effects of
     Just arity -> return arity
     Nothing    -> throwError $ "Unknown operation: " ++ op
@@ -46,12 +46,11 @@ instantiate (Forall as t) = do
   let s = Map.fromDistinctAscList $ zip asIncList as'
   return $ apply s t
 
-extend :: Ident -> Scheme -> Infer a -> Infer a
-extend x sc = local (\ctx -> ctx{ vars = Map.insert x sc (vars ctx) })
+defVar :: Ident -> Scheme -> Infer a -> Infer a
+defVar x sc = local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
 
--- | Extend the context with additional effect operations
-extendEffects :: Effects -> Infer a -> Infer a
-extendEffects effs = local (\ctx -> ctx{ effects = effs <> effects ctx })
+extendAbilities :: Effects -> Infer a -> Infer a
+extendAbilities effs = local (\ctx -> ctx{ abilities = effs <> abilities ctx })
 
 inferComp :: Computation -> Infer CompType
 inferComp = \case
@@ -67,45 +66,37 @@ inferComp = \case
         return $ apply s t2
       _ -> throwError $ "Applying non-function type: " ++ show tf
   COp op v -> do
-    Arity tIn tOut <- findOp op
+    ar <- lookupOp op
     tv <- inferValue v
-    s <- unify tv tIn
-    -- Apply substitution to get the actual arity used
-    let ar' = Arity (apply s tIn) (apply s tOut)
-    return (TComp (apply s tOut) (Map.singleton op ar'))
+    s <- unify tv (input ar)
+    return $ apply s (TComp (output ar) (Map.singleton op ar))
   CDo x c1 c2 -> do
     TComp tv e1 <- inferComp c1
-    TComp tr e2 <- extend x (Forall Set.empty tv) (inferComp c2)
+    TComp tr e2 <- defVar x (Forall mempty tv) (inferComp c2)
     return (TComp tr (e1 <> e2))
   CIf v c1 c2 -> do
     checkValue v TBool
-    t1@(TComp tr1 e1) <- inferComp c1
-    t2@(TComp tr2 e2) <- inferComp c2
+    t1 <- inferComp c1
+    t2 <- inferComp c2
     s <- unify t1 t2
-    return $ apply s (TComp tr1 (e1 <> e2))
+    return $ apply s (TComp (value t1) (effects t1 <> effects t2))
   CCase v x1 c1 x2 c2 -> do
     tv <- inferValue v
     case tv of
       TEither tl tr -> do
-        t1@(TComp tr1 e1) <- extend x1 (Forall Set.empty tl) (inferComp c1)
-        t2@(TComp tr2 e2) <- extend x2 (Forall Set.empty tr) (inferComp c2)
+        t1 <- defVar x1 (Forall mempty tl) (inferComp c1)
+        t2 <- defVar x2 (Forall mempty tr) (inferComp c2)
         s <- unify t1 t2
-        return $ apply s (TComp tr1 (e1 <> e2))
+        return $ apply s (TComp (value t1) (effects t1 <> effects t2))
       _ -> throwError $ "Case analysis on non-either type: " ++ show tv
   CHandle v c -> do
     tv <- inferValue v
     case tv of
-      THandler (TComp hInVal hInEffs) (TComp hOutVal hOutEffs) -> do
-        -- Infer the handled computation with handler's operations in scope
-        -- This allows the computation to use operations defined by the handler
-        cType@(TComp _ cEffs) <- extendEffects hInEffs (inferComp c)
-        -- Unify computation type with handler's expected input (value + effect arities)
-        s <- unify cType (TComp hInVal hInEffs)
-        -- Effects that pass through (not handled by this handler)
-        let passThrough = apply s cEffs `Map.difference` apply s hInEffs
-        -- Final effects = pass through + handler's output effects
-        let outEffs = passThrough <> apply s hOutEffs
-        return $ TComp (apply s hOutVal) outEffs
+      THandler tIn tOut -> do
+        tc <- extendAbilities (effects tIn) (inferComp c)
+        s <- unify tc tIn
+        let newEffects = (effects tc Map.\\ effects tIn) <> effects tOut
+        return $ apply s (TComp (value tOut) newEffects)
       _ -> throwError $ "Handling with non-handler type: " ++ show tv
 
 checkComp :: CompType -> Computation -> Infer ()
@@ -115,13 +106,13 @@ checkComp t c = do
   checkEffectUsage (apply s t') (apply s t)
 
 checkEffectUsage :: CompType -> CompType -> Infer ()
-checkEffectUsage t1@(TComp _ e1) t2@(TComp _ e2) = do
-  unless (e1 `Map.isSubmapOf` e2)
+checkEffectUsage t1 t2 = do
+  unless (effects t1 `Map.isSubmapOf` effects t2)
     $ throwError $ "Computation " ++ show t1 ++ " incompatible with " ++ show t2
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
-  VVar x    -> findVar x
+  VVar x    -> lookupVar x
   VInt _    -> return TInt
   VBool _   -> return TBool
   VString _ -> return TString
@@ -142,14 +133,14 @@ inferValue = \case
     return $ TEither t1 t2
   VFun x c -> do
     t1 <- fresh
-    t2 <- extend x (Forall Set.empty t1) (inferComp c)
+    t2 <- defVar x (Forall mempty t1) (inferComp c)
     return $ TFun t1 t2
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
     let tf = TFun t1 (TComp t2 mempty)
-    tBody <- extend f (Forall Set.empty tf)
-      $ extend x (Forall Set.empty t1)
+    tBody <- defVar f (Forall mempty tf)
+      $ defVar x (Forall mempty t1)
       $ inferComp c
     s <- unify tBody (TComp t2 mempty)
     return $ apply s tf
@@ -160,7 +151,7 @@ inferValue = \case
 
     -- 1. Infer return clause
     -- xr has type hInVal, body should produce hOutVal
-    TComp retOutVal retEffs <- extend xr (Forall Set.empty hInVal) (inferComp cr)
+    TComp retOutVal retEffs <- defVar xr (Forall mempty hInVal) (inferComp cr)
     s1 <- unify retOutVal hOutVal
 
     -- Apply substitution to track the refined types
@@ -183,8 +174,8 @@ inferValue = \case
 
           -- Infer the operation body
           TComp opBodyOut opBodyEffs <-
-            extend x (Forall Set.empty opIn) $
-            extend k (Forall Set.empty kType) $
+            defVar x (Forall mempty opIn) $
+            defVar k (Forall mempty kType) $
             inferComp cop
 
           -- The body output should match the handler output
@@ -210,7 +201,7 @@ inferValue = \case
         Nothing -> return (hOutVal2, mempty, s2)
         Just (FinClause xf cf) -> do
             -- Finally transforms the handler intermediate output (hOutVal2) into final result
-            TComp finOut finEffs <- extend xf (Forall Set.empty hOutVal2) (inferComp cf)
+            TComp finOut finEffs <- defVar xf (Forall mempty hOutVal2) (inferComp cf)
             return (finOut, finEffs, s2)
 
     -- Apply final substitution to all effects
