@@ -46,8 +46,8 @@ instantiate (Forall as t) = do
   let s = Map.fromDistinctAscList $ zip asIncList as'
   return $ apply s t
 
-defVar :: Ident -> Scheme -> Infer a -> Infer a
-defVar x sc = local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
+extendVariable :: Ident -> Scheme -> Infer a -> Infer a
+extendVariable x sc = local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
 
 extendAbilities :: Effects -> Infer a -> Infer a
 extendAbilities effs = local (\ctx -> ctx{ abilities = effs <> abilities ctx })
@@ -72,7 +72,7 @@ inferComp = \case
     return $ apply s (TComp (output ar) (Map.singleton op ar))
   CDo x c1 c2 -> do
     TComp tv e1 <- inferComp c1
-    TComp tr e2 <- defVar x (Forall mempty tv) (inferComp c2)
+    TComp tr e2 <- extendVariable x (Forall mempty tv) (inferComp c2)
     return (TComp tr (e1 <> e2))
   CIf v c1 c2 -> do
     checkValue v TBool
@@ -84,8 +84,8 @@ inferComp = \case
     tv <- inferValue v
     case tv of
       TEither tl tr -> do
-        t1 <- defVar x1 (Forall mempty tl) (inferComp c1)
-        t2 <- defVar x2 (Forall mempty tr) (inferComp c2)
+        t1 <- extendVariable x1 (Forall mempty tl) (inferComp c1)
+        t2 <- extendVariable x2 (Forall mempty tr) (inferComp c2)
         s <- unify t1 t2
         return $ apply s (TComp (value t1) (effects t1 <> effects t2))
       _ -> throwError $ "Case analysis on non-either type: " ++ show tv
@@ -133,14 +133,14 @@ inferValue = \case
     return $ TEither t1 t2
   VFun x c -> do
     t1 <- fresh
-    t2 <- defVar x (Forall mempty t1) (inferComp c)
+    t2 <- extendVariable x (Forall mempty t1) (inferComp c)
     return $ TFun t1 t2
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
     let tf = TFun t1 (TComp t2 mempty)
-    tBody <- defVar f (Forall mempty tf)
-      $ defVar x (Forall mempty t1)
+    tBody <- extendVariable f (Forall mempty tf)
+      $ extendVariable x (Forall mempty t1)
       $ inferComp c
     s <- unify tBody (TComp t2 mempty)
     return $ apply s tf
@@ -151,7 +151,7 @@ inferValue = \case
 
     -- 1. Infer return clause
     -- xr has type hInVal, body should produce hOutVal
-    TComp retOutVal retEffs <- defVar xr (Forall mempty hInVal) (inferComp cr)
+    TComp retOutVal retEffs <- extendVariable xr (Forall mempty hInVal) (inferComp cr)
     s1 <- unify retOutVal hOutVal
 
     -- Apply substitution to track the refined types
@@ -174,8 +174,8 @@ inferValue = \case
 
           -- Infer the operation body
           TComp opBodyOut opBodyEffs <-
-            defVar x (Forall mempty opIn) $
-            defVar k (Forall mempty kType) $
+            extendVariable x (Forall mempty opIn) $
+            extendVariable k (Forall mempty kType) $
             inferComp cop
 
           -- The body output should match the handler output
@@ -201,7 +201,7 @@ inferValue = \case
         Nothing -> return (hOutVal2, mempty, s2)
         Just (FinClause xf cf) -> do
             -- Finally transforms the handler intermediate output (hOutVal2) into final result
-            TComp finOut finEffs <- defVar xf (Forall mempty hOutVal2) (inferComp cf)
+            TComp finOut finEffs <- extendVariable xf (Forall mempty hOutVal2) (inferComp cf)
             return (finOut, finEffs, s2)
 
     -- Apply final substitution to all effects
