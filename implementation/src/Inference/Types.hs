@@ -65,7 +65,7 @@ parensIf True s = "(" ++ s ++ ")"
 parensIf False s = s
 
 instance Show CompType where
-  show (TComp t es) = showType 5 t ++ "!" ++ showEffects es
+  show (TComp t es) = show t ++ "!" ++ showEffects es
     where
       showEffects es = "{" ++
         intercalate "," (Map.foldrWithKey (\op ar acc ->
