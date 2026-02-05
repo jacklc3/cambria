@@ -20,6 +20,7 @@ instance Substitutable ValueType where
   apply _ TBool            = TBool
   apply _ TDouble          = TDouble
   apply _ TString          = TString
+  apply _ TName            = TName
   apply s (TPair t1 t2)    = TPair (apply s t1) (apply s t2)
   apply s (TEither t1 t2)  = TEither (apply s t1) (apply s t2)
   apply s (TFun t1 t2)     = TFun (apply s t1) (apply s t2)
@@ -31,6 +32,7 @@ instance Substitutable ValueType where
   ftv TBool                = Set.empty
   ftv TDouble              = Set.empty
   ftv TString              = Set.empty
+  ftv TName                = Set.empty
   ftv (TPair t1 t2)        = ftv t1 `Set.union` ftv t2
   ftv (TEither t1 t2)      = ftv t1 `Set.union` ftv t2
   ftv (TFun t1 t2)         = ftv t1 `Set.union` ftv t2

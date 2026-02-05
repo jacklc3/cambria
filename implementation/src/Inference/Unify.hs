@@ -18,6 +18,7 @@ instance Unifiable ValueType where
   unify TBool TBool     = return Map.empty
   unify TDouble TDouble = return Map.empty
   unify TString TString = return Map.empty
+  unify TName TName     = return Map.empty
   unify (TPair t1 t2) (TPair t1' t2') = do
     s1 <- unify t1 t1'
     s2 <- unify (apply s1 t2) (apply s1 t2')
@@ -31,8 +32,8 @@ instance Unifiable ValueType where
     s2 <- unify (apply s1 t2) (apply s1 t2')
     return (s2 `Map.union` s1)
   unify (THandler t1 t2) (THandler t1' t2') = do
-    s1 <- unify t1 t2
-    s2 <- unify (apply s1 t1) (apply s1 t2)
+    s1 <- unify t1 t1'
+    s2 <- unify (apply s1 t2) (apply s1 t2')
     return (s2 `Map.union` s1)
   unify (TVar u) t = bind u t
   unify t (TVar u) = bind u t
