@@ -170,7 +170,6 @@ inferValue = \case
         finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
         s <- unify (effects finOut) (effects opsOut)
         return (finOut, s)
-
     return $ apply s3 (THandler (TComp (apply s2 hInVal) ops) (addEffects (effects opsOut) finOut))
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"

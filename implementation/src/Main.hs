@@ -46,6 +46,7 @@ main = do
           case infer ast of
             Left err -> putStrLn err
             Right t -> do
+              putStrLn $ "Desugared AST: " ++ show ast
               putStrLn $ "Type inferred: " ++ show t
               result <- evalIO initialEnv ast
               print result

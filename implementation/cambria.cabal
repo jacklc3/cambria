@@ -10,7 +10,7 @@ author:             Jack Liell-Cock
 maintainer:         jackliellcock@gmail.com
 -- bug-reports:
 copyright:          2025 Jack Liell-Cock
-extra-source-files: CHANGELOG.md
+-- extra-source-files: CHANGELOG.md
 
 executable cambria
   main-is:          Main.hs
