@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-
 module Inference.Substitutable where
 
 import qualified Data.Map as Map
@@ -43,7 +41,7 @@ instance Substitutable Arity where
   apply s (Arity t1 t2)    = Arity (apply s t1) (apply s t2)
   ftv (Arity t1 t2)        = ftv t1 <> ftv t2
 
-instance Substitutable Effects where
+instance (Substitutable v) => Substitutable (Map.Map k v) where
   apply s                  = Map.map (apply s)
   ftv                      = foldMap ftv
 

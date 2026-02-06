@@ -1,6 +1,3 @@
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 module Inference.Unify where
 
 import Control.Monad (foldM)
@@ -55,12 +52,12 @@ instance Unifiable Arity where
     s2 <- unify (apply s1 t2) (apply s1 t2')
     return (s2 <> s1)
 
-instance Unifiable Effects where
-  unify e1 e2 = do
-    foldM unifyOp mempty (Map.intersectionWith (,) e1 e2)
+instance (Unifiable v, Substitutable v, Ord k) => Unifiable (Map.Map k v) where
+  unify m1 m2 = do
+    foldM unifyV mempty (Map.intersectionWith (,) m1 m2)
     where
-      unifyOp s (ar1, ar2) = do
-        s' <- unify (apply s ar1) (apply s ar2)
+      unifyV s (v1, v2) = do
+        s' <- unify (apply s v1) (apply s v2)
         return (s' <> s)
 
 bind :: Ident -> ValueType -> Infer Subst

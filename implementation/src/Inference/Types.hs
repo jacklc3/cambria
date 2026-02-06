@@ -40,8 +40,8 @@ data CompType = TComp {
 type Effects = Map.Map Op Arity
 
 data Arity = Arity {
-  input  :: ValueType,
-  output :: ValueType
+  arg  :: ValueType,
+  ret :: ValueType
 } deriving (Eq)
 
 instance Show ValueType where
@@ -72,7 +72,7 @@ instance Show CompType where
           (" " ++ op ++ " : " ++ show ar ++ " ") : acc) [] es) ++ "}"
 
 instance Show Arity where
-  show (Arity input output) = show input ++ " ~> " ++ show output
+  show (Arity arg ret) = show arg ++ " ~> " ++ show ret
 
 data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
