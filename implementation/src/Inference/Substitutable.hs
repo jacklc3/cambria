@@ -6,8 +6,6 @@ import qualified Data.Set as Set
 import Inference.Types
 import Syntax (Ident)
 
-type Subst = Map.Map Ident ValueType
-
 class Substitutable a where
   apply :: Subst -> a -> a
   ftv   :: a -> Set.Set Ident

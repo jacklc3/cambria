@@ -13,10 +13,17 @@ import Data.Monoid (Monoid)
 
 import Syntax (Ident, Op)
 
-type Infer a = ReaderT Context (StateT Int (Except String)) a
+type Subst = Map.Map Ident ValueType
+
+data InferState = InferState {
+  count :: Int,
+  subst :: Subst
+}
+
+type Infer a = ReaderT Context (StateT InferState (Except String)) a
 
 runInfer :: Context -> Infer a -> Either String a
-runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) 0)
+runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty))
 
 data ValueType
   = TVar Ident
