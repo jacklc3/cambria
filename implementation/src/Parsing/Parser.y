@@ -62,12 +62,14 @@ import Control.Monad.Except
   '~>'                       { Token _ _ TokSquigglyArrow }
   ':'                        { Token _ _ TokColon }
   '&'                        { Token _ _ TokAmpersand }
+  '='                        { Token _ _ TokEquals }
 
   integer                    { Token _ _ (TokInt $$) }
   boolean                    { Token _ _ (TokBool $$) }
   string                     { Token _ _ (TokString $$) }
   var                        { Token _ _ (TokIdent $$) }
   op                         { Token _ _ (TokOp $$) }
+  typeparam                  { Token _ _ (TokTypeParam $$) }
 
 %right ';'
 %nonassoc '=='
@@ -130,6 +132,7 @@ handlerClause :: { HandlerClause }
   : return nvar '->' comp                 { RC $2 $4 }
   | var '(' nvar ';' nvar ')' '->' comp   { OC $1 $3 $5 $8 }
   | finally nvar '->' comp                { FC $2 $4 }
+  | typeparam '=' type                    { TC $1 $3 }
 
 comp :: { SugaredComp }
   : compTerm ';' comp                     { SCDo "_" $1 $3 }
@@ -183,6 +186,7 @@ typeAtom :: { BaseType }
   | Double                                { BTDouble }
   | Str                                   { BTString }
   | Name                                  { BTName }
+  | typeparam                             { BTParam $1 }
   | '(' type ')'                          { $2 }
 
 {

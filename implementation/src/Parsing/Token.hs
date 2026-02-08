@@ -62,3 +62,4 @@ data TokenKind
   | TokSquigglyArrow
   | TokColon
   | TokAmpersand
+  | TokTypeParam String

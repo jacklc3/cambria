@@ -68,6 +68,8 @@ tokens :-
   ":"                        { \p s -> Token p (quotes s) TokColon }
   "&"                        { \p s -> Token p (quotes s) TokAmpersand }
 
+  \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (tail s)) }
+
   $digit+                    { \p s -> Token p s (TokInt (read s)) }
   true                       { \p s -> Token p s (TokBool True) }
   false                      { \p s -> Token p s (TokBool False) }

@@ -7,6 +7,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Reader
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 import Syntax
 import Inference.Types
@@ -109,8 +110,21 @@ inferComp = \case
     unify t1 t2
     applySubst (addEffects (effects t2) t1)
   CDeclare op dtArg dtRet c -> do
-    let ar = Arity (toValueType dtArg) (toValueType dtRet)
-    extendAbilities (Map.singleton op ar) (inferComp c)
+    ctx <- ask
+    let tArg = resolveBaseType dtArg
+        tRet = resolveBaseType dtRet
+        ar   = Arity tArg tRet
+        -- Discover params from resolved types, merge with existing
+        params = collectTParams tArg <> collectTParams tRet
+        paramMap = Set.foldl' (\pm p ->
+          if Map.member p pm then pm
+          else Map.insert p p pm
+          ) (parameters ctx) params
+    -- Run continuation with extended context
+    local (\ctx' -> ctx' {
+      abilities  = Map.singleton op ar <> abilities ctx',
+      parameters = paramMap
+    }) (inferComp c)
   CHandle v c -> do
     tv <- inferValue v
     tInVal <- fresh
@@ -166,12 +180,45 @@ inferValue = \case
              $ inferComp c
     unify (value tBody) t2
     applySubst (TFun t1 tBody)
-  VHandler (Handler (RetClause xr cr) opClauses finClause) -> do
+  VHandler (Handler (RetClause xr cr) opClauses finClause typeInsts) -> do
+    -- Process type instantiations: build param substitution map
+    ctx <- ask
+    paramSubst <- foldM (\ps (paramName, baseType) -> do
+      case Map.lookup paramName (parameters ctx) of
+        Nothing -> throwError $ "Type parameter $" ++ paramName ++ " not in scope"
+        Just paramId -> return (Map.insert paramId (resolveBaseType baseType) ps)
+      ) Map.empty typeInsts
+    -- Find all ops in abilities whose arities mention any instantiated param
+    let instantiatedParams = Map.keysSet paramSubst
+        arityMentions (Arity a r) = collectTParams a <> collectTParams r
+        requiredOps = Map.keysSet $ Map.filter
+          (\ar -> not $ Set.null $ arityMentions ar `Set.intersection` instantiatedParams)
+          (abilities ctx)
+    -- Verify handler handles all required ops
+    let handledOps = Set.fromList (map fst opClauses)
+    let missingOps = requiredOps Set.\\ handledOps
+    unless (Set.null missingOps) $
+      throwError $ "Handler instantiates type parameter(s) but does not handle operation(s): "
+        ++ show (Set.toList missingOps)
+
+    -- Resolve concrete arities for ops with instantiated params
+    let concreteArity op = case Map.lookup op (abilities ctx) of
+          Just (Arity a r) | not (Map.null paramSubst) ->
+            Just (Arity (substParams paramSubst a) (substParams paramSubst r))
+          _ -> Nothing
+
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
-          opOut <- extendVariable x (Forall mempty opArg)
-                   $ extendVariable k (Forall mempty (TFun opRet hOut))
+          case concreteArity op of
+            Just ar -> do
+              unify opArg (arg ar)
+              unify opRet (ret ar)
+            Nothing -> return ()
+          opArg' <- applySubst opArg
+          opRet' <- applySubst opRet
+          opOut <- extendVariable x (Forall mempty opArg')
+                   $ extendVariable k (Forall mempty (TFun opRet' hOut))
                    $ inferComp cOp
           unify opOut hOut
           hOut' <- applySubst (addEffects (effects opOut) hOut)
@@ -203,12 +250,34 @@ checkValue v t = do
   t' <- inferValue v
   unify t' t
 
-toValueType :: BaseType -> ValueType
-toValueType BTUnit         = TUnit
-toValueType BTInt          = TInt
-toValueType BTBool         = TBool
-toValueType BTDouble       = TDouble
-toValueType BTString       = TString
-toValueType BTName         = TName
-toValueType (BTPair a b)   = TPair (toValueType a) (toValueType b)
-toValueType (BTEither a b) = TEither (toValueType a) (toValueType b)
+resolveBaseType :: BaseType -> ValueType
+resolveBaseType BTUnit         = TUnit
+resolveBaseType BTInt          = TInt
+resolveBaseType BTBool         = TBool
+resolveBaseType BTDouble       = TDouble
+resolveBaseType BTString       = TString
+resolveBaseType BTName         = TName
+resolveBaseType (BTPair a b)   = TPair (resolveBaseType a) (resolveBaseType b)
+resolveBaseType (BTEither a b) = TEither (resolveBaseType a) (resolveBaseType b)
+resolveBaseType (BTParam p)    = TParam p
+
+collectTParams :: ValueType -> Set.Set Ident
+collectTParams (TParam p)       = Set.singleton p
+collectTParams (TPair t1 t2)    = collectTParams t1 <> collectTParams t2
+collectTParams (TEither t1 t2)  = collectTParams t1 <> collectTParams t2
+collectTParams (TFun t1 t2)     = collectTParams t1 <> collectTParams (value t2)
+collectTParams (THandler t1 t2) = collectTParams (value t1) <> collectTParams (value t2)
+collectTParams _                = Set.empty
+
+substParams :: Map.Map Ident ValueType -> ValueType -> ValueType
+substParams ps (TParam p)       = Map.findWithDefault (TParam p) p ps
+substParams ps (TPair t1 t2)    = TPair (substParams ps t1) (substParams ps t2)
+substParams ps (TEither t1 t2)  = TEither (substParams ps t1) (substParams ps t2)
+substParams ps (TFun t1 t2)     = TFun (substParams ps t1) (substParamsComp ps t2)
+substParams ps (THandler t1 t2) = THandler (substParamsComp ps t1) (substParamsComp ps t2)
+substParams _  t                = t
+
+substParamsComp :: Map.Map Ident ValueType -> CompType -> CompType
+substParamsComp ps (TComp t es) = TComp (substParams ps t) (Map.map substAr es)
+  where substAr (Arity a r) = Arity (substParams ps a) (substParams ps r)
+

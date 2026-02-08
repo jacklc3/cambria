@@ -1,0 +1,6 @@
+-- Test: type mismatch with existential type
+-- $p from ref should not be usable where Int is expected
+declare !get : $p ~> Int in
+declare !ref : Int ~> $p in
+do a <- !ref 42 in
+a + 1

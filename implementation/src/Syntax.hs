@@ -19,6 +19,7 @@ data BaseType
   | BTName
   | BTPair BaseType BaseType
   | BTEither BaseType BaseType
+  | BTParam String
   deriving (Show, Eq)
 
 data Value
@@ -97,12 +98,14 @@ data FinClause = FinClause Ident Computation
 data Handler = Handler {
   retClause :: RetClause,
   opClauses :: [(Op, OpClause)],
-  finClause :: Maybe FinClause
+  finClause :: Maybe FinClause,
+  typeInsts :: [(String, BaseType)]
 }
 
 instance Show Handler where
-  show (Handler (RetClause xr cr) ocs fc) =
+  show (Handler (RetClause xr cr) ocs fc tis) =
     let
+      tiStrs = map (\(p, t) -> "$" ++ p ++ " = " ++ show t) tis
       retStr = "return " ++ xr ++ " -> " ++ show cr
       opStrs = map (\(op, OpClause x k c) ->
         op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) ocs
@@ -110,4 +113,4 @@ instance Show Handler where
         Just (FinClause xf cf) -> ", finally " ++ xf ++ " -> " ++ show cf
         Nothing -> ""
     in
-      "handler { " ++ (concat $ intersperse ", " (retStr : opStrs)) ++ finStr ++ " }"
+      "handler { " ++ (concat $ intersperse ", " (tiStrs ++ retStr : opStrs)) ++ finStr ++ " }"

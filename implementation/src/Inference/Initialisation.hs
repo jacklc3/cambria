@@ -33,3 +33,4 @@ initialCtx :: Context
 initialCtx = Context
   (Map.fromList primitives)
   (Map.fromList primitiveOps)
+  Map.empty

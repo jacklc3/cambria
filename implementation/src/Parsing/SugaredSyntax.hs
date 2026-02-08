@@ -29,3 +29,4 @@ data HandlerClause
   = RC Ident SugaredComp
   | OC Op Ident Ident SugaredComp
   | FC Ident SugaredComp
+  | TC String BaseType

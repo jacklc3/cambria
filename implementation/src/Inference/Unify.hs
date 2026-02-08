@@ -20,6 +20,8 @@ instance Unifiable ValueType where
   unify TDouble TDouble = return mempty
   unify TString TString = return mempty
   unify TName TName     = return mempty
+  unify (TParam p) (TParam q)
+    | p == q    = return mempty
   unify (TPair t1 t2) (TPair t1' t2') = do
     s1 <- unify t1 t1'
     s2 <- unify (apply s1 t2) (apply s1 t2')

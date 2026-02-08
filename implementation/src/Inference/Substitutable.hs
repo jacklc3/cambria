@@ -11,6 +11,7 @@ class Substitutable a where
   ftv   :: a -> Set.Set Ident
 
 instance Substitutable ValueType where
+  apply _ (TParam p)       = TParam p
   apply _ TUnit            = TUnit
   apply _ TInt             = TInt
   apply _ TBool            = TBool
@@ -23,6 +24,7 @@ instance Substitutable ValueType where
   apply s (THandler t1 t2) = THandler (apply s t1) (apply s t2)
   apply s t@(TVar a)       = Map.findWithDefault t a s
 
+  ftv (TParam _)           = mempty
   ftv TUnit                = mempty
   ftv TInt                 = mempty
   ftv TBool                = mempty
@@ -52,5 +54,5 @@ instance Substitutable Scheme where
   ftv (Forall as t)        = ftv t Set.\\ as
 
 instance Substitutable Context where
-  apply s (Context vs es)  = Context (Map.map (apply s) vs) es
-  ftv (Context vs _)       = foldMap ftv vs
+  apply s (Context vs es tp) = Context (Map.map (apply s) vs) es tp
+  ftv (Context vs _ _)       = foldMap ftv vs

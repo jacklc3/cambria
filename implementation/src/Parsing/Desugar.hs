@@ -92,20 +92,22 @@ desugarVars xs c = foldr (\x c' -> CReturn (VFun x c')) c xs
 
 desugarHandler :: [HandlerClause] -> Fresh Handler
 desugarHandler cs = do
-  (rc, ocs, fc) <- foldM f (Nothing,[],Nothing) cs
+  (rc, ocs, fc, tcs) <- foldM f (Nothing,[],Nothing,[]) cs
   rc' <- case rc of
     Just rc -> return rc
     Nothing -> do
       x <- newVar
       return $ RetClause x (CReturn (VVar x))
-  return $ Handler rc' ocs fc
+  return $ Handler rc' ocs fc tcs
     where
-      f (_, ocs, fc) (RC x c) = do
+      f (_, ocs, fc, tcs) (RC x c) = do
         c' <- desugarComp c
-        return (Just (RetClause x c'), ocs, fc)
-      f (rc, ocs, fc) (OC op x k c) = do
+        return (Just (RetClause x c'), ocs, fc, tcs)
+      f (rc, ocs, fc, tcs) (OC op x k c) = do
         c' <- desugarComp c
-        return (rc, (op, OpClause x k c'):ocs, fc)
-      f (rc, ocs, _) (FC x c) = do
+        return (rc, (op, OpClause x k c'):ocs, fc, tcs)
+      f (rc, ocs, _, tcs) (FC x c) = do
         c' <- desugarComp c
-        return (rc, ocs, Just (FinClause x c'))
+        return (rc, ocs, Just (FinClause x c'), tcs)
+      f (rc, ocs, fc, tcs) (TC name ty) =
+        return (rc, ocs, fc, (name, ty) : tcs)

@@ -23,6 +23,7 @@ runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty))
 
 data ValueType
   = TVar Ident
+  | TParam Ident
   | TUnit
   | TInt
   | TBool
@@ -52,6 +53,7 @@ instance Show ValueType where
 
 showType :: Int -> ValueType -> String
 showType _ (TVar a) = a
+showType _ (TParam p) = "$" ++ p
 showType _ TUnit = "Unit"
 showType _ TInt = "Int"
 showType _ TBool = "Bool"
@@ -81,6 +83,7 @@ data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 data Context = Context {
-  variables :: Map.Map Ident Scheme,
-  abilities :: Effects
+  variables  :: Map.Map Ident Scheme,
+  abilities  :: Effects,
+  parameters :: Map.Map String Ident
 } deriving (Show)
