@@ -81,9 +81,12 @@ inferComp = \case
   CApp f v -> do
     tf <- inferValue f
     tv <- inferValue v
-    tRet <- fresh
-    unify tf (TFun tv (TComp tRet mempty))
-    applySubst tRet
+    tRetVal <- fresh
+    unify tf (TFun tv (TComp tRetVal mempty))
+    tf' <- applySubst tf
+    case tf' of
+      TFun _ tRet -> return tRet
+      _           -> throwError $ "Applying non-function: " ++ show tf'
   COp op v -> do
     ar <- lookupOp op
     tv <- inferValue v
@@ -119,17 +122,20 @@ inferComp = \case
     return $ addEffects (effects t2') t1'
   CHandle v c -> do
     tv <- inferValue v
-    tIn <- fresh
-    tOut <- fresh
-    unify tv (THandler tIn tOut)
-    tIn' <- applySubst tIn
-    tc <- extendAbilities (effects tIn') (inferComp c)
-    tIn'' <- applySubst tIn'
-    unify tc tIn''
-    tc' <- applySubst tc
-    tOut' <- applySubst tOut
-    tInFinal <- applySubst tIn''
-    return $ addEffects (effects tc' Map.\\ effects tInFinal) tOut'
+    tInVal <- fresh
+    tOutVal <- fresh
+    unify tv (THandler (TComp tInVal mempty) (TComp tOutVal mempty))
+    tv' <- applySubst tv
+    case tv' of
+      THandler tIn tOut -> do
+        tc <- extendAbilities (effects tIn) (inferComp c)
+        tIn' <- applySubst tIn
+        unify tc tIn'
+        tc' <- applySubst tc
+        tOut' <- applySubst tOut
+        tIn'' <- applySubst tIn'
+        return $ addEffects (effects tc' Map.\\ effects tIn'') tOut'
+      _ -> throwError $ "Handleing with non-handler: " ++ show tv'
 
 checkComp :: CompType -> Computation -> Infer ()
 checkComp t1 c = do
@@ -178,7 +184,7 @@ inferValue = \case
       $ inferComp c
     unify tBody (TComp t2 mempty)
     applySubst tf
-  VHandler (Handler (RetClause xr cr) opClauses finallyClause) -> do
+  VHandler (Handler (RetClause xr cr) opClauses finClause) -> do
     hInVal <- fresh
     hOutVal <- fresh
     retOut <- extendVariable xr (Forall mempty hInVal) (inferComp cr)
@@ -190,26 +196,20 @@ inferValue = \case
           opOut <- extendVariable x (Forall mempty opArg) $
                    extendVariable k (Forall mempty (TFun opRet hOut)) $
                    inferComp cOp
-          hOutCurrent <- applySubst hOut
-          unify opOut hOutCurrent
-          hOut' <- applySubst hOutCurrent
-          opOut' <- applySubst opOut
-          return (Map.insert op (Arity opArg opRet) ops, addEffects (effects opOut') hOutNew)
+          unify opOut hOut
+          hOut' <- applySubst (addEffects (effects opOut) hOut)
+          return (Map.insert op (Arity opArg opRet) ops, hOut')
 
-    -- Initial state for fold: empty ops, initial hOut is just the return value
-    hOutStart <- applySubst (TComp hOutVal mempty)
-    (ops, opsOut) <- foldM processOpClause (mempty, hOutStart) opClauses
-    finalRes <- case finallyClause of
+    retOut' <- applySubst retOut
+    (ops, opsOut) <- foldM processOpClause (mempty, retOut) opClauses
+    finOut <- case finClause of
       Nothing -> return (TComp (value opsOut) ops)
       Just (FinClause xf cf) -> do
-        opsOut' <- applySubst opsOut
-        finOut <- extendVariable xf (Forall mempty (value opsOut')) (inferComp cf)
-        unify (effects finOut) (effects opsOut')
-        finOut' <- applySubst finOut
-        return $ addEffects (effects opsOut') finOut'
+        finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
+        unify (effects finOut) (effects opsOut)
+        applySubst (addEffects (effects opsOut) finOut)
     hInVal' <- applySubst hInVal
-    return $ THandler (TComp hInVal ops) finalRes
-
+    return $ THandler (TComp hInVal' ops) finOut
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 
