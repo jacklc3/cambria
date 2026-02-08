@@ -8,6 +8,7 @@ import Parsing.Token
 
 $digit = 0-9
 $alpha = [a-zA-Z]
+$lower = [a-z]
 $whitechar  = [\ \t\n\r]
 
 tokens :-
@@ -30,6 +31,13 @@ tokens :-
   inr                        { \p s -> Token p s TokInr }
   case                       { \p s -> Token p s TokCase }
   of                         { \p s -> Token p s TokOf }
+  declare                    { \p s -> Token p s TokDeclare }
+  Unit                       { \p s -> Token p s TokTUnit }
+  Int                        { \p s -> Token p s TokTInt }
+  Bool                       { \p s -> Token p s TokTBool }
+  Double                     { \p s -> Token p s TokTDouble }
+  Str                        { \p s -> Token p s TokTString }
+  Name                       { \p s -> Token p s TokTName }
 
   "()"                       { \p s -> Token p (quotes s) TokUnit }
   "&&"                       { \p s -> Token p (quotes s) TokAnd }
@@ -56,11 +64,14 @@ tokens :-
   "_"                        { \p s -> Token p (quotes s) TokUnderscore }
   ";"                        { \p s -> Token p (quotes s) TokSemiColon }
   "++"                       { \p s -> Token p (quotes s) TokConcat }
+  "~>"                       { \p s -> Token p (quotes s) TokSquigglyArrow }
+  ":"                        { \p s -> Token p (quotes s) TokColon }
+  "&"                        { \p s -> Token p (quotes s) TokAmpersand }
 
   $digit+                    { \p s -> Token p s (TokInt (read s)) }
   true                       { \p s -> Token p s (TokBool True) }
   false                      { \p s -> Token p s (TokBool False) }
-  $alpha[$alpha$digit\_\']*  { \p s -> Token p s (TokIdent s) }
+  $lower[$alpha$digit\_\']*  { \p s -> Token p s (TokIdent s) }
   \"(\\.|[^\"])*\"           { \p s -> Token p s (TokString (unescape (init (tail s)))) }
   !$alpha[$alpha$digit\_\']* { \p s -> Token p s (TokOp (tail s)) }
 

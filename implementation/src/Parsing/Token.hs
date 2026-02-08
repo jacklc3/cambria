@@ -25,6 +25,13 @@ data TokenKind
   | TokInr
   | TokCase
   | TokOf
+  -- Type names
+  | TokTUnit
+  | TokTInt
+  | TokTBool
+  | TokTDouble
+  | TokTString
+  | TokTName
   -- Symbols
   | TokUnit
   | TokAnd
@@ -51,3 +58,7 @@ data TokenKind
   | TokUnderscore
   | TokSemiColon
   | TokConcat
+  | TokDeclare
+  | TokSquigglyArrow
+  | TokColon
+  | TokAmpersand

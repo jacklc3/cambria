@@ -1,0 +1,3 @@
+-- Declare an operation at top level without handling it
+declare !ask : Unit ~> Int in
+!ask ()

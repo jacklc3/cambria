@@ -10,6 +10,17 @@ type Name  = Unique
 data Env   = Env (Map Ident Value)
 data Side  = L | R
 
+data BaseType
+  = BTUnit
+  | BTInt
+  | BTBool
+  | BTDouble
+  | BTString
+  | BTName
+  | BTPair BaseType BaseType
+  | BTEither BaseType BaseType
+  deriving (Show, Eq)
+
 data Value
   = VInt Integer
   | VDouble Double
@@ -66,6 +77,7 @@ data Computation
   | CCase Value Ident Computation Ident Computation
   | CApp Value Value
   | CHandle Value Computation
+  | CDeclare Op BaseType BaseType Computation
 
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v
@@ -77,6 +89,7 @@ instance Show Computation where
     ++ show x2 ++ " -> " ++ show c2 ++ " }"
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
+  show (CDeclare op tArg tRet c) = "declare !" ++ op ++ " : " ++ show tArg ++ " ~> " ++ show tRet ++ " in " ++ show c
 
 data RetClause = RetClause Ident Computation
 data OpClause = OpClause Ident Ident Computation

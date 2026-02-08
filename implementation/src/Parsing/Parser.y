@@ -6,7 +6,7 @@ module Parsing.Parser (
 import Parsing.Token
 import Parsing.Lexer
 import Parsing.SugaredSyntax
-import Syntax (Ident, Op, Side(..))
+import Syntax (Ident, Op, Side(..), BaseType(..))
 
 import Control.Monad.Except
 }
@@ -35,6 +35,13 @@ import Control.Monad.Except
   inr                        { Token _ _ TokInr }
   case                       { Token _ _ TokCase }
   of                         { Token _ _ TokOf }
+  declare                    { Token _ _ TokDeclare }
+  Unit                       { Token _ _ TokTUnit }
+  Int                        { Token _ _ TokTInt }
+  Bool                       { Token _ _ TokTBool }
+  Double                     { Token _ _ TokTDouble }
+  Str                        { Token _ _ TokTString }
+  Name                       { Token _ _ TokTName }
 
   '()'                       { Token _ _ TokUnit }
   '=='                       { Token _ _ TokEq }
@@ -52,6 +59,9 @@ import Control.Monad.Except
   '_'                        { Token _ _ TokUnderscore }
   ';'                        { Token _ _ TokSemiColon }
   '++'                       { Token _ _ TokConcat }
+  '~>'                       { Token _ _ TokSquigglyArrow }
+  ':'                        { Token _ _ TokColon }
+  '&'                        { Token _ _ TokAmpersand }
 
   integer                    { Token _ _ (TokInt $$) }
   boolean                    { Token _ _ (TokBool $$) }
@@ -131,6 +141,7 @@ compTerm :: { SugaredComp }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
   | with expr handle compTerm             { SCWith $2 $4 }
+  | declare op ':' type '~>' type in compTerm  { SCDeclare $2 $4 $6 $8 }
   | compInfix                             { $1 }
 
 compInfix :: { SugaredComp }
@@ -156,6 +167,23 @@ inlMatch :: { (Ident, SugaredComp) }
 
 inrMatch :: { (Ident, SugaredComp) }
   : inr nvar '->' comp                    { ($2, $4) }
+
+type :: { BaseType }
+  : typeProd                              { $1 }
+  | typeProd '+' typeProd                 { BTEither $1 $3 }
+
+typeProd :: { BaseType }
+  : typeAtom                              { $1 }
+  | typeAtom '&' typeAtom                 { BTPair $1 $3 }
+
+typeAtom :: { BaseType }
+  : Unit                                  { BTUnit }
+  | Int                                   { BTInt }
+  | Bool                                  { BTBool }
+  | Double                                { BTDouble }
+  | Str                                   { BTString }
+  | Name                                  { BTName }
+  | '(' type ')'                          { $2 }
 
 {
 

@@ -108,6 +108,9 @@ inferComp = \case
     t2 <- extendVariable x2 (Forall mempty tr') (inferComp c2)
     unify t1 t2
     applySubst (addEffects (effects t2) t1)
+  CDeclare op dtArg dtRet c -> do
+    let ar = Arity (toValueType dtArg) (toValueType dtRet)
+    extendAbilities (Map.singleton op ar) (inferComp c)
   CHandle v c -> do
     tv <- inferValue v
     tInVal <- fresh
@@ -199,3 +202,13 @@ checkValue (VEither R v) (TEither _ t) = checkValue v t
 checkValue v t = do
   t' <- inferValue v
   unify t' t
+
+toValueType :: BaseType -> ValueType
+toValueType BTUnit         = TUnit
+toValueType BTInt          = TInt
+toValueType BTBool         = TBool
+toValueType BTDouble       = TDouble
+toValueType BTString       = TString
+toValueType BTName         = TName
+toValueType (BTPair a b)   = TPair (toValueType a) (toValueType b)
+toValueType (BTEither a b) = TEither (toValueType a) (toValueType b)

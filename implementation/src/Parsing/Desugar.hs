@@ -44,6 +44,9 @@ desugarComp = \case
   SCWith e c -> do
     c' <- desugarComp c
     desugarExpr (\v -> CHandle v c') e
+  SCDeclare op tArg tRet c -> do
+    c' <- desugarComp c
+    return (CDeclare op tArg tRet c')
 
 desugarApp :: (Value -> Value -> Computation) -> SugaredExpr -> SugaredExpr -> Fresh Computation
 desugarApp f e1 e2 = do
