@@ -7,7 +7,6 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Reader
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 
 import Syntax
 import Inference.Types
@@ -135,7 +134,7 @@ inferComp = \case
         tOut' <- applySubst tOut
         tIn'' <- applySubst tIn'
         return $ addEffects (effects tc' Map.\\ effects tIn'') tOut'
-      _ -> throwError $ "Handleing with non-handler: " ++ show tv'
+      _ -> throwError $ "Handling with non-handler: " ++ show tv'
 
 checkComp :: CompType -> Computation -> Infer ()
 checkComp t1 c = do
@@ -178,18 +177,15 @@ inferValue = \case
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
-    let tf = TFun t1 (TComp t2 mempty)
-    tBody <- extendVariable f (Forall mempty tf)
+    tBody <- extendVariable f (Forall mempty (TFun t1 (TComp t2 mempty)))
       $ extendVariable x (Forall mempty t1)
       $ inferComp c
-    unify tBody (TComp t2 mempty)
-    applySubst tf
+    unify (value tBody) t2
+    applySubst (TFun t1 tBody)
   VHandler (Handler (RetClause xr cr) opClauses finClause) -> do
     hInVal <- fresh
-    hOutVal <- fresh
     retOut <- extendVariable xr (Forall mempty hInVal) (inferComp cr)
-    unify retOut (TComp hOutVal mempty)
-    
+
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
@@ -200,10 +196,9 @@ inferValue = \case
           hOut' <- applySubst (addEffects (effects opOut) hOut)
           return (Map.insert op (Arity opArg opRet) ops, hOut')
 
-    retOut' <- applySubst retOut
     (ops, opsOut) <- foldM processOpClause (mempty, retOut) opClauses
     finOut <- case finClause of
-      Nothing -> return (TComp (value opsOut) ops)
+      Nothing -> applySubst opsOut
       Just (FinClause xf cf) -> do
         finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)

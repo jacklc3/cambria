@@ -42,7 +42,7 @@ instance Show Value where
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
-  show (VPrimitive _)   = "<primative>"
+  show (VPrimitive _)   = "<primitive>"
   show (VClosure _ _ _) = "<closure>"
 
 instance Eq Value where

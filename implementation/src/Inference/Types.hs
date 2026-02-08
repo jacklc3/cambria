@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Inference.Types where
 
 import Control.Monad.Except
@@ -8,8 +6,6 @@ import Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.List (intercalate)
-import Data.Semigroup (Semigroup)
-import Data.Monoid (Monoid)
 
 import Syntax (Ident, Op)
 
