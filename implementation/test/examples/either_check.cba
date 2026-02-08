@@ -1,0 +1,4 @@
+case inl 42 of {
+  inl x -> return (x + 1),
+  inr y -> return (y - 1)
+}

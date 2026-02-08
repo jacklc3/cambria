@@ -15,9 +15,7 @@ import qualified Inference.Unify as Unify
 import Inference.Initialisation (initialCtx)
 
 infer :: Computation -> Either String CompType
-infer c = runInfer initialCtx $ do
-  t <- inferComp c
-  applySubst t
+infer c = runInfer initialCtx (inferComp c)
 
 extendSubst :: Subst -> Infer ()
 extendSubst s' = modify (\st -> st { subst = s' `compose` subst st })
@@ -79,75 +77,58 @@ inferComp = \case
     return $ TComp tv mempty
   CApp f v -> do
     tf <- inferValue f
-    tv <- inferValue v
-    tRetVal <- fresh
-    unify tf (TFun tv (TComp tRetVal mempty))
-    tf' <- applySubst tf
-    case tf' of
-      TFun _ tRet -> return tRet
-      _           -> throwError $ "Applying non-function: " ++ show tf'
+    tArg <- fresh
+    tRet <- fresh
+    unify tf (TFun tArg (TComp tRet mempty))
+    tArg' <- applySubst tArg
+    checkValue v tArg'
+    ~(TFun _ ct) <- applySubst tf
+    return ct
   COp op v -> do
     ar <- lookupOp op
-    tv <- inferValue v
-    unify tv (arg ar)
+    checkValue v (arg ar)
     applySubst (TComp (ret ar) (Map.singleton op ar))
   CDo x c1 c2 -> do
     t1 <- inferComp c1
-    t1' <- applySubst t1
-    t2 <- extendVariable x (Forall mempty (value t1')) (inferComp c2)
-    t1Final <- applySubst t1'
-    return $ addEffects (effects t1Final) t2
+    t2 <- extendVariable x (Forall mempty (value t1)) (inferComp c2)
+    applySubst (addEffects (effects t1) t2)
   CIf v c1 c2 -> do
-    tv <- inferValue v
-    unify tv TBool
+    checkValue v TBool
     t1 <- inferComp c1
     t2 <- inferComp c2
     unify t1 t2
-    t1' <- applySubst t1
-    t2' <- applySubst t2
-    return $ addEffects (effects t2') t1'
+    applySubst (addEffects (effects t2) t1)
   CCase v x1 c1 x2 c2 -> do
-    tv <- inferValue v
     tl <- fresh
     tr <- fresh
-    unify tv (TEither tl tr)
+    checkValue v (TEither tl tr)
     tl' <- applySubst tl
     tr' <- applySubst tr
     t1 <- extendVariable x1 (Forall mempty tl') (inferComp c1)
     t2 <- extendVariable x2 (Forall mempty tr') (inferComp c2)
     unify t1 t2
-    t1' <- applySubst t1
-    t2' <- applySubst t2
-    return $ addEffects (effects t2') t1'
+    applySubst (addEffects (effects t2) t1)
   CHandle v c -> do
     tv <- inferValue v
     tInVal <- fresh
     tOutVal <- fresh
     unify tv (THandler (TComp tInVal mempty) (TComp tOutVal mempty))
-    tv' <- applySubst tv
-    case tv' of
-      THandler tIn tOut -> do
-        tc <- extendAbilities (effects tIn) (inferComp c)
-        tIn' <- applySubst tIn
-        unify tc tIn'
-        tc' <- applySubst tc
-        tOut' <- applySubst tOut
-        tIn'' <- applySubst tIn'
-        return $ addEffects (effects tc' Map.\\ effects tIn'') tOut'
-      _ -> throwError $ "Handling with non-handler: " ++ show tv'
+    ~(THandler tIn tOut) <- applySubst tv
+    tc <- extendAbilities (effects tIn) (inferComp c)
+    unify tc tIn
+    applySubst (addEffects (effects tc Map.\\ effects tIn) tOut)
 
 checkComp :: CompType -> Computation -> Infer ()
-checkComp t1 c = do
-  t2 <- inferComp c
-  unify t1 t2
-  t1' <- applySubst t1
-  t2' <- applySubst t2
-  checkEffectUsage t2' t1'
-
-checkEffectUsage :: CompType -> CompType -> Infer ()
-checkEffectUsage t1 t2 = do
-  unless (effects t1 `Map.isSubmapOf` effects t2) $
-    throwError $ "Computation " ++ show t1 ++ " incompatible with " ++ show t2
+checkComp expected c = do
+  t <- inferComp c
+  unify expected t
+  t' <- applySubst t
+  ctx <- asks abilities
+  let allowed = effects expected <> ctx
+      illegal = effects t' `Map.difference` allowed
+  unless (Map.null illegal) $
+    throwError $ "Unexpected effects: " ++ show (TComp (value t') illegal)
+      ++ " not in " ++ show expected
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -161,7 +142,7 @@ inferValue = \case
   VPair v1 v2 -> do
     t1 <- inferValue v1
     t2 <- inferValue v2
-    return $ TPair t1 t2
+    applySubst (TPair t1 t2)
   VEither L v1 -> do
     t1 <- inferValue v1
     t2 <- fresh
@@ -173,42 +154,48 @@ inferValue = \case
   VFun x c -> do
     t1 <- fresh
     t2 <- extendVariable x (Forall mempty t1) (inferComp c)
-    return $ TFun t1 t2
+    applySubst (TFun t1 t2)
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
     tBody <- extendVariable f (Forall mempty (TFun t1 (TComp t2 mempty)))
-      $ extendVariable x (Forall mempty t1)
-      $ inferComp c
+             $ extendVariable x (Forall mempty t1)
+             $ inferComp c
     unify (value tBody) t2
     applySubst (TFun t1 tBody)
   VHandler (Handler (RetClause xr cr) opClauses finClause) -> do
-    hInVal <- fresh
-    retOut <- extendVariable xr (Forall mempty hInVal) (inferComp cr)
-
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
-          opOut <- extendVariable x (Forall mempty opArg) $
-                   extendVariable k (Forall mempty (TFun opRet hOut)) $
-                   inferComp cOp
+          opOut <- extendVariable x (Forall mempty opArg)
+                   $ extendVariable k (Forall mempty (TFun opRet hOut))
+                   $ inferComp cOp
           unify opOut hOut
           hOut' <- applySubst (addEffects (effects opOut) hOut)
-          return (Map.insert op (Arity opArg opRet) ops, hOut')
+          ops' <- applySubst (Map.insert op (Arity opArg opRet) ops)
+          return (ops', hOut')
 
+    hInVal <- fresh
+    retOut <- extendVariable xr (Forall mempty hInVal) (inferComp cr)
     (ops, opsOut) <- foldM processOpClause (mempty, retOut) opClauses
     finOut <- case finClause of
-      Nothing -> applySubst opsOut
+      Nothing -> return opsOut
       Just (FinClause xf cf) -> do
         finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
-        applySubst (addEffects (effects opsOut) finOut)
-    hInVal' <- applySubst hInVal
-    return $ THandler (TComp hInVal' ops) finOut
+        return $ addEffects (effects opsOut) finOut
+    applySubst (THandler (TComp hInVal ops) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 
 checkValue :: Value -> ValueType -> Infer ()
+checkValue (VFun x c) (TFun tv tc)     = extendVariable x (Forall mempty tv) (checkComp tc c)
+checkValue (VRec f x c) (TFun tv tc)   = extendVariable f (Forall mempty (TFun tv tc))
+                                         $ extendVariable x (Forall mempty tv)
+                                         $ checkComp tc c
+checkValue (VPair v1 v2) (TPair t1 t2) = checkValue v1 t1 >> checkValue v2 t2
+checkValue (VEither L v) (TEither t _) = checkValue v t
+checkValue (VEither R v) (TEither _ t) = checkValue v t
 checkValue v t = do
   t' <- inferValue v
   unify t' t

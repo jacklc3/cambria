@@ -1,0 +1,2 @@
+do f <- return (rec f n -> if n == 0 then return 0 else do _ <- !print "tick" in f (n - 1)) in
+f 3
