@@ -8,16 +8,16 @@ do lookup <- return (rec lookup g a b ->
 in
 with handler {
   return x  -> return (fun _ -> return x),
-  get(a; k) -> return (fun s -> k (s a) s),
-  set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
-  ref(x; k) -> do a <- !new () in return (fun s ->
+  get a k -> return (fun s -> k (s a) s),
+  set x k -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+  ref x k -> do a <- !unique () in return (fun s ->
     k a (fun b -> if b == a then return x else s b)),
   finally s -> s (fun _ -> return ())
 } handle (
   with handler {
-    newgraph(z; k) -> k (!ref ()),
-    newnode(z; k) -> k (!new ()),
-    isedge(gab; k) ->
+    newgraph z k -> k (!ref ()),
+    newnode z k -> k (!unique ()),
+    isedge gab k ->
       do g <- fst gab in
       do a <- fst (snd gab) in
       do b <- snd (snd gab) in

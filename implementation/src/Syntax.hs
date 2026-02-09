@@ -1,26 +1,14 @@
-module Syntax where
+module Syntax (module Syntax, module Types) where
 
 import Data.List (intersperse)
-import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Unique (Unique, hashUnique)
 
-type Ident = String
-type Op    = String
-type Name  = Unique
-data Env   = Env (Map Ident Value)
-data Side  = L | R
+import Types
 
-data BaseType
-  = BTUnit
-  | BTInt
-  | BTBool
-  | BTDouble
-  | BTString
-  | BTName
-  | BTPair BaseType BaseType
-  | BTEither BaseType BaseType
-  | BTParam String
-  deriving (Show, Eq)
+type Name  = Unique
+data Env   = Env (Map.Map Ident Value)
+data Side  = L | R
 
 data Value
   = VInt Integer
@@ -36,7 +24,7 @@ data Value
   | VFun Ident Computation
   | VRec Ident Ident Computation
     -- Runtime-only values
-  | VName Name
+  | VUnique Name
   | VPrimitive (Value -> Computation)
   | VClosure Ident Computation Env
 
@@ -46,7 +34,7 @@ instance Show Value where
   show (VBool b)        = show b
   show (VString s)      = show s
   show VUnit            = "()"
-  show (VName a)        = "<a" ++ show (hashUnique a) ++ ">"
+  show (VUnique a)        = "<a" ++ show (hashUnique a) ++ ">"
   show (VPair v1 v2)    = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
   show (VEither L v)    = "inl " ++ show v
   show (VEither R v)    = "inr " ++ show v
@@ -63,7 +51,7 @@ instance Eq Value where
   (VBool b1) == (VBool b2)         = b1 == b2
   (VString s1) == (VString s2)     = s1 == s2
   VUnit == VUnit                   = True
-  (VName a1) == (VName a2)         = a1 == a2
+  (VUnique a1) == (VUnique a2)         = a1 == a2
   (VPair v1 v2) == (VPair v3 v4)   = v1 == v3 && v2 == v4
   (VEither L v1) == (VEither L v2) = v1 == v2
   (VEither R v1) == (VEither R v2) = v1 == v2
@@ -78,7 +66,7 @@ data Computation
   | CCase Value Ident Computation Ident Computation
   | CApp Value Value
   | CHandle Value Computation
-  | CDeclare Op BaseType BaseType Computation
+  | CDeclare Op ValueType ValueType Computation
 
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v
@@ -90,7 +78,7 @@ instance Show Computation where
     ++ show x2 ++ " -> " ++ show c2 ++ " }"
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
-  show (CDeclare op tArg tRet c) = "declare !" ++ op ++ " : " ++ show tArg ++ " ~> " ++ show tRet ++ " in " ++ show c
+  show (CDeclare op tArg tRet c) = "declare !" ++ op ++ " : " ++ show tArg ++ " ~> " ++ show tRet ++ ". " ++ show c
 
 data RetClause = RetClause Ident Computation
 data OpClause = OpClause Ident Ident Computation
@@ -99,16 +87,16 @@ data Handler = Handler {
   retClause :: RetClause,
   opClauses :: [(Op, OpClause)],
   finClause :: Maybe FinClause,
-  typeInsts :: [(String, BaseType)]
+  typeInsts :: [(String, ValueType)]
 }
 
 instance Show Handler where
   show (Handler (RetClause xr cr) ocs fc tis) =
     let
-      tiStrs = map (\(p, t) -> "$" ++ p ++ " = " ++ show t) tis
+      tiStrs = map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) tis
       retStr = "return " ++ xr ++ " -> " ++ show cr
       opStrs = map (\(op, OpClause x k c) ->
-        op ++ "(" ++ x ++ "; " ++ k ++ ") -> " ++ show c) ocs
+        op ++ " " ++ x ++ " " ++ k ++ " -> " ++ show c) ocs
       finStr = case fc of
         Just (FinClause xf cf) -> ", finally " ++ xf ++ " -> " ++ show cf
         Nothing -> ""

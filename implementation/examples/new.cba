@@ -1,4 +1,4 @@
-do x <- !new () in
-do y <- !new () in
-do z <- !new () in
+do x <- !unique () in
+do y <- !unique () in
+do z <- !unique () in
 return ((x,y),z)

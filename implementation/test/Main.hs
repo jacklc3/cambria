@@ -30,9 +30,9 @@ data TestCase = TestCase
 
 coreTests :: [TestCase]
 coreTests =
-  [ TestCase "new: fresh resource identifiers"
-      "do x <- !new () in\ndo y <- !new () in\ndo z <- !new () in\nreturn ((x,y),z)"
-      (Right "((Name x Name) x Name)!{ new : Unit ~> Name }")
+  [ TestCase "unique: fresh resource identifiers"
+      "do x <- !unique () in\ndo y <- !unique () in\ndo z <- !unique () in\nreturn ((x,y),z)"
+      (Right "((Unique & Unique) & Unique)!{ unique : Unit ~> Unique }")
 
   , TestCase "print: string output effect"
       "!print \"test\""
@@ -44,7 +44,7 @@ coreTests =
 
   , TestCase "pickMax: handler eliminating decide effect"
       ( "with handler {\n"
-     ++ "  decide(v; k) -> max (k true, k false)\n"
+     ++ "  decide v k -> max (k true, k false)\n"
      ++ "} handle (\n"
      ++ "  do x1 <- if !decide () then return 15 else return 30 in\n"
      ++ "  do x2 <- if !decide () then return 5  else return 10 in\n"
@@ -55,12 +55,12 @@ coreTests =
   , TestCase "collect: handler collecting print output"
       ( "with handler {\n"
      ++ "  return x -> return (x, \"\"),\n"
-     ++ "  print(s; k) -> do x <- k () in\n"
+     ++ "  print s k -> do x <- k () in\n"
      ++ "    return (fst x, s ++ (snd x))\n"
      ++ "} handle (\n"
      ++ "  !print \"A\"; !print \"B\"; !print \"C\"\n"
      ++ ")" )
-      (Right "(Unit x Str)!{}")
+      (Right "(Unit & Str)!{}")
   ]
 
 -- ============================================================
@@ -75,7 +75,7 @@ bidiTests =
 
   , TestCase "checkValue: pair checked structurally"
       "return ((1, true), \"hello\")"
-      (Right "((Int x Bool) x Str)!{}")
+      (Right "((Int & Bool) & Str)!{}")
 
   , TestCase "checkValue: either left branch"
       "case inl 42 of {\n  inl x -> return (x + 1),\n  inr y -> return (y - 1)\n}"
@@ -104,7 +104,7 @@ handlerTests =
   [ TestCase "handler: passthrough (print handled, effect removed)"
       ( "with handler {\n"
      ++ "  return x -> return x,\n"
-     ++ "  print(s; k) -> k ()\n"
+     ++ "  print s k -> k ()\n"
      ++ "} handle (\n"
      ++ "  !print \"hello\"\n"
      ++ ")" )
@@ -113,7 +113,7 @@ handlerTests =
   , TestCase "handler: effect leak from op clause body"
       ( "with handler {\n"
      ++ "  return x -> return x,\n"
-     ++ "  decide(v; k) -> do _ <- !print \"deciding\" in k true\n"
+     ++ "  decide v k -> do _ <- !print \"deciding\" in k true\n"
      ++ "} handle (\n"
      ++ "  if !decide () then return 1 else return 2\n"
      ++ ")" )
@@ -122,7 +122,7 @@ handlerTests =
   , TestCase "handler: unifies effect arities between handler and body"
       ( "with handler {\n"
      ++ "  return x -> return (x + 1),\n"
-     ++ "  ask(v; k) -> k \"hello\"\n"
+     ++ "  ask v k -> k \"hello\"\n"
      ++ "} handle (\n"
      ++ "  do s <- !ask () in\n"
      ++ "  return s\n"
@@ -132,7 +132,7 @@ handlerTests =
   , TestCase "handler: op return type consistent with body usage"
       ( "with handler {\n"
      ++ "  return x -> return x,\n"
-     ++ "  choose(v; k) -> k true\n"
+     ++ "  choose v k -> k true\n"
      ++ "} handle (\n"
      ++ "  do b <- !choose () in\n"
      ++ "  if b then return 1 else return 2\n"
@@ -142,7 +142,7 @@ handlerTests =
   , TestCase "handler: unhandled effects pass through"
       ( "with handler {\n"
      ++ "  return x -> return x,\n"
-     ++ "  decide(v; k) -> k true\n"
+     ++ "  decide v k -> k true\n"
      ++ "} handle (\n"
      ++ "  do b <- !decide () in\n"
      ++ "  if b then !print \"yes\" else !print \"no\"\n"
@@ -152,9 +152,9 @@ handlerTests =
   , TestCase "handler: finally clause (local state)"
       ( "with handler {\n"
      ++ "  return x  -> return (fun _ -> return x),\n"
-     ++ "  get(a; k) -> return (fun s -> k (s a) s),\n"
-     ++ "  set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),\n"
-     ++ "  ref(x; k) -> do a <- !new () in return (fun s ->\n"
+     ++ "  get a k -> return (fun s -> k (s a) s),\n"
+     ++ "  set x k -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),\n"
+     ++ "  ref x k -> do a <- !unique () in return (fun s ->\n"
      ++ "    k a (fun b -> if b == a then return x else s b)),\n"
      ++ "  finally s -> s (fun _ -> return 0)\n"
      ++ "} handle (\n"
@@ -162,7 +162,7 @@ handlerTests =
      ++ "  do b <- !ref 3 in\n"
      ++ "  (!set (a, !get b + !get a); !get a)\n"
      ++ ")" )
-      (Right "Int!{ new : Unit ~> Name }")
+      (Right "Int!{ unique : Unit ~> Unique }")
   ]
 
 -- ============================================================
@@ -173,7 +173,7 @@ compTests :: [TestCase]
 compTests =
   [ TestCase "do: sequential binding"
       "do x <- return 1 in\ndo y <- return 2 in\nreturn (x + y, ())"
-      (Right "(Int x Unit)!{}")
+      (Right "(Int & Unit)!{}")
 
   , TestCase "do: effects accumulate across bindings"
       "do x <- !flip () in\ndo _ <- !print \"hello\" in\nreturn x"
@@ -186,8 +186,8 @@ compTests =
   , TestCase "substitution example"
       ( "with handler {\n"
      ++ "  return x  -> return (inl x),\n"
-     ++ "  var(a; k) -> return (inr a),\n"
-     ++ "  sub(_; k) -> do c <- !new () in\n"
+     ++ "  var a k -> return (inr a),\n"
+     ++ "  sub _ k -> do c <- !unique () in\n"
      ++ "    case k (inl c) of {\n"
      ++ "      inl x -> return (inl x),\n"
      ++ "      inr d -> if d == c then k (inr ()) else return (inr d)\n"
@@ -201,7 +201,7 @@ compTests =
      ++ "    inr _ -> return 3\n"
      ++ "  }\n"
      ++ ")" )
-      (Right "(Int + Name)!{ new : Unit ~> Name }")
+      (Right "(Int + Unique)!{ unique : Unit ~> Unique }")
   ]
 
 -- ============================================================

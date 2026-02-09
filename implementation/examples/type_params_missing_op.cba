@@ -1,10 +1,13 @@
 -- Test: handler instantiates $p but is missing an op (should fail)
-declare !get : $p ~> Int in
-declare !set : $p & Int ~> Unit in
 with handler {
-  $p = Name,
+  $p -> Unique,
   return x -> return x,
-  get(a; k) -> k 42
+  get a k -> k 42,
+  ref x k -> k ()
 } handle (
-  !get ()
+  declare !get : $p ~> Int.
+  declare !set : $p & Int ~> Unit.
+  declare !ref : Int ~> $p.
+  do a <- !ref 0 in
+  !set (a, !get a)
 )

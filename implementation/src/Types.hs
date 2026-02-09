@@ -1,25 +1,10 @@
-module Inference.Types where
+module Types where
 
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Reader
-import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Data.List (intercalate)
+import qualified Data.Map as Map
 
-import Syntax (Ident, Op)
-
-type Subst = Map.Map Ident ValueType
-
-data InferState = InferState {
-  count :: Int,
-  subst :: Subst
-}
-
-type Infer a = ReaderT Context (StateT InferState (Except String)) a
-
-runInfer :: Context -> Infer a -> Either String a
-runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty))
+type Ident = String
+type Op    = String
 
 data ValueType
   = TVar Ident
@@ -29,7 +14,7 @@ data ValueType
   | TBool
   | TDouble
   | TString
-  | TName
+  | TUnique
   | TPair ValueType ValueType
   | TEither ValueType ValueType
   | TFun ValueType CompType
@@ -59,7 +44,7 @@ showType _ TInt = "Int"
 showType _ TBool = "Bool"
 showType _ TDouble = "Double"
 showType _ TString = "Str"
-showType _ TName = "Name"
+showType _ TUnique = "Unique"
 showType p (TPair t1 t2) = parensIf (p > 3) $ showType 4 t1 ++ " & " ++ showType 4 t2
 showType p (TEither t1 t2) = parensIf (p > 2) $ showType 3 t1 ++ " + " ++ showType 3 t2
 showType p (TFun t1 t2) = parensIf (p > 1) $ showType 2 t1 ++ " -> " ++ show t2
@@ -78,12 +63,3 @@ instance Show CompType where
 
 instance Show Arity where
   show (Arity arg ret) = show arg ++ " ~> " ++ show ret
-
-data Scheme = Forall (Set.Set Ident) ValueType
-  deriving (Eq, Show)
-
-data Context = Context {
-  variables  :: Map.Map Ident Scheme,
-  abilities  :: Effects,
-  parameters :: Map.Map String Ident
-} deriving (Show)

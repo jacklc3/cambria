@@ -31,7 +31,7 @@ data TokenKind
   | TokTBool
   | TokTDouble
   | TokTString
-  | TokTName
+  | TokTUnique
   -- Symbols
   | TokUnit
   | TokAnd
@@ -62,4 +62,5 @@ data TokenKind
   | TokSquigglyArrow
   | TokColon
   | TokAmpersand
+  | TokDot
   | TokTypeParam String

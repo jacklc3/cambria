@@ -1,9 +1,9 @@
 -- Two cluster graph
 -- See also erdosrenyi.cba
 with handler {
-  newgraph(_; k) -> k (!new ()),
-  newnode(g; k) -> k (!flip ()),
-  isedge(gab; k) ->
+  newgraph _ k -> k (!unique ()),
+  newnode g k -> k (!flip ()),
+  isedge gab k ->
     do a <- fst (snd gab) in
     do b <- snd (snd gab) in
     if a == b then return false else return true

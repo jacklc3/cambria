@@ -1,7 +1,7 @@
 with handler {
   return x  -> return (inl x),
-  var(a; k) -> return (inr a),
-  sub(_; k) -> do c <- !new () in
+  var a k -> return (inr a),
+  sub _ k -> do c <- !unique () in
     case k (inl c) of {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)

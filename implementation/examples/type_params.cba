@@ -1,17 +1,17 @@
 -- Test existential type parameters
--- Declares get/set with abstract parameter type $p
-declare !get : $p ~> Int in
-declare !set : $p & Int ~> Unit in
-declare !ref : Int ~> $p in
+-- Declares get/set/ref with abstract parameter type $p inside handle body
 with handler {
-  $p = Name,
+  $p -> Unique,
   return x  -> return (fun _ -> return x),
-  get(a; k) -> return (fun s -> k (s a) s),
-  set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
-  ref(x; k) -> do a <- !new () in return (fun s ->
+  get a k -> return (fun s -> k (s a) s),
+  set x k -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+  ref x k -> do a <- !unique () in return (fun s ->
     k a (fun b -> if b == a then return x else s b)),
   finally s -> s (fun _ -> return 0)
 } handle (
+  declare !get : $p ~> Int.
+  declare !set : $p & Int ~> Unit.
+  declare !ref : Int ~> $p.
   do a <- !ref 2 in
   do b <- !ref 3 in
   (!set (a, !get b + !get a); !get a)

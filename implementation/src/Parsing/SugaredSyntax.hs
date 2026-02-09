@@ -1,6 +1,7 @@
 module Parsing.SugaredSyntax where
 
-import Syntax (Ident, Op, Side(..), BaseType(..))
+import Types (Ident, Op, ValueType(..))
+import Syntax (Side(..))
 
 data SugaredExpr
   = SEVar Ident
@@ -23,10 +24,10 @@ data SugaredComp
   | SCCase SugaredExpr (Ident, SugaredComp) (Ident, SugaredComp)
   | SCApp SugaredExpr SugaredExpr
   | SCWith SugaredExpr SugaredComp
-  | SCDeclare Op BaseType BaseType SugaredComp
+  | SCDeclare Op ValueType ValueType SugaredComp
 
 data HandlerClause
   = RC Ident SugaredComp
   | OC Op Ident Ident SugaredComp
   | FC Ident SugaredComp
-  | TC String BaseType
+  | TC String ValueType

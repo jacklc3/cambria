@@ -15,7 +15,7 @@ import Inference.Infer (infer)
 
 handlerIO :: [(Op, Value -> Value -> IO Computation)]
 handlerIO =
-  [ ("new",       \_           k -> newUnique  >>= return . CApp k . VName)
+  [ ("unique",    \_           k -> newUnique  >>= return . CApp k . VUnique)
   , ("print",     \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
   , ("read",      \_           k -> getLine    >>= return . CApp k . VString)
   , ("flip",      \_           k -> randomIO   >>= return . CApp k . VBool)

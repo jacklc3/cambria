@@ -27,7 +27,7 @@ primitives =
   , ("fst",  \(VPair x _) -> x)
   , ("snd",  \(VPair _ x) -> x)
   , ("==",   \(VPair x y) -> VBool (x == y))
-  , ("hash", \(VName a) -> VString $ show $ hashUnique a)
+  , ("hash", \(VUnique a) -> VString $ show $ hashUnique a)
   ]
 
 initialEnv :: Env

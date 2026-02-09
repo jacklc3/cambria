@@ -1,0 +1,11 @@
+-- Test: handler handles an op with $p but does NOT instantiate $p
+-- The handler keeps $p abstract — is this allowed?
+with handler {
+  return x -> return x,
+  get a k -> k 42
+} handle (
+  declare !get : $p ~> Int.
+  declare !ref : Int ~> $p.
+  do a <- !ref 10 in
+  !get a
+)

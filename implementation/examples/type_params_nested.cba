@@ -1,12 +1,12 @@
 -- Test: instantiate one type param to a type using another type param
 -- $p1 is instantiated to $p2 + Int
-declare !get : $p2 ~> Int in
-declare !ref : Int ~> $p1 in
 with handler {
-  $p1 = $p2 + Int,
+  $p1 -> $p2 + Int,
   return x -> return x,
-  ref(x; k) -> k (inr x)
+  ref x k -> k (inr x)
 } handle (
+  declare !get : $p2 ~> Int.
+  declare !ref : Int ~> $p1.
   do a <- !ref 42 in
   return a
 )

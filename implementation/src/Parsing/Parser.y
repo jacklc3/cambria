@@ -6,7 +6,8 @@ module Parsing.Parser (
 import Parsing.Token
 import Parsing.Lexer
 import Parsing.SugaredSyntax
-import Syntax (Ident, Op, Side(..), BaseType(..))
+import Types (Ident, Op, ValueType(..))
+import Syntax (Side(..))
 
 import Control.Monad.Except
 }
@@ -41,7 +42,7 @@ import Control.Monad.Except
   Bool                       { Token _ _ TokTBool }
   Double                     { Token _ _ TokTDouble }
   Str                        { Token _ _ TokTString }
-  Name                       { Token _ _ TokTName }
+  Unique                     { Token _ _ TokTUnique }
 
   '()'                       { Token _ _ TokUnit }
   '=='                       { Token _ _ TokEq }
@@ -62,6 +63,7 @@ import Control.Monad.Except
   '~>'                       { Token _ _ TokSquigglyArrow }
   ':'                        { Token _ _ TokColon }
   '&'                        { Token _ _ TokAmpersand }
+  '.'                        { Token _ _ TokDot }
   '='                        { Token _ _ TokEquals }
 
   integer                    { Token _ _ (TokInt $$) }
@@ -130,9 +132,9 @@ handlerClauses :: { [HandlerClause] }
 
 handlerClause :: { HandlerClause }
   : return nvar '->' comp                 { RC $2 $4 }
-  | var '(' nvar ';' nvar ')' '->' comp   { OC $1 $3 $5 $8 }
+  | var nvar nvar '->' comp               { OC $1 $2 $3 $5 }
   | finally nvar '->' comp                { FC $2 $4 }
-  | typeparam '=' type                    { TC $1 $3 }
+  | typeparam '->' type                   { TC $1 $3 }
 
 comp :: { SugaredComp }
   : compTerm ';' comp                     { SCDo "_" $1 $3 }
@@ -144,7 +146,7 @@ compTerm :: { SugaredComp }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
   | with expr handle compTerm             { SCWith $2 $4 }
-  | declare op ':' type '~>' type in compTerm  { SCDeclare $2 $4 $6 $8 }
+  | declare op ':' type '~>' type '.' compTerm  { SCDeclare $2 $4 $6 $8 }
   | compInfix                             { $1 }
 
 compInfix :: { SugaredComp }
@@ -171,22 +173,22 @@ inlMatch :: { (Ident, SugaredComp) }
 inrMatch :: { (Ident, SugaredComp) }
   : inr nvar '->' comp                    { ($2, $4) }
 
-type :: { BaseType }
+type :: { ValueType }
   : typeProd                              { $1 }
-  | typeProd '+' typeProd                 { BTEither $1 $3 }
+  | typeProd '+' typeProd                 { TEither $1 $3 }
 
-typeProd :: { BaseType }
+typeProd :: { ValueType }
   : typeAtom                              { $1 }
-  | typeAtom '&' typeAtom                 { BTPair $1 $3 }
+  | typeAtom '&' typeAtom                 { TPair $1 $3 }
 
-typeAtom :: { BaseType }
-  : Unit                                  { BTUnit }
-  | Int                                   { BTInt }
-  | Bool                                  { BTBool }
-  | Double                                { BTDouble }
-  | Str                                   { BTString }
-  | Name                                  { BTName }
-  | typeparam                             { BTParam $1 }
+typeAtom :: { ValueType }
+  : Unit                                  { TUnit }
+  | Int                                   { TInt }
+  | Bool                                  { TBool }
+  | Double                                { TDouble }
+  | Str                                   { TString }
+  | Unique                                { TUnique }
+  | typeparam                             { TParam $1 }
   | '(' type ')'                          { $2 }
 
 {

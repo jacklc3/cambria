@@ -37,7 +37,7 @@ tokens :-
   Bool                       { \p s -> Token p s TokTBool }
   Double                     { \p s -> Token p s TokTDouble }
   Str                        { \p s -> Token p s TokTString }
-  Name                       { \p s -> Token p s TokTName }
+  Unique                     { \p s -> Token p s TokTUnique }
 
   "()"                       { \p s -> Token p (quotes s) TokUnit }
   "&&"                       { \p s -> Token p (quotes s) TokAnd }
@@ -67,6 +67,7 @@ tokens :-
   "~>"                       { \p s -> Token p (quotes s) TokSquigglyArrow }
   ":"                        { \p s -> Token p (quotes s) TokColon }
   "&"                        { \p s -> Token p (quotes s) TokAmpersand }
+  "."                        { \p s -> Token p (quotes s) TokDot }
 
   \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (tail s)) }
 

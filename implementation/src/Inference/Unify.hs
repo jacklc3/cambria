@@ -1,69 +1,62 @@
 module Inference.Unify where
 
-import Control.Monad (foldM)
 import Control.Monad.Except
+import Control.Monad.State
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Inference.Types
 import Inference.Substitutable
 
-import Syntax (Ident)
+import Types
+
+extendSubst :: Subst -> Infer ()
+extendSubst s' = modify (\st -> st { subst = compose s' (subst st) })
+
+compose :: Subst -> Subst -> Subst
+compose s2 s1 = Map.map (apply s2) s1 `Map.union` s2
+
+applySubst :: Substitutable a => a -> Infer a
+applySubst t = do
+  s <- gets subst
+  return (apply s t)
 
 class Unifiable a where
-  unify :: a -> a -> Infer Subst
+  unify :: a -> a -> Infer ()
 
 instance Unifiable ValueType where
-  unify TUnit TUnit     = return mempty
-  unify TInt TInt       = return mempty
-  unify TBool TBool     = return mempty
-  unify TDouble TDouble = return mempty
-  unify TString TString = return mempty
-  unify TName TName     = return mempty
-  unify (TParam p) (TParam q)
-    | p == q    = return mempty
-  unify (TPair t1 t2) (TPair t1' t2') = do
-    s1 <- unify t1 t1'
-    s2 <- unify (apply s1 t2) (apply s1 t2')
-    return (s2 <> s1)
-  unify (TEither t1 t2) (TEither t1' t2') = do
-    s1 <- unify t1 t1'
-    s2 <- unify (apply s1 t2) (apply s1 t2')
-    return (s2 <> s1)
-  unify (TFun t1 t2) (TFun t1' t2') = do
-    s1 <- unify t1 t1'
-    s2 <- unify (apply s1 t2) (apply s1 t2')
-    return (s2 <> s1)
-  unify (THandler t1 t2) (THandler t1' t2') = do
-    s1 <- unify t1 t1'
-    s2 <- unify (apply s1 t2) (apply s1 t2')
-    return (s2 <> s1)
-  unify (TVar u) t = bind u t
-  unify t (TVar u) = bind u t
-  unify t1 t2 = throwError $ "Type mismatch: " ++ show t1 ++ " vs " ++ show t2
+  unify t1 t2 = do
+    t1' <- applySubst t1
+    t2' <- applySubst t2
+    unify' t1' t2'
+    where
+      unify' TUnit TUnit     = return ()
+      unify' TInt TInt       = return ()
+      unify' TBool TBool     = return ()
+      unify' TDouble TDouble = return ()
+      unify' TString TString = return ()
+      unify' TUnique TUnique     = return ()
+      unify' (TParam p) (TParam q)
+        | p == q    = return ()
+      unify' (TPair a b) (TPair a' b')     = unify a a' >> unify b b'
+      unify' (TEither a b) (TEither a' b') = unify a a' >> unify b b'
+      unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'
+      unify' (THandler a b) (THandler a' b') = unify a a' >> unify b b'
+      unify' (TVar u) t = bind u t
+      unify' t (TVar u) = bind u t
+      unify' a b = throwError $ "Type mismatch: " ++ show a ++ " vs " ++ show b
 
 instance Unifiable CompType where
-  unify (TComp t es) (TComp t' es') = do
-    s1 <- unify t t'
-    s2 <- unify (apply s1 es) (apply s1 es')
-    return (s2 <> s1)
+  unify (TComp t es) (TComp t' es') = unify t t' >> unify es es'
 
 instance Unifiable Arity where
-  unify (Arity t1 t2) (Arity t1' t2') = do
-    s1 <- unify t1 t1'
-    s2 <- unify (apply s1 t2) (apply s1 t2')
-    return (s2 <> s1)
+  unify (Arity t1 t2) (Arity t1' t2') = unify t1 t1' >> unify t2 t2'
 
 instance (Unifiable v, Substitutable v, Ord k) => Unifiable (Map.Map k v) where
-  unify m1 m2 = do
-    foldM unifyV mempty (Map.intersectionWith (,) m1 m2)
-    where
-      unifyV s (v1, v2) = do
-        s' <- unify (apply s v1) (apply s v2)
-        return (s' <> s)
+  unify m1 m2 = mapM_ unifyV (Map.intersectionWith (,) m1 m2)
+    where unifyV (v1, v2) = unify v1 v2
 
-bind :: Ident -> ValueType -> Infer Subst
+bind :: Ident -> ValueType -> Infer ()
 bind u t
-  | t == TVar u = return mempty
+  | t == TVar u = return ()
   | u `Set.member` ftv t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
-  | otherwise = return $ Map.singleton u t
+  | otherwise = extendSubst (Map.singleton u t)
