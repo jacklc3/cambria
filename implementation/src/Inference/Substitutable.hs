@@ -10,6 +10,8 @@ import Types
 
 type Subst = Map.Map Ident ValueType
 
+data Variable = Types | Params deriving (Show)
+
 data InferState = InferState {
   count :: Int,
   subst :: Subst
@@ -29,66 +31,41 @@ data Context = Context {
 } deriving (Show)
 
 class Substitutable a where
-  apply       :: Subst -> a -> a
-  ftv         :: a -> Set.Set Ident
-  applyParams :: Subst -> a -> a
-  ftp         :: a -> Set.Set Ident
+  apply :: Variable -> Subst -> a -> a
+  free  :: Variable -> a -> Set.Set Ident
 
 instance Substitutable ValueType where
-  apply _ (TParam p)       = TParam p
-  apply _ TUnit            = TUnit
-  apply _ TInt             = TInt
-  apply _ TBool            = TBool
-  apply _ TDouble          = TDouble
-  apply _ TString          = TString
-  apply _ TUnique          = TUnique
-  apply s (TPair t1 t2)    = TPair (apply s t1) (apply s t2)
-  apply s (TEither t1 t2)  = TEither (apply s t1) (apply s t2)
-  apply s (TFun t1 t2)     = TFun (apply s t1) (apply s t2)
-  apply s (THandler t1 t2) = THandler (apply s t1) (apply s t2)
-  apply s t@(TVar a)       = Map.findWithDefault t a s
+  apply _ _ TUnit             = TUnit
+  apply _ _ TInt              = TInt
+  apply _ _ TBool             = TBool
+  apply _ _ TDouble           = TDouble
+  apply _ _ TString           = TString
+  apply _ _ TUnique           = TUnique
+  apply v s (TPair t1 t2)     = TPair (apply v s t1) (apply v s t2)
+  apply v s (TEither t1 t2)   = TEither (apply v s t1) (apply v s t2)
+  apply v s (TFun t1 t2)      = TFun (apply v s t1) (apply v s t2)
+  apply v s (THandler t1 t2)  = THandler (apply v s t1) (apply v s t2)
+  apply Types s t@(TVar a)    = Map.findWithDefault t a s
+  apply Params _ (TVar a)     = TVar a
+  apply Types _ (TParam p)    = TParam p
+  apply Params s t@(TParam p) = Map.findWithDefault t p s
 
-  ftv (TPair t1 t2)        = ftv t1 <> ftv t2
-  ftv (TEither t1 t2)      = ftv t1 <> ftv t2
-  ftv (TFun t1 t2)         = ftv t1 <> ftv t2
-  ftv (THandler t1 t2)     = ftv t1 <> ftv t2
-  ftv (TVar a)             = Set.singleton a
-  ftv _                    = mempty
-
-  applyParams _ (TVar a)         = TVar a
-  applyParams _ TUnit            = TUnit
-  applyParams _ TInt             = TInt
-  applyParams _ TBool            = TBool
-  applyParams _ TDouble          = TDouble
-  applyParams _ TString          = TString
-  applyParams _ TUnique            = TUnique
-  applyParams s (TPair t1 t2)    = TPair (applyParams s t1) (applyParams s t2)
-  applyParams s (TEither t1 t2)  = TEither (applyParams s t1) (applyParams s t2)
-  applyParams s (TFun t1 t2)     = TFun (applyParams s t1) (applyParams s t2)
-  applyParams s (THandler t1 t2) = THandler (applyParams s t1) (applyParams s t2)
-  applyParams s t@(TParam p)     = Map.findWithDefault t p s
-
-  ftp (TPair t1 t2)        = ftp t1 <> ftp t2
-  ftp (TEither t1 t2)      = ftp t1 <> ftp t2
-  ftp (TFun t1 t2)         = ftp t1 <> ftp t2
-  ftp (THandler t1 t2)     = ftp t1 <> ftp t2
-  ftp (TParam p)           = Set.singleton p
-  ftp _                    = mempty
+  free v (TPair t1 t2)       = free v t1 <> free v t2
+  free v (TEither t1 t2)     = free v t1 <> free v t2
+  free v (TFun t1 t2)        = free v t1 <> free v t2
+  free v (THandler t1 t2)    = free v t1 <> free v t2
+  free Types (TVar a)        = Set.singleton a
+  free Params (TParam p)     = Set.singleton p
+  free _ _                   = mempty
 
 instance Substitutable Arity where
-  apply s (Arity t1 t2)       = Arity (apply s t1) (apply s t2)
-  ftv (Arity t1 t2)           = ftv t1 <> ftv t2
-  applyParams s (Arity t1 t2) = Arity (applyParams s t1) (applyParams s t2)
-  ftp (Arity t1 t2)           = ftp t1 <> ftp t2
+  apply v s (Arity t1 t2)    = Arity (apply v s t1) (apply v s t2)
+  free v (Arity t1 t2)       = free v t1 <> free v t2
 
 instance (Substitutable v) => Substitutable (Map.Map k v) where
-  apply s       = Map.map (apply s)
-  ftv           = foldMap ftv
-  applyParams s = Map.map (applyParams s)
-  ftp           = foldMap ftp
+  apply v s                  = Map.map (apply v s)
+  free v                     = foldMap (free v)
 
 instance Substitutable CompType where
-  apply s (TComp t es)       = TComp (apply s t) (apply s es)
-  ftv (TComp t es)           = ftv t <> ftv es
-  applyParams s (TComp t es) = TComp (applyParams s t) (applyParams s es)
-  ftp (TComp t es)           = ftp t <> ftp es
+  apply v s (TComp t es)     = TComp (apply v s t) (apply v s es)
+  free v (TComp t es)        = free v t <> free v es

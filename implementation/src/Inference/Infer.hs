@@ -42,7 +42,7 @@ lookupOp op = do
 instantiate :: Scheme -> Infer ValueType
 instantiate (Forall as t) = do
   s <- traverse (const fresh) (Map.fromSet id as)
-  return $ apply s t
+  return $ apply Types s t
 
 extendVariable :: Ident -> Scheme -> Infer a -> Infer a
 extendVariable x sc = local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
@@ -106,10 +106,10 @@ inferComp = \case
     ~(THandler tIn tOut) <- applySubst tv
     tc <- extendAbilities (effects tIn) (inferComp c)
     -- Apply param substitution to body effects before unifying
-    let tc' = applyParams pSubst tc
+    let tc' = apply Params pSubst tc
     -- Check that all ops mentioning instantiated params are handled
     let affectedOps = Map.keysSet $ Map.filter
-          (\ar -> not $ Set.null $ ftp ar `Set.intersection` Map.keysSet pSubst)
+          (\ar -> not $ Set.null $ free Params ar `Set.intersection` Map.keysSet pSubst)
           (effects tc)
         handledOps = Map.keysSet (effects tIn)
         missingOps = affectedOps Set.\\ handledOps

@@ -13,12 +13,12 @@ extendSubst :: Subst -> Infer ()
 extendSubst s' = modify (\st -> st { subst = compose s' (subst st) })
 
 compose :: Subst -> Subst -> Subst
-compose s2 s1 = Map.map (apply s2) s1 `Map.union` s2
+compose s2 s1 = apply Types s2 s1 `Map.union` s2
 
 applySubst :: Substitutable a => a -> Infer a
 applySubst t = do
   s <- gets subst
-  return (apply s t)
+  return (apply Types s t)
 
 class Unifiable a where
   unify :: a -> a -> Infer ()
@@ -58,5 +58,5 @@ instance (Unifiable v, Substitutable v, Ord k) => Unifiable (Map.Map k v) where
 bind :: Ident -> ValueType -> Infer ()
 bind u t
   | t == TVar u = return ()
-  | u `Set.member` ftv t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
+  | u `Set.member` free Types t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
   | otherwise = extendSubst (Map.singleton u t)
