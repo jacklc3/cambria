@@ -3,11 +3,11 @@
 with handler {
   $p -> Unique,
   return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (s a) s),
-  set x k -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !unique () in return (fun s ->
-    k a (fun b -> if b == a then return x else s b)),
-  finally s -> s (fun _ -> return 0)
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
 } handle (
   declare !get : $p ~> Int.
   declare !set : $p & Int ~> Unit.

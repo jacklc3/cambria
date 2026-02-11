@@ -5,11 +5,15 @@ do countSuccesses <- return rec countSuccesses n f ->
    if n == 0 then return 0 else do i <- countSuccesses (n-1) f in i + boolToInt (f ())
 in
 with handler {
+  $p -> Double,
   newproc _ k -> k (!uniform ()),
   sample a k -> k (!bernoulli a)
 } handle (
+  declare !newproc : Unit ~> $p.
+  declare !sample : $p ~> Bool.
+
   -- Make a new urn, and draw ten times, reporting the number of trues
-  do a1 <- !newproc () in
-  countSuccesses 10 (fun _ -> !sample a1)
+  do a <- !newproc () in
+  countSuccesses 10 (fun _ -> !sample a)
 )
 

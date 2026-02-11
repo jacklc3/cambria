@@ -30,6 +30,8 @@ data TokenKind
   | TokTDouble
   | TokTString
   | TokTUnique
+  | TokTMap
+  | TokTList
   -- Symbols
   | TokUnit
   | TokAnd

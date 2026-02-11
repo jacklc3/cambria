@@ -1,35 +1,30 @@
 -- Erdos-Renyi graphon
-do lookup <- return (rec lookup g a b ->
-  if a == b then return false else
-  if g == () then return () else
-  if (fst (fst g)) == (a,b) then return (snd (fst g)) else
-  if (fst (fst g)) == (b,a) then return (snd (fst g)) else
-  lookup (snd g) a b)
-in
 with handler {
   return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (s a) s),
-  set x k -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !unique () in return (fun s ->
-    k a (fun b -> if b == a then return x else s b)),
-  finally s -> s (fun _ -> return ())
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
 } handle (
   with handler {
-    newgraph z k -> k (!ref ()),
+    newgraph z k -> k (!ref (empty ())),
     newnode z k -> k (!unique ()),
     isedge gab k ->
       do g <- fst gab in
       do a <- fst (snd gab) in
       do b <- snd (snd gab) in
-      do e <- lookup (!get g) a b in
-      if e == () then
-        do e <- !flip () in
-        do z <- !set (g,(((a,b),e), !get g)) in
-        return e
+      do m <- !get g in
+      if member ((a,b), m) then
+        lookup ((a,b), m)
+      else if member ((b,a), m) then
+        lookup ((b,a), m)
       else
+        do e <- !flip () in
+        do z <- !set (g, insert (((a,b),e), m)) in
         return e
   } handle (
-    -- Make a new graph, pick two nodes, and check an edge between then
+    -- Make a new graph, pick two nodes, and check an edge between them
     do g <- !newgraph () in
     do a <- !newnode g in
     do b <- !newnode g in

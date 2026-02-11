@@ -28,6 +28,18 @@ primitives =
   , ("snd",  \(VPair _ x) -> x)
   , ("==",   \(VPair x y) -> VBool (x == y))
   , ("hash", \(VUnique a) -> VString $ show $ hashUnique a)
+  , ("empty",  \VUnit -> VMap [])
+  , ("insert", \(VPair (VPair k v) (VMap m)) -> VMap ((k, v) : filter (\(k', _) -> k' /= k) m))
+  , ("remove", \(VPair k (VMap m)) -> VMap (filter (\(k', _) -> k' /= k) m))
+  , ("lookup", \(VPair k (VMap m)) -> case Prelude.lookup k m of
+      Just v  -> v
+      Nothing -> error $ "Key not found in map: " ++ show k)
+  , ("member", \(VPair k (VMap m)) -> VBool (any (\(k', _) -> k' == k) m))
+  , ("nil",    \VUnit -> VList [])
+  , ("cons",   \(VPair x (VList xs)) -> VList (x : xs))
+  , ("head",   \(VList (x:_)) -> x)
+  , ("tail",   \(VList (_:xs)) -> VList xs)
+  , ("isnil",  \(VList xs) -> VBool (null xs))
   ]
 
 initialEnv :: Env

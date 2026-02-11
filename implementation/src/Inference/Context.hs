@@ -25,6 +25,16 @@ primitives =
   , ("==",   Forall (Set.fromList ["a"]) (TFun (TPair (TVar "a") (TVar "a")) (TComp TBool mempty)))
   , ("fst",  Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "a") mempty)))
   , ("snd",  Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "b") mempty)))
+  , ("empty",  Forall (Set.fromList ["k","v"]) (TFun TUnit (TComp (TMap (TVar "k") (TVar "v")) mempty)))
+  , ("insert", Forall (Set.fromList ["k","v"]) (TFun (TPair (TPair (TVar "k") (TVar "v")) (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) mempty)))
+  , ("remove", Forall (Set.fromList ["k","v"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) mempty)))
+  , ("lookup", Forall (Set.fromList ["k","v"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TVar "v") mempty)))
+  , ("member", Forall (Set.fromList ["k","v"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp TBool mempty)))
+  , ("nil",    Forall (Set.fromList ["a"]) (TFun TUnit (TComp (TList (TVar "a")) mempty)))
+  , ("cons",   Forall (Set.fromList ["a"]) (TFun (TPair (TVar "a") (TList (TVar "a"))) (TComp (TList (TVar "a")) mempty)))
+  , ("head",   Forall (Set.fromList ["a"]) (TFun (TList (TVar "a")) (TComp (TVar "a") mempty)))
+  , ("tail",   Forall (Set.fromList ["a"]) (TFun (TList (TVar "a")) (TComp (TList (TVar "a")) mempty)))
+  , ("isnil",  Forall (Set.fromList ["a"]) (TFun (TList (TVar "a")) (TComp TBool mempty)))
   ]
 
 primitiveOps :: [(String, Arity)]

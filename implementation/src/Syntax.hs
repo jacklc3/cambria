@@ -19,6 +19,8 @@ data Value
   | VPair Value Value
   | VEither Side Value
   | VHandler Handler
+  | VMap [(Value, Value)]
+  | VList [Value]
     -- Parsetime-only values
   | VVar Ident
   | VFun Ident Computation
@@ -34,11 +36,13 @@ instance Show Value where
   show (VBool b)        = show b
   show (VString s)      = show s
   show VUnit            = "()"
-  show (VUnique a)        = "<a" ++ show (hashUnique a) ++ ">"
+  show (VUnique a)      = "<a" ++ show (hashUnique a) ++ ">"
   show (VPair v1 v2)    = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
   show (VEither L v)    = "inl " ++ show v
   show (VEither R v)    = "inr " ++ show v
   show (VHandler h)     = show h
+  show (VMap entries)   = "{" ++ concat (intersperse ", " (map (\(k,v) -> show k ++ ": " ++ show v) entries)) ++ "}"
+  show (VList vs)       = "[" ++ concat (intersperse ", " (map show vs)) ++ "]"
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
@@ -55,6 +59,8 @@ instance Eq Value where
   (VPair v1 v2) == (VPair v3 v4)   = v1 == v3 && v2 == v4
   (VEither L v1) == (VEither L v2) = v1 == v2
   (VEither R v1) == (VEither R v2) = v1 == v2
+  (VMap m1) == (VMap m2)            = m1 == m2
+  (VList l1) == (VList l2)          = l1 == l2
   (VVar x1) == (VVar x2)           = x1 == x2
   _ == _                           = False
 

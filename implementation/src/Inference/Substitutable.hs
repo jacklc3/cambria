@@ -12,24 +12,28 @@ class Substitutable a where
   free  :: Variable -> a -> Set.Set Ident
 
 instance Substitutable ValueType where
-  apply _ _ TUnit             = TUnit
-  apply _ _ TInt              = TInt
-  apply _ _ TBool             = TBool
-  apply _ _ TDouble           = TDouble
-  apply _ _ TString           = TString
-  apply _ _ TUnique           = TUnique
-  apply v s (TPair t1 t2)     = TPair (apply v s t1) (apply v s t2)
-  apply v s (TEither t1 t2)   = TEither (apply v s t1) (apply v s t2)
-  apply v s (TFun t1 t2)      = TFun (apply v s t1) (apply v s t2)
+  apply _ _ TUnit               = TUnit
+  apply _ _ TInt                = TInt
+  apply _ _ TBool               = TBool
+  apply _ _ TDouble             = TDouble
+  apply _ _ TString             = TString
+  apply _ _ TUnique             = TUnique
+  apply v s (TPair t1 t2)       = TPair (apply v s t1) (apply v s t2)
+  apply v s (TEither t1 t2)     = TEither (apply v s t1) (apply v s t2)
+  apply v s (TFun t1 t2)        = TFun (apply v s t1) (apply v s t2)
+  apply v s (TList a)           = TList (apply v s a)
+  apply v s (TMap k t)          = TMap (apply v s k) (apply v s t)
   apply v s (THandler t1 ps t2) = THandler (apply v s t1) (apply v s ps) (apply v s t2)
-  apply Types s t@(TVar a)    = Map.findWithDefault t a s
-  apply Params _ (TVar a)     = TVar a
-  apply Types _ (TParam p)    = TParam p
-  apply Params s t@(TParam p) = Map.findWithDefault t p s
+  apply Types s t@(TVar a)      = Map.findWithDefault t a s
+  apply Params _ (TVar a)       = TVar a
+  apply Types _ (TParam p)      = TParam p
+  apply Params s t@(TParam p)   = Map.findWithDefault t p s
 
   free v (TPair t1 t2)       = free v t1 <> free v t2
   free v (TEither t1 t2)     = free v t1 <> free v t2
   free v (TFun t1 t2)        = free v t1 <> free v t2
+  free v (TList a)           = free v a
+  free v (TMap k t)          = free v k <> free v t
   free v (THandler t1 ps t2) = free v t1 <> free v ps <> free v t2
   free Types (TVar a)        = Set.singleton a
   free Params (TParam p)     = Set.singleton p

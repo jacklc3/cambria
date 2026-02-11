@@ -6,14 +6,15 @@ do countSuccesses <- return rec countSuccesses n f ->
 in
 with handler {
   return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (s a) s),
-  set x k -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !unique () in return (fun s ->
-    k a (fun b -> if b == a then return x else s b)),
-  finally s -> s (fun _ -> return ())
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
 } handle (
   with handler {
-    newproc z k -> k(!ref(1,1)),
+    $p -> Unique,
+    newproc z k -> k (!ref (1,1)),
     sample a k ->
       do ij <- !get a in
       do i <- fst ij in do j <- snd ij in
@@ -21,6 +22,9 @@ with handler {
       do n <- boolToInt b in
       (!set(a,(i+n,j+(1-n))) ; k b)
   } handle (
+    declare !newproc : Unit ~> $p.
+    declare !sample : $p ~> Bool.
+
     -- Make a new urn, and draw ten times, reporting the number of trues
     do a1 <- !newproc() in
     countSuccesses 10 (fun _ -> !sample a1)
