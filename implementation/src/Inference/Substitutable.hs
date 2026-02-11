@@ -1,34 +1,14 @@
 module Inference.Substitutable where
 
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Reader
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
+import Inference.Context (Context)
 
 type Subst = Map.Map Ident ValueType
 
 data Variable = Types | Params deriving (Show)
-
-data InferState = InferState {
-  count :: Int,
-  subst :: Subst
-}
-
-type Infer a = ReaderT Context (StateT InferState (Except String)) a
-
-runInfer :: Context -> Infer a -> Either String a
-runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty))
-
-data Scheme = Forall (Set.Set Ident) ValueType
-  deriving (Eq, Show)
-
-data Context = Context {
-  variables :: Map.Map Ident Scheme,
-  abilities :: Effects
-} deriving (Show)
 
 class Substitutable a where
   apply :: Variable -> Subst -> a -> a

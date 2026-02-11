@@ -10,9 +10,9 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Syntax
+import Inference.Unify
+import Inference.Context
 import Inference.Substitutable
-import Inference.Unify (unify, applySubst)
-import Inference.Initialisation (initialCtx)
 
 infer :: Computation -> Either String CompType
 infer c = runInfer initialCtx (inferComp c)

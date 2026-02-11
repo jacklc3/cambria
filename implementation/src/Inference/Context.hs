@@ -1,10 +1,17 @@
-module Inference.Initialisation where
+module Inference.Context where
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
-import Inference.Substitutable (Scheme(..), Context(..))
+
+data Scheme = Forall (Set.Set Ident) ValueType
+  deriving (Eq, Show)
+
+data Context = Context {
+  variables :: Map.Map Ident Scheme,
+  abilities :: Effects
+} deriving (Show)
 
 primitives :: [(String, Scheme)]
 primitives =
