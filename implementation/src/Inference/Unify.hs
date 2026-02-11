@@ -1,26 +1,14 @@
 module Inference.Unify where
 
-
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.State
+import Control.Monad.Except (throwError)
+import Control.Monad.State (gets, modify)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
 
-import Inference.Context
+import Inference.Monad
 import Inference.Substitutable
-
-data InferState = InferState {
-  count :: Int,
-  subst :: Subst
-}
-
-type Infer a = ReaderT Context (StateT InferState (Except String)) a
-
-runInfer :: Context -> Infer a -> Either String a
-runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty))
 
 extendSubst :: Subst -> Infer ()
 extendSubst s' = modify (\st -> st { subst = compose s' (subst st) })

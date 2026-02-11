@@ -7,8 +7,8 @@ module Parsing.Desugar (
 import Syntax
 import Parsing.SugaredSyntax
 
-import Control.Monad.State
 import Control.Monad (foldM)
+import Control.Monad.State (State, evalState, get, modify)
 
 type Fresh a = State Integer a
 

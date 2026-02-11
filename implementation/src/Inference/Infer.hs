@@ -3,16 +3,17 @@
 module Inference.Infer where
 
 import Control.Monad (foldM, unless)
-import Control.Monad.Except
-import Control.Monad.State
-import Control.Monad.Reader
+import Control.Monad.Except (throwError)
+import Control.Monad.State (get, put)
+import Control.Monad.Reader (asks, local)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Syntax
-import Inference.Unify
-import Inference.Context
-import Inference.Substitutable
+import Inference.Monad
+import Inference.Unify (unify, applySubst)
+import Inference.Context (Context(..), Scheme(..), initialCtx)
+import Inference.Substitutable (Variable(..), apply, free)
 
 infer :: Computation -> Either String CompType
 infer c = runInfer initialCtx (inferComp c)

@@ -4,7 +4,6 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
-import Inference.Context (Context)
 
 type Subst = Map.Map Ident ValueType
 

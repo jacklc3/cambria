@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Parsing.Token where
 
 data TokenKind
