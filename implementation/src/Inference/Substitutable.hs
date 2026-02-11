@@ -5,8 +5,6 @@ import qualified Data.Set as Set
 
 import Types
 
-type Subst = Map.Map Ident ValueType
-
 data Variable = Types | Params deriving (Show)
 
 class Substitutable a where
@@ -23,7 +21,7 @@ instance Substitutable ValueType where
   apply v s (TPair t1 t2)     = TPair (apply v s t1) (apply v s t2)
   apply v s (TEither t1 t2)   = TEither (apply v s t1) (apply v s t2)
   apply v s (TFun t1 t2)      = TFun (apply v s t1) (apply v s t2)
-  apply v s (THandler t1 t2)  = THandler (apply v s t1) (apply v s t2)
+  apply v s (THandler t1 ps t2) = THandler (apply v s t1) (apply v s ps) (apply v s t2)
   apply Types s t@(TVar a)    = Map.findWithDefault t a s
   apply Params _ (TVar a)     = TVar a
   apply Types _ (TParam p)    = TParam p
@@ -32,7 +30,7 @@ instance Substitutable ValueType where
   free v (TPair t1 t2)       = free v t1 <> free v t2
   free v (TEither t1 t2)     = free v t1 <> free v t2
   free v (TFun t1 t2)        = free v t1 <> free v t2
-  free v (THandler t1 t2)    = free v t1 <> free v t2
+  free v (THandler t1 ps t2) = free v t1 <> free v ps <> free v t2
   free Types (TVar a)        = Set.singleton a
   free Params (TParam p)     = Set.singleton p
   free _ _                   = mempty

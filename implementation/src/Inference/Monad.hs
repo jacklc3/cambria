@@ -4,8 +4,8 @@ import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Reader
 
+import Types (Subst)
 import Inference.Context (Context)
-import Inference.Substitutable (Subst)
 
 data InferState = InferState {
   count :: Int,

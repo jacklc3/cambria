@@ -5,6 +5,7 @@ import qualified Data.Map as Map
 
 type Ident = String
 type Op    = String
+type Subst = Map.Map Ident ValueType
 
 data ValueType
   = TVar Ident
@@ -18,7 +19,7 @@ data ValueType
   | TPair ValueType ValueType
   | TEither ValueType ValueType
   | TFun ValueType CompType
-  | THandler CompType CompType
+  | THandler CompType Subst CompType
   deriving (Eq)
 
 data CompType = TComp {
@@ -48,7 +49,11 @@ showType _ TUnique = "Unique"
 showType p (TPair t1 t2) = parensIf (p > 3) $ showType 4 t1 ++ " & " ++ showType 4 t2
 showType p (TEither t1 t2) = parensIf (p > 2) $ showType 3 t1 ++ " + " ++ showType 3 t2
 showType p (TFun t1 t2) = parensIf (p > 1) $ showType 2 t1 ++ " -> " ++ show t2
-showType p (THandler t1 t2) = parensIf (p > 0) $ show t1 ++ " => " ++ show t2
+showType p (THandler t1 ps t2)
+  | Map.null ps = parensIf (p > 0) $ show t1 ++ " => " ++ show t2
+  | otherwise   = parensIf (p > 0) $ show t1 ++ " =[" ++ showSubst ps ++ "]=> " ++ show t2
+  where
+    showSubst = intercalate ", " . Map.foldrWithKey (\k v acc -> (k ++ ": " ++ show v) : acc) []
 
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"

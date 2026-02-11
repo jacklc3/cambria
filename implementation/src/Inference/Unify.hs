@@ -41,7 +41,7 @@ instance Unifiable ValueType where
       unify' (TPair a b) (TPair a' b')     = unify a a' >> unify b b'
       unify' (TEither a b) (TEither a' b') = unify a a' >> unify b b'
       unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'
-      unify' (THandler a b) (THandler a' b') = unify a a' >> unify b b'
+      unify' (THandler a ps b) (THandler a' ps' b') = unify a a' >> unify ps ps' >> unify b b'
       unify' (TVar u) t = bind u t
       unify' t (TVar u) = bind u t
       unify' a b = throwError $ "Type mismatch: " ++ show a ++ " vs " ++ show b

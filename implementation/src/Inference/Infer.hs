@@ -4,7 +4,7 @@ module Inference.Infer where
 
 import Control.Monad (foldM, unless)
 import Control.Monad.Except (throwError)
-import Control.Monad.State (get, put)
+import Control.Monad.State (gets, modify)
 import Control.Monad.Reader (asks, local)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -20,9 +20,9 @@ infer c = runInfer initialCtx (inferComp c)
 
 fresh :: Infer ValueType
 fresh = do
-  st <- get
-  put st { count = count st + 1 }
-  return $ TVar $ "t" ++ show (count st)
+  count <- gets count
+  modify (\st ->  st { count = succ count } )
+  return $ TVar $ "t" ++ show count
 
 lookupVar :: Ident -> Infer ValueType
 lookupVar x = do
@@ -96,27 +96,19 @@ inferComp = \case
     extendAbilities (Map.singleton op (Arity arg ret)) (inferComp c)
   CHandle v c -> do
     tv <- inferValue v
-    -- Extract type instantiations from handler value
-    let tInsts = case v of
-          VHandler h -> typeInsts h
-          _          -> []
-        pSubst = Map.fromList tInsts
     tInVal <- fresh
     tOutVal <- fresh
-    unify tv (THandler (TComp tInVal mempty) (TComp tOutVal mempty))
-    ~(THandler tIn tOut) <- applySubst tv
+    unify tv (THandler (TComp tInVal mempty) mempty (TComp tOutVal mempty))
+    ~(THandler tIn pSubst tOut) <- applySubst tv
     tc <- extendAbilities (effects tIn) (inferComp c)
-    -- Apply param substitution to body effects before unifying
-    let tc' = apply Params pSubst tc
-    -- Check that all ops mentioning instantiated params are handled
     let affectedOps = Map.keysSet $ Map.filter
           (\ar -> not $ Set.null $ free Params ar `Set.intersection` Map.keysSet pSubst)
           (effects tc)
-        handledOps = Map.keysSet (effects tIn)
-        missingOps = affectedOps Set.\\ handledOps
+        missingOps = affectedOps Set.\\ Map.keysSet (effects tIn)
     unless (Set.null missingOps) $
-      throwError $ "Handler instantiates type parameter(s) but does not handle operation(s): "
+      throwError $ "Handler instantiates type parameters but does not handle operations: "
         ++ show (Set.toList missingOps)
+    let tc' = apply Params pSubst tc
     unify tc' tIn
     applySubst (addEffects (effects tc' Map.\\ effects tIn) tOut)
 
@@ -164,7 +156,7 @@ inferValue = \case
              $ inferComp c
     unify (value tBody) t2
     applySubst (TFun t1 tBody)
-  VHandler (Handler (RetClause xr cr) opClauses finClause _) -> do
+  VHandler (Handler (RetClause xr cr) opClauses finClause tInsts) -> do
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
@@ -185,7 +177,7 @@ inferValue = \case
         finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
         return $ addEffects (effects opsOut) finOut
-    applySubst (THandler (TComp hInVal ops) finOut)
+    applySubst (THandler (TComp hInVal ops) (Map.fromList tInsts) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 
