@@ -6,55 +6,58 @@ import qualified Data.Set as Set
 import Types
 import Inference.Context (Scheme(..))
 
-data Variable = Types | Params deriving (Show)
-
-compose :: Variable -> Subst -> Subst -> Subst
-compose v s2 s1 = apply v s2 s1 `Map.union` s2
+data Kind = TV | PV | EV
 
 class Substitutable a where
-  apply :: Variable -> Subst -> a -> a
-  free  :: Variable -> a -> Set.Set Ident
+  apply :: Subst -> a -> a
+  free  :: Kind -> a -> Set.Set Ident
 
 instance Substitutable ValueType where
-  apply _ _ TUnit               = TUnit
-  apply _ _ TInt                = TInt
-  apply _ _ TBool               = TBool
-  apply _ _ TDouble             = TDouble
-  apply _ _ TString             = TString
-  apply _ _ TUnique             = TUnique
-  apply v s (TPair t1 t2)       = TPair (apply v s t1) (apply v s t2)
-  apply v s (TEither t1 t2)     = TEither (apply v s t1) (apply v s t2)
-  apply v s (TFun t1 t2)        = TFun (apply v s t1) (apply v s t2)
-  apply v s (TList a)           = TList (apply v s a)
-  apply v s (TMap k t)          = TMap (apply v s k) (apply v s t)
-  apply v s (THandler t1 ps t2) = THandler (apply v s t1) (apply v s ps) (apply v s t2)
-  apply Types s t@(TVar a)      = Map.findWithDefault t a s
-  apply Params _ (TVar a)       = TVar a
-  apply Types _ (TParam p)      = TParam p
-  apply Params s t@(TParam p)   = Map.findWithDefault t p s
+  apply (Type s) (TVar a)      = Map.findWithDefault (TVar a) a s
+  apply (Parameter s) (TParam p) = Map.findWithDefault (TParam p) p s
+  apply s (TPair t1 t2)        = TPair (apply s t1) (apply s t2)
+  apply s (TEither t1 t2)      = TEither (apply s t1) (apply s t2)
+  apply s (TFun t1 t2)         = TFun (apply s t1) (apply s t2)
+  apply s (TList a)            = TList (apply s a)
+  apply s (TMap k t)           = TMap (apply s k) (apply s t)
+  apply s (THandler t1 ps t2)  = THandler (apply s t1) (apply s ps) (apply s t2)
+  apply _ t                    = t
 
-  free v (TPair t1 t2)       = free v t1 <> free v t2
-  free v (TEither t1 t2)     = free v t1 <> free v t2
-  free v (TFun t1 t2)        = free v t1 <> free v t2
-  free v (TList a)           = free v a
-  free v (TMap k t)          = free v k <> free v t
-  free v (THandler t1 ps t2) = free v t1 <> free v ps <> free v t2
-  free Types (TVar a)        = Set.singleton a
-  free Params (TParam p)     = Set.singleton p
-  free _ _                   = mempty
+  free k (TPair t1 t2)         = free k t1 <> free k t2
+  free k (TEither t1 t2)       = free k t1 <> free k t2
+  free k (TFun t1 t2)          = free k t1 <> free k t2
+  free k (TList a)             = free k a
+  free k (TMap k' t)           = free k k' <> free k t
+  free k (THandler t1 ps t2)   = free k t1 <> free k ps <> free k t2
+  free TV  (TVar a)            = Set.singleton a
+  free PV (TParam p)           = Set.singleton p
+  free _ _                     = mempty
 
 instance Substitutable Arity where
-  apply v s (Arity t1 t2)    = Arity (apply v s t1) (apply v s t2)
-  free v (Arity t1 t2)       = free v t1 <> free v t2
+  apply s (Arity t1 t2)        = Arity (apply s t1) (apply s t2)
+  free k (Arity t1 t2)         = free k t1 <> free k t2
 
 instance (Substitutable v) => Substitutable (Map.Map k v) where
-  apply v s                  = Map.map (apply v s)
-  free v                     = foldMap (free v)
+  apply s                      = Map.map (apply s)
+  free k                       = foldMap (free k)
+
+instance Substitutable EffectsType where
+  apply s (Closed m)           = Closed (apply s m)
+  apply (Effect s) (Open m r)  = case Map.lookup r s of
+    Just (Closed m')  -> Closed (apply (Effect s) m <> m')
+    Just (Open m' r') -> Open (apply (Effect s) m <> m') r'
+    Nothing           -> Open (apply (Effect s) m) r
+  apply s (Open m r)           = Open (apply s m) r
+
+  free k  (Closed m)           = free k m
+  free EV (Open m r)           = Set.insert r (free EV m)
+  free k  (Open m _)           = free k m
 
 instance Substitutable CompType where
-  apply v s (TComp t es)     = TComp (apply v s t) (apply v s es)
-  free v (TComp t es)        = free v t <> free v es
+  apply s (TComp t e)          = TComp (apply s t) (apply s e)
+  free k (TComp t e)           = free k t <> free k e
 
 instance Substitutable Scheme where
-  apply v s (Forall as t)    = Forall as (apply v (s `Map.withoutKeys` as) t)
-  free v (Forall as t)       = free v t Set.\\ as
+  apply (Type m) (Forall as t) = Forall as (apply (Type (m `Map.withoutKeys` as)) t)
+  apply s (Forall as t)        = Forall as (apply s t)
+  free k (Forall as t)         = free k t Set.\\ as

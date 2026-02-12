@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 import Syntax
 import Inference.Monad
-import Inference.Unify (unify, applySubst, freshEffects, prependOps)
+import Inference.Unify (unify, applySubst, freshRow, prependOps)
 import Inference.Context
 import Inference.Substitutable
 
@@ -21,17 +21,13 @@ infer c = runInfer initialCtx $ do
   let prims = Map.fromList primitiveOps
   mapM_ (\(op, ar) -> case Map.lookup op prims of
     Just ar' -> unify ar ar'
-    Nothing  -> return ()) (Map.toList (effectOps (effects tc)))
+    Nothing  -> return ()) (Map.toList (rowOps (effects tc)))
   tc' <- applySubst tc
   return tc'{ effects = closeEffects (effects tc') }
 
 closeEffects :: EffectsType -> EffectsType
 closeEffects (Closed m) = Closed m
 closeEffects (Open m _) = Closed m
-
-effectOps :: EffectsType -> Map.Map Op Arity
-effectOps (Closed m)  = m
-effectOps (Open m _)  = m
 
 fresh :: Infer ValueType
 fresh = do
@@ -43,8 +39,8 @@ lookupVariable :: Ident -> Infer ValueType
 lookupVariable x = do
   variables <- ask
   case Map.lookup x variables of
-    Just sc -> do
-      t <- instantiate sc
+    Just scheme -> do
+      t <- instantiate scheme
       applySubst t
     Nothing     -> throwError $ "Unbound variable: " ++ x
 
@@ -58,30 +54,30 @@ extendVariable x sc = local (Map.insert x sc)
 
 generalizeComp :: CompType -> Infer Scheme
 generalizeComp tc = do
+  tc' <- applySubst tc
   ctx <- ask
   ctx' <- applySubst ctx
-  tc' <- applySubst tc
-  let freeTV     = free TV (value tc')
-      restrictTV = free TV ctx' <> free TV (effects tc')
-  return $ Forall (freeVars Set.\\ restrictTV) (value tc')
+  let freeVars       = free FreeTypes (value tc')
+      restricedVars  = free FreeTypes ctx' <> free FreeTypes (effects tc')
+  return $ Forall (freeVars Set.\\ restricedVars) (value tc')
 
 mergeEffects :: EffectsType -> CompType -> Infer CompType
 mergeEffects es tc = do
   unify (effects tc) es
   tc' <- applySubst tc
-  return tc'{ effects = es `effectUnion` effects tc' }
+  return tc'{ effects = es `rowUnion` effects tc' }
 
-effectUnion :: EffectsType -> EffectsType -> EffectsType
-effectUnion (Closed m1) (Closed m2)  = Closed (m1 <> m2)
-effectUnion (Closed m1) (Open m2 r)  = Open (m1 <> m2) r
-effectUnion (Open m1 r) (Closed m2)  = Open (m1 <> m2) r
-effectUnion (Open m1 _) (Open m2 r)  = Open (m1 <> m2) r
+rowUnion :: EffectsType -> EffectsType -> EffectsType
+rowUnion (Closed m1) (Closed m2)  = Closed (m1 <> m2)
+rowUnion (Closed m1) (Open m2 r)  = Open (m1 <> m2) r
+rowUnion (Open m1 r) (Closed m2)  = Open (m1 <> m2) r
+rowUnion (Open m1 _) (Open m2 r)  = Open (m1 <> m2) r
 
-effectDiff :: EffectsType -> EffectsType -> EffectsType
-effectDiff (Closed m1) (Closed m2) = Closed (m1 Map.\\ m2)
-effectDiff (Open m1 r) (Closed m2) = Open (m1 Map.\\ m2) r
-effectDiff (Open m1 r) (Open m2 _) = Open (m1 Map.\\ m2) r
-effectDiff (Closed m1) (Open m2 _) = Closed (m1 Map.\\ m2)
+rowDiff :: EffectsType -> EffectsType -> EffectsType
+rowDiff (Closed m1) (Closed m2) = Closed (m1 Map.\\ m2)
+rowDiff (Open m1 r) (Closed m2) = Open (m1 Map.\\ m2) r
+rowDiff (Open m1 r) (Open m2 _) = Open (m1 Map.\\ m2) r
+rowDiff (Closed m1) (Open m2 _) = Closed (m1 Map.\\ m2)
 
 inferComp :: Computation -> Infer CompType
 inferComp = \case
@@ -90,23 +86,23 @@ inferComp = \case
     return $ TComp tv closed
   CApp f v -> do
     tf <- inferValue f
-    t1 <- fresh
-    t2 <- fresh
-    e2 <- freshEffects
-    unify tf (TFun t1 (TComp t2 e2))
-    t1' <- applySubst t1
-    checkValue v t1'
+    tArg <- fresh
+    tRet <- fresh
+    row <- freshRow
+    unify tf (TFun tArg (TComp tRet row))
+    tArg' <- applySubst tArg
+    checkValue v tArg'
     ~(TFun _ ct) <- applySubst tf
     return ct
   COp op v -> do
     tv <- inferValue v
-    t1 <- fresh
-    e1 <- freshEffects
-    applySubst (TComp t1 (prependOps (Map.singleton op (Arity tv t1)) e1))
+    tRet <- fresh
+    row <- freshRow
+    applySubst (TComp tRet (prependOps (Map.singleton op (Arity tv tRet)) row))
   CDo x c1 c2 -> do
     t1 <- inferComp c1
-    sc <- generalizeComp t1
-    t2 <- extendVariable x sc (inferComp c2)
+    scheme <- generalizeComp t1
+    t2 <- extendVariable x scheme (inferComp c2)
     mergeEffects (effects t1) t2
   CIf v c1 c2 -> do
     checkValue v TBool
@@ -132,22 +128,26 @@ inferComp = \case
     tv <- inferValue v
     tInVal <- fresh
     tOutVal <- fresh
-    eIn <- freshEffects
-    eOut <- freshEffects
-    unify tv (THandler (TComp tInVal eIn) mempty (TComp tOutVal eOut))
+    rowIn <- freshRow
+    rowOut <- freshRow
+    unify tv (THandler (TComp tInVal rowIn) mempty (TComp tOutVal rowOut))
     ~(THandler tIn ps tOut) <- applySubst tv
     tc <- inferComp c
     let missingOps = Map.filterWithKey (\op ar ->
-          not (Map.keysSet ps `Set.disjoint` free PV ar)
-          && op `Map.notMember` effectOps (effects tIn)) (effectOps (effects tc))
+          not (Map.keysSet ps `Set.disjoint` free FreeParams ar)
+          && op `Map.notMember` rowOps (effects tIn)) (rowOps (effects tc))
     unless (Map.null missingOps) $
       throwError $ "Handler instantiates type parameters " ++ show (Map.keys ps)
         ++ " but does not handle operations " ++ showOps missingOps
-    let tc' = apply (Parameter ps) tc
+    let tc' = apply (Param ps) tc
     unify tc' tIn
     tc'' <- applySubst tc'
     tOut' <- applySubst tOut
-    mergeEffects (effects tc'' `effectDiff` effects tIn) tOut'
+    mergeEffects (effects tc'' `rowDiff` effects tIn) tOut'
+  where
+    rowTail :: EffectsType -> Ident
+    rowTail (Open _ r) = r
+    rowTail (Closed _) = error "rowTail: closed row"
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -177,11 +177,12 @@ inferValue = \case
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
-    e2 <- freshEffects
-    tBody <- extendVariable f (Forall mempty (TFun t1 (TComp t2 e2)))
+    row <- freshRow
+    tBody <- extendVariable f (Forall mempty (TFun t1 (TComp t2 row)))
              $ extendVariable x (Forall mempty t1)
              $ inferComp c
-    unify tBody (TComp t2 e2)
+    unify (value tBody) t2
+    unify (effects tBody) row
     applySubst (TFun t1 tBody)
   VHandler (Handler (RetClause xr cr) opClauses finClause tInsts) -> do
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do

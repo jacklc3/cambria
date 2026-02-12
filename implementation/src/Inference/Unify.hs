@@ -11,12 +11,23 @@ import Inference.Monad
 import Inference.Substitutable
 
 extendSubst :: Subst -> Infer ()
-extendSubst s' = modify (\st -> st { subst = compose Types s' (subst st) })
+extendSubst (Type s')     = modify (\st ->
+  st { typeSubst = Map.map (apply (Type s')) (typeSubst st) <> s' })
+extendSubst (Effect s')   = modify (\st ->
+  st { effectSubst  = Map.map (apply (Effect s'))  (effectSubst st)  <> s' })
+extendSubst (Parameter _) = error "Parameter substitutions should not be added to state"
 
 applySubst :: Substitutable a => a -> Infer a
 applySubst t = do
-  s <- gets subst
-  return (apply Types s t)
+  ts <- gets typeSubst
+  es <- gets effectSubst
+  return (apply (Effect es) (apply (Type ts) t))
+
+freshEffects :: Infer EffectsType
+freshEffects = do
+  c <- gets count
+  modify (\st -> st { count = succ c })
+  return $ Open mempty ("e" ++ show c)
 
 class Unifiable a where
   unify :: a -> a -> Infer ()
@@ -46,7 +57,7 @@ instance Unifiable ValueType where
       unify' a b = throwError $ "Type mismatch: " ++ show a ++ " vs " ++ show b
 
 instance Unifiable CompType where
-  unify (TComp t es) (TComp t' es') = unify t t' >> unify es es'
+  unify (TComp t e) (TComp t' e') = unify t t' >> unify e e'
 
 instance Unifiable Arity where
   unify (Arity t1 t2) (Arity t1' t2') = unify t1 t1' >> unify t2 t2'
@@ -54,8 +65,41 @@ instance Unifiable Arity where
 instance (Unifiable v, Substitutable v, Ord k) => Unifiable (Map.Map k v) where
   unify m1 m2 = mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
 
+instance Unifiable EffectsType where
+  unify r1 r2 = do
+    r1' <- applySubst r1
+    r2' <- applySubst r2
+    unifyEffects r1' r2'
+
+unifyEffects :: EffectsType -> EffectsType -> Infer ()
+unifyEffects (Closed m1) (Closed m2) =
+  mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
+unifyEffects (Open m1 r1) (Closed m2) = do
+  mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
+  bindEffects r1 (Closed (m2 Map.\\ m1))
+unifyEffects (Closed m1) (Open m2 r2) = do
+  mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
+  bindEffects r2 (Closed (m1 Map.\\ m2))
+unifyEffects (Open m1 r1) (Open m2 r2)
+  | r1 == r2  = mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
+  | otherwise = do
+      mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
+      r3 <- freshEffects
+      bindEffects r1 (prependOps (m2 Map.\\ m1) r3)
+      bindEffects r2 (prependOps (m1 Map.\\ m2) r3)
+
+prependOps :: Map.Map Op Arity -> EffectsType -> EffectsType
+prependOps ops (Closed m) = Closed (ops <> m)
+prependOps ops (Open m u) = Open (ops <> m) u
+
+bindEffects :: Ident -> EffectsType -> Infer ()
+bindEffects u e
+  | e == Open mempty u = return ()
+  | u `Set.member` free EV e = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show e
+  | otherwise = extendSubst (Effect (Map.singleton u e))
+
 bind :: Ident -> ValueType -> Infer ()
 bind u t
   | t == TVar u = return ()
-  | u `Set.member` free Types t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
-  | otherwise = extendSubst (Map.singleton u t)
+  | u `Set.member` free TV t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
+  | otherwise = extendSubst (Type (Map.singleton u t))

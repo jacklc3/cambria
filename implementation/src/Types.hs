@@ -5,7 +5,11 @@ import qualified Data.Map as Map
 
 type Ident = String
 type Op    = String
-type Subst = Map.Map Ident ValueType
+
+data Subst
+  = Type      (Map.Map Ident ValueType)
+  | Parameter (Map.Map Ident ValueType)
+  | Effect    (Map.Map Ident EffectsType)
 
 data ValueType
   = TVar Ident
@@ -19,20 +23,23 @@ data ValueType
   | TPair ValueType ValueType
   | TEither ValueType ValueType
   | TFun ValueType CompType
-  | THandler CompType Subst CompType
+  | THandler CompType (Map.Map Ident ValueType) CompType
   | TMap ValueType ValueType
   | TList ValueType
   deriving (Eq)
 
 data CompType = TComp {
-  value :: ValueType,
-  effects :: Effects
+  value   :: ValueType,
+  effects :: EffectsType
 } deriving (Eq)
 
-type Effects = Map.Map Op Arity
+data EffectsType
+  = Closed (Map.Map Op Arity)
+  | Open   (Map.Map Op Arity) Ident
+  deriving (Eq)
 
 data Arity = Arity {
-  arg  :: ValueType,
+  arg :: ValueType,
   ret :: ValueType
 } deriving (Eq)
 
@@ -52,22 +59,28 @@ showType p (TPair t1 t2) = parensIf (p > 3) $ showType 4 t1 ++ " & " ++ showType
 showType p (TEither t1 t2) = parensIf (p > 2) $ showType 3 t1 ++ " + " ++ showType 3 t2
 showType p (TFun t1 t2) = parensIf (p > 1) $ showType 2 t1 ++ " -> " ++ show t2
 showType _ (TMap k v) = "Map " ++ showType 5 k ++ " " ++ showType 5 v
-showType _ (TList a) = "List " ++ showType 5 a
+showType _ (TList t) = "List " ++ showType 5 t
 showType p (THandler t1 ps t2)
   | Map.null ps = parensIf (p > 0) $ show t1 ++ " => " ++ show t2
-  | otherwise   = parensIf (p > 0) $ show t1 ++ " =[" ++ showSubst ps ++ "]=> " ++ show t2
+  | otherwise   = parensIf (p > 0) $ show t1 ++ " =[" ++ showParamSubst ps ++ "]=> " ++ show t2
   where
-    showSubst = intercalate ", " . Map.foldrWithKey (\k v acc -> (k ++ ": " ++ show v) : acc) []
+    showParamSubst = intercalate ", " . Map.foldrWithKey (\k v acc -> (k ++ ": " ++ show v) : acc) []
 
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"
 parensIf False s = s
 
 instance Show CompType where
-  show (TComp t es) = showType 4 t ++ "!" ++ showEffects es
+  show (TComp t e) = showType 4 t ++ "!" ++ show e
 
-showEffects :: Effects -> String
-showEffects es = "{" ++ intercalate "," (Map.elems format) ++ "}"
+instance Show EffectsType where
+  show (Closed es) = "{" ++ showOps es ++ "}"
+  show (Open es r)
+    | Map.null es = "{" ++ r ++ "}"
+    | otherwise  = "{" ++ showOps es ++ " | " ++ r ++ "}"
+
+showOps :: Map.Map Op Arity -> String
+showOps es = intercalate "," (Map.elems format)
   where
     format = Map.mapWithKey (\op ar -> " " ++ op ++ " : " ++ show ar ++ " ") es
 
