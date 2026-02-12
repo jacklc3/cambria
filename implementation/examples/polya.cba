@@ -5,6 +5,7 @@ do countSuccesses <- return rec countSuccesses n f ->
    if n == 0 then return 0 else do i <- countSuccesses (n-1) f in i + boolToInt (f ())
 in
 with handler {
+  $q -> Unique,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
@@ -13,7 +14,7 @@ with handler {
   finally s -> s (empty ())
 } handle (
   with handler {
-    $p -> Unique,
+    $p -> $q,
     newproc z k -> k (!ref (1,1)),
     sample a k ->
       do ij <- !get a in

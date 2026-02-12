@@ -2,19 +2,18 @@ module Inference.Unify where
 
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets, modify)
+import Control.Monad.Reader (asks)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
 
 import Inference.Monad
+import Inference.Context (parameters)
 import Inference.Substitutable
 
 extendSubst :: Subst -> Infer ()
-extendSubst s' = modify (\st -> st { subst = compose s' (subst st) })
-
-compose :: Subst -> Subst -> Subst
-compose s2 s1 = apply Types s2 s1 `Map.union` s2
+extendSubst s' = modify (\st -> st { subst = compose Types s' (subst st) })
 
 applySubst :: Substitutable a => a -> Infer a
 applySubst t = do
@@ -38,14 +37,16 @@ instance Unifiable ValueType where
       unify' TUnique TUnique = return ()
       unify' (TParam p) (TParam q)
         | p == q = return ()
+      unify' (TVar u) t = bind u t
+      unify' t (TVar u) = bind u t
+      unify' (TParam p) t = resolve p t
+      unify' t (TParam p) = resolve p t
       unify' (TPair a b) (TPair a' b')     = unify a a' >> unify b b'
       unify' (TEither a b) (TEither a' b') = unify a a' >> unify b b'
       unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'
       unify' (TList a) (TList a')          = unify a a'
       unify' (TMap k v) (TMap k' v')       = unify k k' >> unify v v'
       unify' (THandler a ps b) (THandler a' ps' b') = unify a a' >> unify ps ps' >> unify b b'
-      unify' (TVar u) t = bind u t
-      unify' t (TVar u) = bind u t
       unify' a b = throwError $ "Type mismatch: " ++ show a ++ " vs " ++ show b
 
 instance Unifiable CompType where
@@ -63,3 +64,10 @@ bind u t
   | t == TVar u = return ()
   | u `Set.member` free Types t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
   | otherwise = extendSubst (Map.singleton u t)
+
+resolve :: Ident -> ValueType -> Infer ()
+resolve p t = do
+  ps <- asks parameters
+  case Map.lookup p ps of
+    Just t' -> unify t' t
+    Nothing -> throwError $ "Type mismatch: " ++ show (TParam p) ++ " vs " ++ show t

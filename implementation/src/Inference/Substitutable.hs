@@ -7,6 +7,9 @@ import Types
 
 data Variable = Types | Params deriving (Show)
 
+compose :: Variable -> Subst -> Subst -> Subst
+compose v s2 s1 = apply v s2 s1 `Map.union` s2
+
 class Substitutable a where
   apply :: Variable -> Subst -> a -> a
   free  :: Variable -> a -> Set.Set Ident

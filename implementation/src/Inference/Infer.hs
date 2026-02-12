@@ -12,8 +12,8 @@ import qualified Data.Set as Set
 import Syntax
 import Inference.Monad
 import Inference.Unify (unify, applySubst)
-import Inference.Context (Context(..), Scheme(..), initialCtx)
-import Inference.Substitutable (Variable(..), apply, free)
+import Inference.Context
+import Inference.Substitutable
 
 infer :: Computation -> Either String CompType
 infer c = runInfer initialCtx (inferComp c)
@@ -46,10 +46,16 @@ instantiate (Forall as t) = do
   return $ apply Types s t
 
 extendVariable :: Ident -> Scheme -> Infer a -> Infer a
-extendVariable x sc = local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
+extendVariable x sc =
+  local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
 
 extendAbilities :: Effects -> Infer a -> Infer a
-extendAbilities effects = local (\ctx -> ctx{ abilities = effects <> abilities ctx })
+extendAbilities effects =
+  local (\ctx -> ctx{ abilities = effects <> abilities ctx })
+
+extendParameters :: Subst -> Infer a -> Infer a
+extendParameters ps =
+  local (\ctx -> ctx{ parameters = compose Params (parameters ctx) ps })
 
 addEffects :: Effects -> CompType -> CompType
 addEffects es t = t{ effects = es <> effects t}
@@ -99,16 +105,16 @@ inferComp = \case
     tInVal <- fresh
     tOutVal <- fresh
     unify tv (THandler (TComp tInVal mempty) mempty (TComp tOutVal mempty))
-    ~(THandler tIn pSubst tOut) <- applySubst tv
-    tc <- extendAbilities (effects tIn) (inferComp c)
+    ~(THandler tIn ps tOut) <- applySubst tv
+    tc <- extendParameters ps (extendAbilities (effects tIn) (inferComp c))
     let affectedOps = Map.keysSet $ Map.filter
-          (\ar -> not $ Set.null $ free Params ar `Set.intersection` Map.keysSet pSubst)
+          (\ar -> not $ Set.null $ free Params ar `Set.intersection` Map.keysSet ps)
           (effects tc)
         missingOps = affectedOps Set.\\ Map.keysSet (effects tIn)
     unless (Set.null missingOps) $
       throwError $ "Handler instantiates type parameters but does not handle operations: "
         ++ show (Set.toList missingOps)
-    let tc' = apply Params pSubst tc
+    let tc' = apply Params ps tc
     unify tc' tIn
     applySubst (addEffects (effects tc' Map.\\ effects tIn) tOut)
 
