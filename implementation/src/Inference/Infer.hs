@@ -135,9 +135,7 @@ inferComp = \case
         ++ " but does not handle operations " ++ showOps missingOps
     let tc' = apply (Parameter ps) tc
     unify tc' tIn
-    tc'' <- applySubst tc'
-    tOut' <- applySubst tOut
-    mergeEffects (effects tc'' `effectDiff` effects tIn) tOut'
+    mergeEffects (effects tc' `effectDiff` effects tIn) tOut
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
