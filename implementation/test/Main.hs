@@ -253,6 +253,14 @@ errorTests =
       "!nonexistent ()"
       (Right "t0!{ nonexistent : Unit ~> t0 }")
 
+  , TestCase "error: duplicate declare with conflicting use"
+      ( "declare !ask : Unit ~> Int.\n"
+     ++ "do x <- !ask () in\n"
+     ++ "declare !ask : Unit ~> Bool.\n"
+     ++ "do y <- !ask () in\n"
+     ++ "return (x, y)" )
+      (Left "Type mismatch: Int vs Bool")
+
   , TestCase "error: branch type mismatch"
       "if true then return 1 else return \"hello\""
       (Left "Type mismatch")
