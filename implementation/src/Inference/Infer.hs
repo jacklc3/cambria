@@ -11,8 +11,9 @@ import qualified Data.Set as Set
 
 import Syntax
 import Inference.Monad
-import Inference.Unify (unify, applySubst, freshEffects, prependOps)
+import Inference.Unify (unify, applySubst, freshEffects)
 import Inference.Context
+import Inference.Effects
 import Inference.Substitutable
 
 infer :: Computation -> Either String CompType
@@ -24,14 +25,6 @@ infer c = runInfer initialCtx $ do
     Nothing  -> return ()) (Map.toList (effectOps (effects tc)))
   tc' <- applySubst tc
   return tc'{ effects = closeEffects (effects tc') }
-
-closeEffects :: EffectsType -> EffectsType
-closeEffects (Closed m) = Closed m
-closeEffects (Open m _) = Closed m
-
-effectOps :: EffectsType -> Map.Map Op Arity
-effectOps (Closed m)  = m
-effectOps (Open m _)  = m
 
 fresh :: Infer ValueType
 fresh = do
@@ -63,25 +56,13 @@ generalizeComp tc = do
   tc' <- applySubst tc
   let freeTV     = free TV (value tc')
       restrictTV = free TV ctx' <> free TV (effects tc')
-  return $ Forall (freeVars Set.\\ restrictTV) (value tc')
+  return $ Forall (freeTV Set.\\ restrictTV) (value tc')
 
 mergeEffects :: EffectsType -> CompType -> Infer CompType
 mergeEffects es tc = do
   unify (effects tc) es
   tc' <- applySubst tc
   return tc'{ effects = es `effectUnion` effects tc' }
-
-effectUnion :: EffectsType -> EffectsType -> EffectsType
-effectUnion (Closed m1) (Closed m2)  = Closed (m1 <> m2)
-effectUnion (Closed m1) (Open m2 r)  = Open (m1 <> m2) r
-effectUnion (Open m1 r) (Closed m2)  = Open (m1 <> m2) r
-effectUnion (Open m1 _) (Open m2 r)  = Open (m1 <> m2) r
-
-effectDiff :: EffectsType -> EffectsType -> EffectsType
-effectDiff (Closed m1) (Closed m2) = Closed (m1 Map.\\ m2)
-effectDiff (Open m1 r) (Closed m2) = Open (m1 Map.\\ m2) r
-effectDiff (Open m1 r) (Open m2 _) = Open (m1 Map.\\ m2) r
-effectDiff (Closed m1) (Open m2 _) = Closed (m1 Map.\\ m2)
 
 inferComp :: Computation -> Infer CompType
 inferComp = \case
@@ -102,7 +83,7 @@ inferComp = \case
     tv <- inferValue v
     t1 <- fresh
     e1 <- freshEffects
-    applySubst (TComp t1 (prependOps (Map.singleton op (Arity tv t1)) e1))
+    applySubst (TComp t1 (addEffectOps (Map.singleton op (Arity tv t1)) e1))
   CDo x c1 c2 -> do
     t1 <- inferComp c1
     sc <- generalizeComp t1

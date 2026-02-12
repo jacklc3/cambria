@@ -4,14 +4,12 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
+import Inference.Effects (closed)
 
 data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 type Context = Map.Map Ident Scheme
-
-closed :: EffectsType
-closed = Closed mempty
 
 primitives :: [(String, Scheme)]
 primitives =

@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import Types
 
 import Inference.Monad
+import Inference.Effects (addEffectOps)
 import Inference.Substitutable
 
 extendSubst :: Subst -> Infer ()
@@ -85,12 +86,8 @@ unifyEffects (Open m1 r1) (Open m2 r2)
   | otherwise = do
       mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
       r3 <- freshEffects
-      bindEffects r1 (prependOps (m2 Map.\\ m1) r3)
-      bindEffects r2 (prependOps (m1 Map.\\ m2) r3)
-
-prependOps :: Map.Map Op Arity -> EffectsType -> EffectsType
-prependOps ops (Closed m) = Closed (ops <> m)
-prependOps ops (Open m u) = Open (ops <> m) u
+      bindEffects r1 (addEffectOps (m2 Map.\\ m1) r3)
+      bindEffects r2 (addEffectOps (m1 Map.\\ m2) r3)
 
 bindEffects :: Ident -> EffectsType -> Infer ()
 bindEffects u e
