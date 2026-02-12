@@ -16,7 +16,10 @@ import Inference.Context
 import Inference.Substitutable
 
 infer :: Computation -> Either String CompType
-infer c = runInfer initialCtx (inferComp c)
+infer c = runInfer initialCtx $ do
+  tc <- inferComp c
+  unify (effects tc) (Map.fromList primitiveOps)
+  applySubst tc
 
 fresh :: Infer ValueType
 fresh = do
@@ -33,13 +36,6 @@ lookupVar x = do
       applySubst t
     Nothing     -> throwError $ "Unbound variable: " ++ x
 
-lookupOp :: Op -> Infer Arity
-lookupOp op = do
-  effects <- asks abilities
-  case Map.lookup op effects of
-    Just arity -> applySubst arity
-    Nothing    -> throwError $ "Unknown operation: " ++ op
-
 instantiate :: Scheme -> Infer ValueType
 instantiate (Forall as t) = do
   s <- traverse (const fresh) (Map.fromSet id as)
@@ -49,16 +45,10 @@ extendVariable :: Ident -> Scheme -> Infer a -> Infer a
 extendVariable x sc =
   local (\ctx -> ctx{ variables = Map.insert x sc (variables ctx) })
 
-extendAbilities :: Effects -> Infer a -> Infer a
-extendAbilities effects =
-  local (\ctx -> ctx{ abilities = effects <> abilities ctx })
-
-extendParameters :: Subst -> Infer a -> Infer a
-extendParameters ps =
-  local (\ctx -> ctx{ parameters = compose Params (parameters ctx) ps })
-
-addEffects :: Effects -> CompType -> CompType
-addEffects es t = t{ effects = es <> effects t}
+mergeEffects :: Effects -> CompType -> Infer CompType
+mergeEffects es t = do
+  unify (effects t) es
+  applySubst t{ effects = es <> effects t }
 
 inferComp :: Computation -> Infer CompType
 inferComp = \case
@@ -75,19 +65,19 @@ inferComp = \case
     ~(TFun _ ct) <- applySubst tf
     return ct
   COp op v -> do
-    ar <- lookupOp op
-    checkValue v (arg ar)
-    applySubst (TComp (ret ar) (Map.singleton op ar))
+    tv <- inferValue v
+    tRet <- fresh
+    applySubst (TComp tRet (Map.singleton op (Arity tv tRet)))
   CDo x c1 c2 -> do
     t1 <- inferComp c1
     t2 <- extendVariable x (Forall mempty (value t1)) (inferComp c2)
-    applySubst (addEffects (effects t1) t2)
+    mergeEffects (effects t1) t2
   CIf v c1 c2 -> do
     checkValue v TBool
     t1 <- inferComp c1
     t2 <- inferComp c2
     unify t1 t2
-    applySubst (addEffects (effects t2) t1)
+    mergeEffects (effects t2) t1
   CCase v x1 c1 x2 c2 -> do
     tl <- fresh
     tr <- fresh
@@ -97,16 +87,18 @@ inferComp = \case
     t1 <- extendVariable x1 (Forall mempty tl') (inferComp c1)
     t2 <- extendVariable x2 (Forall mempty tr') (inferComp c2)
     unify t1 t2
-    applySubst (addEffects (effects t2) t1)
+    mergeEffects (effects t2) t1
   CDeclare op arg ret c -> do
-    extendAbilities (Map.singleton op (Arity arg ret)) (inferComp c)
+    tc <- inferComp c
+    unify (Map.singleton op (Arity arg ret)) (effects tc)
+    applySubst tc
   CHandle v c -> do
     tv <- inferValue v
     tInVal <- fresh
     tOutVal <- fresh
     unify tv (THandler (TComp tInVal mempty) mempty (TComp tOutVal mempty))
     ~(THandler tIn ps tOut) <- applySubst tv
-    tc <- extendParameters ps (extendAbilities (effects tIn) (inferComp c))
+    tc <- inferComp c
     let affectedOps = Map.keysSet $ Map.filter
           (\ar -> not $ Set.null $ free Params ar `Set.intersection` Map.keysSet ps)
           (effects tc)
@@ -116,18 +108,7 @@ inferComp = \case
         ++ show (Set.toList missingOps)
     let tc' = apply Params ps tc
     unify tc' tIn
-    applySubst (addEffects (effects tc' Map.\\ effects tIn) tOut)
-
-checkComp :: CompType -> Computation -> Infer ()
-checkComp expected c = do
-  t <- inferComp c
-  unify expected t
-  t' <- applySubst t
-  ctx <- asks abilities
-  let illegal = effects t' Map.\\ (effects expected <> ctx)
-  unless (Map.null illegal) $
-    throwError $ "Unexpected effects: " ++ show (TComp (value t') illegal)
-      ++ " not in " ++ show expected
+    mergeEffects (effects tc' Map.\\ effects tIn) tOut
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -170,7 +151,7 @@ inferValue = \case
                    $ extendVariable k (Forall mempty (TFun opRet hOut))
                    $ inferComp cOp
           unify opOut hOut
-          hOut' <- applySubst (addEffects (effects opOut) hOut)
+          hOut' <- mergeEffects (effects opOut) hOut
           ops' <- applySubst (Map.insert op (Arity opArg opRet) ops)
           return (ops', hOut')
 
@@ -182,16 +163,12 @@ inferValue = \case
       Just (FinClause xf cf) -> do
         finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
-        return $ addEffects (effects opsOut) finOut
+        mergeEffects (effects opsOut) finOut
     applySubst (THandler (TComp hInVal ops) (Map.fromList tInsts) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 
 checkValue :: Value -> ValueType -> Infer ()
-checkValue (VFun x c) (TFun tv tc)     = extendVariable x (Forall mempty tv) (checkComp tc c)
-checkValue (VRec f x c) (TFun tv tc)   = extendVariable f (Forall mempty (TFun tv tc))
-                                         $ extendVariable x (Forall mempty tv)
-                                         $ checkComp tc c
 checkValue (VPair v1 v2) (TPair t1 t2) = checkValue v1 t1 >> checkValue v2 t2
 checkValue (VEither L v) (TEither t _) = checkValue v t
 checkValue (VEither R v) (TEither _ t) = checkValue v t

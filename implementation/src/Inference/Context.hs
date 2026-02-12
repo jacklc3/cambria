@@ -9,9 +9,7 @@ data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 data Context = Context {
-  variables  :: Map.Map Ident Scheme,
-  abilities  :: Effects,
-  parameters :: Subst
+  variables  :: Map.Map Ident Scheme
 } deriving (Show)
 
 primitives :: [(String, Scheme)]
@@ -51,5 +49,3 @@ primitiveOps =
 initialCtx :: Context
 initialCtx = Context
   (Map.fromList primitives)
-  (Map.fromList primitiveOps)
-  mempty

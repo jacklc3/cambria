@@ -249,9 +249,9 @@ errorTests =
       "if 42 then return 1 else return 2"
       (Left "Type mismatch")
 
-  , TestCase "error: unknown operation"
+  , TestCase "unknown operation inferred bottom-up"
       "!nonexistent ()"
-      (Left "Unknown operation: nonexistent")
+      (Right "t0!{ nonexistent : Unit ~> t0 }")
 
   , TestCase "error: branch type mismatch"
       "if true then return 1 else return \"hello\""

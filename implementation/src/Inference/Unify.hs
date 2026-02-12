@@ -2,14 +2,12 @@ module Inference.Unify where
 
 import Control.Monad.Except (throwError)
 import Control.Monad.State (gets, modify)
-import Control.Monad.Reader (asks)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
 
 import Inference.Monad
-import Inference.Context (parameters)
 import Inference.Substitutable
 
 extendSubst :: Subst -> Infer ()
@@ -39,8 +37,6 @@ instance Unifiable ValueType where
         | p == q = return ()
       unify' (TVar u) t = bind u t
       unify' t (TVar u) = bind u t
-      unify' (TParam p) t = resolve p t
-      unify' t (TParam p) = resolve p t
       unify' (TPair a b) (TPair a' b')     = unify a a' >> unify b b'
       unify' (TEither a b) (TEither a' b') = unify a a' >> unify b b'
       unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'
@@ -56,18 +52,10 @@ instance Unifiable Arity where
   unify (Arity t1 t2) (Arity t1' t2') = unify t1 t1' >> unify t2 t2'
 
 instance (Unifiable v, Substitutable v, Ord k) => Unifiable (Map.Map k v) where
-  unify m1 m2 = mapM_ unifyV (Map.intersectionWith (,) m1 m2)
-    where unifyV (v1, v2) = unify v1 v2
+  unify m1 m2 = mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
 
 bind :: Ident -> ValueType -> Infer ()
 bind u t
   | t == TVar u = return ()
   | u `Set.member` free Types t = throwError $ "Occurs check fails: " ++ u ++ " in " ++ show t
   | otherwise = extendSubst (Map.singleton u t)
-
-resolve :: Ident -> ValueType -> Infer ()
-resolve p t = do
-  ps <- asks parameters
-  case Map.lookup p ps of
-    Just t' -> unify t' t
-    Nothing -> throwError $ "Type mismatch: " ++ show (TParam p) ++ " vs " ++ show t
