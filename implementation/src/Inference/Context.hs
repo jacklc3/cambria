@@ -4,35 +4,37 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
-import Inference.Effects (closed)
 
 data Scheme = Forall (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 type Context = Map.Map Ident Scheme
 
+open :: EffectsType
+open = Open mempty "e"
+
 primitives :: [(String, Scheme)]
 primitives =
-  [ ("+",      Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt closed)))
-  , ("-",      Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt closed)))
-  , ("*",      Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt closed)))
-  , ("max",    Forall Set.empty (TFun (TPair TInt TInt) (TComp TInt closed)))
-  , ("/",      Forall Set.empty (TFun (TPair TInt TInt) (TComp TDouble closed)))
-  , ("++",     Forall Set.empty (TFun (TPair TString TString) (TComp TString closed)))
-  , ("hash",   Forall Set.empty (TFun TUnique (TComp TString closed)))
-  , ("==",     Forall (Set.fromList ["a"]) (TFun (TPair (TVar "a") (TVar "a")) (TComp TBool closed)))
-  , ("fst",    Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "a") closed)))
-  , ("snd",    Forall (Set.fromList ["a","b"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "b") closed)))
-  , ("empty",  Forall (Set.fromList ["k","v"]) (TFun TUnit (TComp (TMap (TVar "k") (TVar "v")) closed)))
-  , ("insert", Forall (Set.fromList ["k","v"]) (TFun (TPair (TPair (TVar "k") (TVar "v")) (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) closed)))
-  , ("remove", Forall (Set.fromList ["k","v"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) closed)))
-  , ("lookup", Forall (Set.fromList ["k","v"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TVar "v") closed)))
-  , ("member", Forall (Set.fromList ["k","v"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp TBool closed)))
-  , ("nil",    Forall (Set.fromList ["a"]) (TFun TUnit (TComp (TList (TVar "a")) closed)))
-  , ("cons",   Forall (Set.fromList ["a"]) (TFun (TPair (TVar "a") (TList (TVar "a"))) (TComp (TList (TVar "a")) closed)))
-  , ("head",   Forall (Set.fromList ["a"]) (TFun (TList (TVar "a")) (TComp (TVar "a") closed)))
-  , ("tail",   Forall (Set.fromList ["a"]) (TFun (TList (TVar "a")) (TComp (TList (TVar "a")) closed)))
-  , ("isnil",  Forall (Set.fromList ["a"]) (TFun (TList (TVar "a")) (TComp TBool closed)))
+  [ ("+",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
+  , ("-",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
+  , ("*",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
+  , ("max",    Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
+  , ("/",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TDouble open)))
+  , ("++",     Forall (Set.fromList ["e"]) (TFun (TPair TString TString) (TComp TString open)))
+  , ("hash",   Forall (Set.fromList ["e"]) (TFun TUnique (TComp TString open)))
+  , ("==",     Forall (Set.fromList ["a","e"]) (TFun (TPair (TVar "a") (TVar "a")) (TComp TBool open)))
+  , ("fst",    Forall (Set.fromList ["a","b","e"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "a") open)))
+  , ("snd",    Forall (Set.fromList ["a","b","e"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "b") open)))
+  , ("empty",  Forall (Set.fromList ["k","v","e"]) (TFun TUnit (TComp (TMap (TVar "k") (TVar "v")) open)))
+  , ("insert", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TPair (TVar "k") (TVar "v")) (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) open)))
+  , ("remove", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) open)))
+  , ("lookup", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TVar "v") open)))
+  , ("member", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp TBool open)))
+  , ("nil",    Forall (Set.fromList ["a","e"]) (TFun TUnit (TComp (TList (TVar "a")) open)))
+  , ("cons",   Forall (Set.fromList ["a","e"]) (TFun (TPair (TVar "a") (TList (TVar "a"))) (TComp (TList (TVar "a")) open)))
+  , ("head",   Forall (Set.fromList ["a","e"]) (TFun (TList (TVar "a")) (TComp (TVar "a") open)))
+  , ("tail",   Forall (Set.fromList ["a","e"]) (TFun (TList (TVar "a")) (TComp (TList (TVar "a")) open)))
+  , ("isnil",  Forall (Set.fromList ["a","e"]) (TFun (TList (TVar "a")) (TComp TBool open)))
   ]
 
 primitiveOps :: [(String, Arity)]

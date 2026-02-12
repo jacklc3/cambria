@@ -87,7 +87,7 @@ bidiTests =
 
   , TestCase "checkValue: polymorphic identity function"
       "return (fun x -> return x)"
-      (Right "(t0 -> t0!{})!{}")
+      (Right "(t0 -> t0!{e1})!{}")
 
   , TestCase "inferValue: recursive function preserves effects"
       ( "do f <- return (rec f n -> if n == 0 then return 0 else do _ <- !print \"tick\" in f (n - 1)) in\n"
@@ -367,7 +367,7 @@ polyParamTests =
      ++ "    do r <- !ref init in body r\n"
      ++ "  )) in\n"
      ++ "  do mk1 <- with_ref 42 in\n"
-     ++ "  do r1 <- mk1 (fun r -> do v <- !get r in return (v + 0)) in\n"
+     ++ "  do r1 <- mk1 (fun r -> do v <- !get r in return v) in\n"
      ++ "  do mk2 <- with_ref 0 in\n"
      ++ "  do r2 <- mk2 (fun r -> do v <- !get r in return (v == 0)) in\n"
      ++ "  do mk3 <- with_ref 5 in\n"
@@ -462,7 +462,7 @@ polyParamTests =
      ++ "  do refs <- allocator (cons (10, cons (20, cons (30, nil ())))) in\n"
      ++ "  do reader <- map (fun r -> !get r) in\n"
      ++ "  do vals <- reader refs in\n"
-     ++ "  do first <- return (head vals + 0) in\n"
+     ++ "  do first <- return (head vals) in\n"
      ++ "  do tester <- map (fun n -> return (n == 20)) in\n"
      ++ "  do checks <- tester vals in\n"
      ++ "  return (first, checks)\n"

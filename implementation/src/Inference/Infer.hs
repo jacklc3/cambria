@@ -43,8 +43,11 @@ lookupVariable x = do
 
 instantiate :: Scheme -> Infer ValueType
 instantiate (Forall as t) = do
-  s <- traverse (const fresh) (Map.fromSet id as)
-  return $ apply (Type s) t
+  let tvs = as `Set.intersection` free TV t
+      evs = as `Set.intersection` free EV t
+  s <- traverse (const fresh) (Map.fromSet id tvs)
+  se <- traverse (const freshEffects) (Map.fromSet id evs)
+  return $ apply (Effect se) $ apply (Type s) t
 
 extendVariable :: Ident -> Scheme -> Infer a -> Infer a
 extendVariable x sc = local (Map.insert x sc)
@@ -56,19 +59,25 @@ generalizeComp tc = do
   tc' <- applySubst tc
   let freeTV     = free TV (value tc')
       restrictTV = free TV ctx' <> free TV (effects tc')
-  return $ Forall (freeTV Set.\\ restrictTV) (value tc')
+      freeEV     = free EV (value tc')
+      restrictEV = free EV ctx' <> free EV (effects tc')
+  return $ Forall ((freeTV Set.\\ restrictTV) <> (freeEV Set.\\ restrictEV)) (value tc')
 
 mergeEffects :: EffectsType -> CompType -> Infer CompType
 mergeEffects es tc = do
-  unify (effects tc) es
+  es' <- applySubst es
   tc' <- applySubst tc
-  return tc'{ effects = es `effectUnion` effects tc' }
+  unify es' (effects tc')
+  tc'' <- applySubst tc'
+  es'' <- applySubst es'
+  return tc''{ effects = es'' `effectUnion` effects tc'' }
 
 inferComp :: Computation -> Infer CompType
 inferComp = \case
   CReturn v -> do
     tv <- inferValue v
-    return $ TComp tv closed
+    e <- freshEffects
+    return $ TComp tv e
   CApp f v -> do
     tf <- inferValue f
     t1 <- fresh

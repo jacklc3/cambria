@@ -34,7 +34,7 @@ with handler {
 
   -- Use 1: callback returns Int
   do mk1 <- with_ref 42 in
-  do result1 <- mk1 (fun r -> do v <- !get r in return (v + 0)) in
+  do result1 <- mk1 (fun r -> do v <- !get r in return v) in
 
   -- Use 2: callback returns Bool (different return type!)
   do mk2 <- with_ref 0 in

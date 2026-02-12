@@ -43,7 +43,7 @@ with handler {
   -- (2) map at ($p -> Int): read all refs in the list
   do reader <- map (fun r -> !get r) in
   do vals <- reader refs in
-  do first <- return (head vals + 0) in
+  do first <- return (head vals) in
 
   -- (3) map at (Int -> Bool): test each value
   do tester <- map (fun n -> return (n == 20)) in

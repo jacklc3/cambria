@@ -58,6 +58,9 @@ instance Substitutable CompType where
   free k (TComp t e)           = free k t <> free k e
 
 instance Substitutable Scheme where
-  apply (Type m) (Forall as t) = Forall as (apply (Type (m `Map.withoutKeys` as)) t)
-  apply s (Forall as t)        = Forall as (apply s t)
-  free k (Forall as t)         = free k t Set.\\ as
+  apply (Type m) (Forall as t)   = Forall as (apply (Type (m `Map.withoutKeys` as)) t)
+  apply (Effect m) (Forall as t) = Forall as (apply (Effect (m `Map.withoutKeys` as)) t)
+  apply s (Forall as t)          = Forall as (apply s t)
+  free TV (Forall as t)          = free TV t Set.\\ as
+  free EV (Forall as t)          = free EV t Set.\\ as
+  free k (Forall _ t)            = free k t
