@@ -65,10 +65,11 @@ parensIf False s = s
 
 instance Show CompType where
   show (TComp t es) = showType 4 t ++ "!" ++ showEffects es
-    where
-      showEffects es = "{" ++
-        intercalate "," (Map.foldrWithKey (\op ar acc ->
-          (" " ++ op ++ " : " ++ show ar ++ " ") : acc) [] es) ++ "}"
+
+showEffects :: Effects -> String
+showEffects es = "{" ++ intercalate "," (Map.elems format) ++ "}"
+  where
+    format = Map.mapWithKey (\op ar -> " " ++ op ++ " : " ++ show ar ++ " ") es
 
 instance Show Arity where
   show (Arity arg ret) = show arg ++ " ~> " ++ show ret

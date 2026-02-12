@@ -99,13 +99,12 @@ inferComp = \case
     unify tv (THandler (TComp tInVal mempty) mempty (TComp tOutVal mempty))
     ~(THandler tIn ps tOut) <- applySubst tv
     tc <- inferComp c
-    let affectedOps = Map.keysSet $ Map.filter
-          (\ar -> not $ Set.null $ free Params ar `Set.intersection` Map.keysSet ps)
-          (effects tc)
-        missingOps = affectedOps Set.\\ Map.keysSet (effects tIn)
-    unless (Set.null missingOps) $
-      throwError $ "Handler instantiates type parameters but does not handle operations: "
-        ++ show (Set.toList missingOps)
+    let missingOps = Map.filterWithKey (\op ar ->
+          not (Map.keysSet ps `Set.disjoint` free Params ar)
+          && op `Map.notMember` effects tIn) (effects tc)
+    unless (Map.null missingOps) $
+      throwError $ "Handler instantiates type parameters " ++ show (Map.keys ps)
+        ++ " but does not handle operations " ++ showEffects missingOps
     let tc' = apply Params ps tc
     unify tc' tIn
     mergeEffects (effects tc' Map.\\ effects tIn) tOut
@@ -169,9 +168,6 @@ inferValue = \case
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 
 checkValue :: Value -> ValueType -> Infer ()
-checkValue (VPair v1 v2) (TPair t1 t2) = checkValue v1 t1 >> checkValue v2 t2
-checkValue (VEither L v) (TEither t _) = checkValue v t
-checkValue (VEither R v) (TEither _ t) = checkValue v t
 checkValue v t = do
   t' <- inferValue v
   unify t' t
