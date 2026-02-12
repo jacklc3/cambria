@@ -38,6 +38,8 @@ tokens :-
   Double                     { \p s -> Token p s TokTDouble }
   Str                        { \p s -> Token p s TokTString }
   Unique                     { \p s -> Token p s TokTUnique }
+  Map                        { \p s -> Token p s TokTMap }
+  List                       { \p s -> Token p s TokTList }
 
   "()"                       { \p s -> Token p (quotes s) TokUnit }
   "&&"                       { \p s -> Token p (quotes s) TokAnd }

@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 module Parsing.Token where
 
 data TokenKind
@@ -32,6 +30,8 @@ data TokenKind
   | TokTDouble
   | TokTString
   | TokTUnique
+  | TokTMap
+  | TokTList
   -- Symbols
   | TokUnit
   | TokAnd

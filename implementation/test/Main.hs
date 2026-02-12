@@ -163,6 +163,37 @@ handlerTests =
      ++ "  (!set (a, !get b + !get a); !get a)\n"
      ++ ")" )
       (Right "Int!{ unique : Unit ~> Unique }")
+
+  , TestCase "handler: type param inst missing op rejected (inline)"
+      ( "with handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x -> return x,\n"
+     ++ "  get a k -> k 42,\n"
+     ++ "  ref x k -> k ()\n"
+     ++ "} handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do a <- !ref 0 in\n"
+     ++ "  !set (a, !get a)\n"
+     ++ ")" )
+      (Left "does not handle operation")
+
+  , TestCase "handler: type param inst missing op rejected (variable)"
+      ( "do h <- return handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x -> return x,\n"
+     ++ "  get a k -> k 42,\n"
+     ++ "  ref x k -> k ()\n"
+     ++ "} in\n"
+     ++ "with h handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do a <- !ref 0 in\n"
+     ++ "  !set (a, !get a)\n"
+     ++ ")" )
+      (Left "does not handle operation")
   ]
 
 -- ============================================================
@@ -218,9 +249,17 @@ errorTests =
       "if 42 then return 1 else return 2"
       (Left "Type mismatch")
 
-  , TestCase "error: unknown operation"
+  , TestCase "unknown operation inferred bottom-up"
       "!nonexistent ()"
-      (Left "Unknown operation: nonexistent")
+      (Right "t0!{ nonexistent : Unit ~> t0 }")
+
+  , TestCase "error: duplicate declare with conflicting use"
+      ( "declare !ask : Unit ~> Int.\n"
+     ++ "do x <- !ask () in\n"
+     ++ "declare !ask : Unit ~> Bool.\n"
+     ++ "do y <- !ask () in\n"
+     ++ "return (x, y)" )
+      (Left "Type mismatch: Int vs Bool")
 
   , TestCase "error: branch type mismatch"
       "if true then return 1 else return \"hello\""

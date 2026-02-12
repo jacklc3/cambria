@@ -1,31 +1,17 @@
 module Inference.Unify where
 
-import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.State
+import Control.Monad.Except (throwError)
+import Control.Monad.State (gets, modify)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
 
-import Inference.Context
+import Inference.Monad
 import Inference.Substitutable
 
-data InferState = InferState {
-  count :: Int,
-  subst :: Subst
-}
-
-type Infer a = ReaderT Context (StateT InferState (Except String)) a
-
-runInfer :: Context -> Infer a -> Either String a
-runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty))
-
 extendSubst :: Subst -> Infer ()
-extendSubst s' = modify (\st -> st { subst = compose s' (subst st) })
-
-compose :: Subst -> Subst -> Subst
-compose s2 s1 = apply Types s2 s1 `Map.union` s2
+extendSubst s' = modify (\st -> st { subst = compose Types s' (subst st) })
 
 applySubst :: Substitutable a => a -> Infer a
 applySubst t = do
@@ -46,15 +32,17 @@ instance Unifiable ValueType where
       unify' TBool TBool     = return ()
       unify' TDouble TDouble = return ()
       unify' TString TString = return ()
-      unify' TUnique TUnique     = return ()
+      unify' TUnique TUnique = return ()
       unify' (TParam p) (TParam q)
-        | p == q    = return ()
+        | p == q = return ()
+      unify' (TVar u) t = bind u t
+      unify' t (TVar u) = bind u t
       unify' (TPair a b) (TPair a' b')     = unify a a' >> unify b b'
       unify' (TEither a b) (TEither a' b') = unify a a' >> unify b b'
       unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'
-      unify' (THandler a b) (THandler a' b') = unify a a' >> unify b b'
-      unify' (TVar u) t = bind u t
-      unify' t (TVar u) = bind u t
+      unify' (TList a) (TList a')          = unify a a'
+      unify' (TMap k v) (TMap k' v')       = unify k k' >> unify v v'
+      unify' (THandler a ps b) (THandler a' ps' b') = unify a a' >> unify ps ps' >> unify b b'
       unify' a b = throwError $ "Type mismatch: " ++ show a ++ " vs " ++ show b
 
 instance Unifiable CompType where
@@ -64,8 +52,7 @@ instance Unifiable Arity where
   unify (Arity t1 t2) (Arity t1' t2') = unify t1 t1' >> unify t2 t2'
 
 instance (Unifiable v, Substitutable v, Ord k) => Unifiable (Map.Map k v) where
-  unify m1 m2 = mapM_ unifyV (Map.intersectionWith (,) m1 m2)
-    where unifyV (v1, v2) = unify v1 v2
+  unify m1 m2 = mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
 
 bind :: Ident -> ValueType -> Infer ()
 bind u t

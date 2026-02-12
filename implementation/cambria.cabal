@@ -27,6 +27,7 @@ executable cambria
     Parsing.Lexer
     Parsing.SugaredSyntax
     Parsing.Desugar
+    Inference.Monad
     Inference.Infer
     Inference.Context
     Inference.Substitutable
@@ -60,6 +61,7 @@ test-suite cambria-test
     Parsing.Lexer
     Parsing.SugaredSyntax
     Parsing.Desugar
+    Inference.Monad
     Inference.Infer
     Inference.Context
     Inference.Substitutable

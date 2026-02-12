@@ -43,6 +43,8 @@ import Control.Monad.Except
   Double                     { Token _ _ TokTDouble }
   Str                        { Token _ _ TokTString }
   Unique                     { Token _ _ TokTUnique }
+  Map                        { Token _ _ TokTMap }
+  List                       { Token _ _ TokTList }
 
   '()'                       { Token _ _ TokUnit }
   '=='                       { Token _ _ TokEq }
@@ -188,6 +190,8 @@ typeAtom :: { ValueType }
   | Double                                { TDouble }
   | Str                                   { TString }
   | Unique                                { TUnique }
+  | Map typeAtom typeAtom                 { TMap $2 $3 }
+  | List typeAtom                         { TList $2 }
   | typeparam                             { TParam $1 }
   | '(' type ')'                          { $2 }
 
