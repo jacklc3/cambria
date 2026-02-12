@@ -71,14 +71,14 @@ tokens :-
   "&"                        { \p s -> Token p (quotes s) TokAmpersand }
   "."                        { \p s -> Token p (quotes s) TokDot }
 
-  \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (tail s)) }
+  \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (drop 1 s)) }
 
   $digit+                    { \p s -> Token p s (TokInt (read s)) }
   true                       { \p s -> Token p s (TokBool True) }
   false                      { \p s -> Token p s (TokBool False) }
   $lower[$alpha$digit\_\']*  { \p s -> Token p s (TokIdent s) }
-  \"(\\.|[^\"])*\"           { \p s -> Token p s (TokString (unescape (init (tail s)))) }
-  !$alpha[$alpha$digit\_\']* { \p s -> Token p s (TokOp (tail s)) }
+  \"(\\.|[^\"])*\"           { \p s -> Token p s (TokString (unescape (init (drop 1 s)))) }
+  !$alpha[$alpha$digit\_\']* { \p s -> Token p s (TokOp (drop 1 s)) }
 
 {
 
