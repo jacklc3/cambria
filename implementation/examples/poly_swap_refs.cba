@@ -1,0 +1,40 @@
+-- Polymorphic swap with abstract references
+--
+-- swap is polymorphic: forall a. (a, a) -> (a, a)!S
+-- We use it at both (Int, Int) and ($p, $p).
+--
+-- When instantiated at $p, swap operates on abstract reference
+-- identifiers — values whose concrete type (Unique) is hidden
+-- by the handler. The polymorphic function treats them as opaque
+-- values it can shuffle around without inspecting.
+
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !unique () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
+} handle (
+  declare !get : $p ~> Int.
+  declare !set : $p & Int ~> Unit.
+  declare !ref : Int ~> $p.
+
+  -- Polymorphic swap: forall a. (a, a) -> (a, a)
+  do swap <- return (fun pair -> return (snd pair, fst pair)) in
+
+  -- Use at (Int, Int)
+  do swapped_ints <- swap (10, 20) in
+
+  -- Use at ($p, $p) — swapping abstract reference identifiers!
+  do a <- !ref 100 in
+  do b <- !ref 200 in
+  do swapped_refs <- swap (a, b) in
+
+  -- Now fst swapped_refs is b's ref, snd swapped_refs is a's ref
+  do val_first <- !get (fst swapped_refs) in
+  do val_second <- !get (snd swapped_refs) in
+
+  return (swapped_ints, (val_first, val_second))
+)

@@ -4,6 +4,7 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
+import Inference.Context (Scheme(..))
 
 data Variable = Types | Params deriving (Show)
 
@@ -53,3 +54,7 @@ instance (Substitutable v) => Substitutable (Map.Map k v) where
 instance Substitutable CompType where
   apply v s (TComp t es)     = TComp (apply v s t) (apply v s es)
   free v (TComp t es)        = free v t <> free v es
+
+instance Substitutable Scheme where
+  apply v s (Forall as t)    = Forall as (apply v (s `Map.withoutKeys` as) t)
+  free v (Forall as t)       = free v t Set.\\ as

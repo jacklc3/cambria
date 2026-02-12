@@ -1,0 +1,53 @@
+-- Polymorphic map over abstract references
+--
+-- map is a genuinely polymorphic recursive function:
+--   forall a b. (a -> b!S) -> List(a) -> List(b)!S
+--
+-- We instantiate it at three different type pairs:
+--
+--   1. a=Int, b=$p   — allocate a ref for each integer in a list
+--   2. a=$p,  b=Int  — read from each abstract ref in a list
+--   3. a=Int, b=Bool — test each integer against a predicate
+--
+-- The key: in (1) the output list has element type $p, the abstract
+-- parameter. In (2) the *input* list has element type $p. The same
+-- polymorphic map works uniformly — it never inspects what $p is.
+-- The handler reveals $p = Unique, but map doesn't know or care.
+
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !unique () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
+} handle (
+  declare !get : $p ~> Int.
+  declare !set : $p & Int ~> Unit.
+  declare !ref : Int ~> $p.
+
+  -- Polymorphic map: forall a b. (a -> b!S) -> List(a) -> List(b)!S
+  do map <- return (rec map f -> return (fun xs ->
+    if isnil xs then nil ()
+    else do hd <- f (head xs) in
+         do mapper <- map f in
+         do tl <- mapper (tail xs) in
+         cons (hd, tl)
+  )) in
+
+  -- (1) map at (Int -> $p): allocate a ref for each number
+  do allocator <- map (fun n -> !ref n) in
+  do refs <- allocator (cons (10, cons (20, cons (30, nil ())))) in
+
+  -- (2) map at ($p -> Int): read all refs in the list
+  do reader <- map (fun r -> !get r) in
+  do vals <- reader refs in
+  do first <- return (head vals + 0) in
+
+  -- (3) map at (Int -> Bool): test each value
+  do tester <- map (fun n -> return (n == 20)) in
+  do checks <- tester vals in
+
+  return (first, checks)
+)

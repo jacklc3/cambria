@@ -1,0 +1,56 @@
+-- Polymorphic with_ref combinator
+--
+-- with_ref is a polymorphic resource bracket:
+--   forall a. Int -> ($p -> a!S) -> a!S
+--
+-- It allocates a reference with an initial value, passes the abstract
+-- reference (of type $p) to a callback, and returns whatever the
+-- callback returns. The callback's return type `a` is polymorphic,
+-- so the same combinator can be used to produce Int, Bool, pairs, etc.
+--
+-- This demonstrates the interaction of:
+--   - Parametric polymorphism (forall a)
+--   - Abstract type parameters ($p is existential from the body's perspective)
+--   - Effect operations (!ref, !get, !set used inside the callback)
+
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !unique () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
+} handle (
+  declare !get : $p ~> Int.
+  declare !set : $p & Int ~> Unit.
+  declare !ref : Int ~> $p.
+
+  -- Define the polymorphic combinator once
+  do with_ref <- return (fun init -> return (fun body ->
+    do r <- !ref init in
+    body r
+  )) in
+
+  -- Use 1: callback returns Int
+  do mk1 <- with_ref 42 in
+  do result1 <- mk1 (fun r -> do v <- !get r in return (v + 0)) in
+
+  -- Use 2: callback returns Bool (different return type!)
+  do mk2 <- with_ref 0 in
+  do result2 <- mk2 (fun r ->
+    do v <- !get r in
+    return (v == 0)
+  ) in
+
+  -- Use 3: callback returns (Int, Int) — reads, doubles, writes, reads
+  do mk3 <- with_ref 5 in
+  do result3 <- mk3 (fun r ->
+    do before <- !get r in
+    do _ <- !set (r, before * 2) in
+    do after <- !get r in
+    return (before, after)
+  ) in
+
+  return (result1, (result2, result3))
+)

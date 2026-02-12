@@ -236,6 +236,241 @@ compTests =
   ]
 
 -- ============================================================
+-- Let-polymorphism tests (Kammar-Pretnar style: no value restriction)
+-- ============================================================
+
+polyTests :: [TestCase]
+polyTests =
+  [ TestCase "poly: identity function used at two types"
+      ( "do id <- return (fun x -> return x) in\n"
+     ++ "do a <- id 1 in\n"
+     ++ "do b <- id true in\n"
+     ++ "return (a, b)" )
+      (Right "(Int & Bool)!{}")
+
+  , TestCase "poly: const function used at two types"
+      ( "do const <- return (fun x -> return (fun y -> return x)) in\n"
+     ++ "do a <- const 42 true in\n"
+     ++ "do b <- const \"hello\" 99 in\n"
+     ++ "return (a, b)" )
+      (Right "(Int & Str)!{}")
+
+  , TestCase "poly: swap function used at two pair types"
+      ( "do swap <- return (fun p -> return (snd p, fst p)) in\n"
+     ++ "do a <- swap (1, true) in\n"
+     ++ "do b <- swap (\"hello\", 42) in\n"
+     ++ "return (fst a, fst b)" )
+      (Right "(Bool & Int)!{}")
+
+  , TestCase "poly: higher-order polymorphic apply"
+      ( "do apply <- return (fun f -> f ()) in\n"
+     ++ "do a <- apply (fun x -> return 42) in\n"
+     ++ "do b <- apply (fun x -> return true) in\n"
+     ++ "return (a, b)" )
+      (Right "(Int & Bool)!{}")
+
+  , TestCase "poly: generalization works alongside effects"
+      ( "do _ <- !flip () in\n"
+     ++ "do id <- return (fun x -> return x) in\n"
+     ++ "do a <- id 42 in\n"
+     ++ "do b <- id true in\n"
+     ++ "return (a, b)" )
+      (Right "(Int & Bool)!{ flip : Unit ~> Bool }")
+
+  , TestCase "poly: polymorphic function used across effectful sequencing"
+      ( "do id <- return (fun x -> return x) in\n"
+     ++ "do a <- id 1 in\n"
+     ++ "do _ <- !print \"between\" in\n"
+     ++ "do b <- id true in\n"
+     ++ "return (a, b)" )
+      (Right "(Int & Bool)!{ print : Str ~> Unit }")
+
+  , TestCase "poly: nested polymorphic bindings"
+      ( "do id <- return (fun x -> return x) in\n"
+     ++ "do f <- id (fun y -> return (y, y)) in\n"
+     ++ "do a <- f 1 in\n"
+     ++ "do b <- f true in\n"
+     ++ "return (a, b)" )
+      (Right "((Int & Int) & (Bool & Bool))!{}")
+
+  , TestCase "poly: effect return type var NOT generalized (soundness)"
+      ( "do r <- !myeffect () in\n"
+     ++ "do a <- return r in\n"
+     ++ "do b <- return r in\n"
+     ++ "return (a, b)" )
+      (Right "(t0 & t0)!{ myeffect : Unit ~> t0 }")
+
+  , TestCase "poly: polymorphic function with handler"
+      ( "do id <- return (fun x -> return x) in\n"
+     ++ "with handler {\n"
+     ++ "  return x -> return x,\n"
+     ++ "  ask v k -> k 42\n"
+     ++ "} handle (\n"
+     ++ "  do a <- id (!ask ()) in\n"
+     ++ "  return a\n"
+     ++ ")" )
+      (Right "Int!{}")
+
+  , TestCase "poly: polymorphic list operations"
+      ( "do empty1 <- nil () in\n"
+     ++ "do empty2 <- nil () in\n"
+     ++ "do ints <- cons (1, empty1) in\n"
+     ++ "do bools <- cons (true, empty2) in\n"
+     ++ "return (head ints, head bools)" )
+      (Right "(Int & Bool)!{}")
+  ]
+
+-- ============================================================
+-- Polymorphism + Parameter interaction tests
+-- ============================================================
+
+polyParamTests :: [TestCase]
+polyParamTests =
+  [ TestCase "poly+param: swap refs — poly function at abstract $p type"
+      ( "with handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x  -> return (fun _ -> return x),\n"
+     ++ "  get a k -> return (fun s -> k (lookup (a, s)) s),\n"
+     ++ "  set x k -> return (fun s -> k () (insert (x, s))),\n"
+     ++ "  ref x k -> do a <- !unique () in return (fun s ->\n"
+     ++ "    k a (insert (((a, x), s)))),\n"
+     ++ "  finally s -> s (empty ())\n"
+     ++ "} handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do swap <- return (fun pair -> return (snd pair, fst pair)) in\n"
+     ++ "  do swapped_ints <- swap (10, 20) in\n"
+     ++ "  do a <- !ref 100 in\n"
+     ++ "  do b <- !ref 200 in\n"
+     ++ "  do swapped_refs <- swap (a, b) in\n"
+     ++ "  do v1 <- !get (fst swapped_refs) in\n"
+     ++ "  do v2 <- !get (snd swapped_refs) in\n"
+     ++ "  return (swapped_ints, (v1, v2))\n"
+     ++ ")" )
+      (Right "((Int & Int) & (Int & Int))!{ unique : Unit ~> Unique }")
+
+  , TestCase "poly+param: with_ref combinator — poly callback return type"
+      ( "with handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x  -> return (fun _ -> return x),\n"
+     ++ "  get a k -> return (fun s -> k (lookup (a, s)) s),\n"
+     ++ "  set x k -> return (fun s -> k () (insert (x, s))),\n"
+     ++ "  ref x k -> do a <- !unique () in return (fun s ->\n"
+     ++ "    k a (insert (((a, x), s)))),\n"
+     ++ "  finally s -> s (empty ())\n"
+     ++ "} handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do with_ref <- return (fun init -> return (fun body ->\n"
+     ++ "    do r <- !ref init in body r\n"
+     ++ "  )) in\n"
+     ++ "  do mk1 <- with_ref 42 in\n"
+     ++ "  do r1 <- mk1 (fun r -> do v <- !get r in return (v + 0)) in\n"
+     ++ "  do mk2 <- with_ref 0 in\n"
+     ++ "  do r2 <- mk2 (fun r -> do v <- !get r in return (v == 0)) in\n"
+     ++ "  do mk3 <- with_ref 5 in\n"
+     ++ "  do r3 <- mk3 (fun r ->\n"
+     ++ "    do before <- !get r in\n"
+     ++ "    do _ <- !set (r, before * 2) in\n"
+     ++ "    do after <- !get r in\n"
+     ++ "    return (before, after)\n"
+     ++ "  ) in\n"
+     ++ "  return (r1, (r2, r3))\n"
+     ++ ")" )
+      (Right "(Int & (Bool & (Int & Int)))!{ unique : Unit ~> Unique }")
+
+  , TestCase "poly+param: map_pair at Int, $p->Int, and Int->$p"
+      ( "with handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x  -> return (fun _ -> return x),\n"
+     ++ "  get a k -> return (fun s -> k (lookup (a, s)) s),\n"
+     ++ "  set x k -> return (fun s -> k () (insert (x, s))),\n"
+     ++ "  ref x k -> do a <- !unique () in return (fun s ->\n"
+     ++ "    k a (insert (((a, x), s)))),\n"
+     ++ "  finally s -> s (empty ())\n"
+     ++ "} handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do map_pair <- return (fun f -> return (fun pair ->\n"
+     ++ "    do x <- f (fst pair) in\n"
+     ++ "    do y <- f (snd pair) in\n"
+     ++ "    return (x, y)\n"
+     ++ "  )) in\n"
+     ++ "  do double_both <- map_pair (fun n -> return (n * 2)) in\n"
+     ++ "  do doubled <- double_both (3, 7) in\n"
+     ++ "  do a <- !ref 100 in\n"
+     ++ "  do b <- !ref 200 in\n"
+     ++ "  do read_both <- map_pair (fun r -> !get r) in\n"
+     ++ "  do vals <- read_both (a, b) in\n"
+     ++ "  do sum <- return (fst vals + snd vals) in\n"
+     ++ "  do alloc_both <- map_pair (fun n -> !ref n) in\n"
+     ++ "  do new_refs <- alloc_both (sum, fst doubled + snd doubled) in\n"
+     ++ "  return (doubled, (sum, (!get (fst new_refs), !get (snd new_refs))))\n"
+     ++ ")" )
+      (Right "((Int & Int) & (Int & (Int & Int)))!{ unique : Unit ~> Unique }")
+
+  , TestCase "poly+param: polymorphic incr on abstract refs"
+      ( "with handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x  -> return (fun _ -> return x),\n"
+     ++ "  get a k -> return (fun s -> k (lookup (a, s)) s),\n"
+     ++ "  set x k -> return (fun s -> k () (insert (x, s))),\n"
+     ++ "  ref x k -> do a <- !unique () in return (fun s ->\n"
+     ++ "    k a (insert (((a, x), s)))),\n"
+     ++ "  finally s -> s (empty ())\n"
+     ++ "} handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do incr <- return (fun r ->\n"
+     ++ "    do v <- !get r in\n"
+     ++ "    !set (r, v + 1)\n"
+     ++ "  ) in\n"
+     ++ "  do a <- !ref 10 in\n"
+     ++ "  do b <- !ref 20 in\n"
+     ++ "  do _ <- incr a in\n"
+     ++ "  do _ <- incr b in\n"
+     ++ "  do _ <- incr a in\n"
+     ++ "  return (!get a + !get b)\n"
+     ++ ")" )
+      (Right "Int!{ unique : Unit ~> Unique }")
+
+  , TestCase "poly+param: map at (Int->$p), ($p->Int), (Int->Bool)"
+      ( "with handler {\n"
+     ++ "  $p -> Unique,\n"
+     ++ "  return x  -> return (fun _ -> return x),\n"
+     ++ "  get a k -> return (fun s -> k (lookup (a, s)) s),\n"
+     ++ "  set x k -> return (fun s -> k () (insert (x, s))),\n"
+     ++ "  ref x k -> do a <- !unique () in return (fun s ->\n"
+     ++ "    k a (insert (((a, x), s)))),\n"
+     ++ "  finally s -> s (empty ())\n"
+     ++ "} handle (\n"
+     ++ "  declare !get : $p ~> Int.\n"
+     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !ref : Int ~> $p.\n"
+     ++ "  do map <- return (rec map f -> return (fun xs ->\n"
+     ++ "    if isnil xs then nil ()\n"
+     ++ "    else do hd <- f (head xs) in\n"
+     ++ "         do mapper <- map f in\n"
+     ++ "         do tl <- mapper (tail xs) in\n"
+     ++ "         cons (hd, tl)\n"
+     ++ "  )) in\n"
+     ++ "  do allocator <- map (fun n -> !ref n) in\n"
+     ++ "  do refs <- allocator (cons (10, cons (20, cons (30, nil ())))) in\n"
+     ++ "  do reader <- map (fun r -> !get r) in\n"
+     ++ "  do vals <- reader refs in\n"
+     ++ "  do first <- return (head vals + 0) in\n"
+     ++ "  do tester <- map (fun n -> return (n == 20)) in\n"
+     ++ "  do checks <- tester vals in\n"
+     ++ "  return (first, checks)\n"
+     ++ ")" )
+      (Right "(Int & List Bool)!{ unique : Unit ~> Unique }")
+  ]
+
+-- ============================================================
 -- Error tests (programs that should fail type checking)
 -- ============================================================
 
@@ -318,6 +553,8 @@ main = do
         , bidiTests
         , handlerTests
         , compTests
+        , polyTests
+        , polyParamTests
         , errorTests
         ]
   let results = map runTest allTests

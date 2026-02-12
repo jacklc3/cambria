@@ -1,0 +1,50 @@
+-- Polymorphic map_pair with abstract parameters
+--
+-- map_pair is a single polymorphic function with type:
+--   forall a b. (a -> b!S) -> (a, a) -> (b, b)!S
+--
+-- We instantiate it three ways within the same handler scope:
+--   1. At (Int -> Int)        -- double both elements of an int pair
+--   2. At ($p -> Int)         -- read from two abstract references
+--   3. At (Int -> $p)         -- allocate two references at once
+--
+-- The handler instantiates $p -> Unique, but the polymorphic
+-- function doesn't know or care — it works uniformly over all types.
+
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !unique () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
+} handle (
+  declare !get : $p ~> Int.
+  declare !set : $p & Int ~> Unit.
+  declare !ref : Int ~> $p.
+
+  -- Define the polymorphic map_pair once
+  do map_pair <- return (fun f -> return (fun pair ->
+    do x <- f (fst pair) in
+    do y <- f (snd pair) in
+    return (x, y)
+  )) in
+
+  -- (1) Instantiate at (Int -> Int): double both
+  do double_both <- map_pair (fun n -> return (n * 2)) in
+  do doubled <- double_both (3, 7) in
+
+  -- (2) Instantiate at ($p -> Int): read from two abstract refs
+  do a <- !ref 100 in
+  do b <- !ref 200 in
+  do read_both <- map_pair (fun r -> !get r) in
+  do vals <- read_both (a, b) in
+  do sum <- return (fst vals + snd vals) in
+
+  -- (3) Instantiate at (Int -> $p): allocate two refs at once
+  do alloc_both <- map_pair (fun n -> !ref n) in
+  do new_refs <- alloc_both (sum, fst doubled + snd doubled) in
+
+  return (doubled, (sum, (!get (fst new_refs), !get (snd new_refs))))
+)
