@@ -5,13 +5,13 @@ import qualified Data.Set as Set
 
 import Types
 
-data Scheme = Forall (Set.Set Ident) ValueType
+data Scheme = Forall (Set.Set Ident) (Maybe Ident) ValueType
   deriving (Eq, Show)
 
 type Context = Map.Map Ident Scheme
 
 mkPrimScheme :: [Ident] -> ValueType -> ValueType -> Scheme
-mkPrimScheme vs t1 t2 = Forall (Set.fromList ("e" : vs)) (TFun t1 (TComp t2 (Open mempty "e")))
+mkPrimScheme vs t1 t2 = Forall (Set.fromList vs) (Just "e") (TFun t1 (TComp t2 (Open mempty "e")))
 
 primitives :: [(String, Scheme)]
 primitives =

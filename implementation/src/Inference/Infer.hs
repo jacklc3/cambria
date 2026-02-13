@@ -42,12 +42,10 @@ lookupVariable x = do
     Nothing     -> throwError $ "Unbound variable: " ++ x
 
 instantiate :: Scheme -> Infer ValueType
-instantiate (Forall as t) = do
-  let tvs = as `Set.intersection` free TV t
-      evs = as `Set.intersection` free EV t
-  s <- traverse (const fresh) (Map.fromSet id tvs)
-  se <- traverse (const freshEffects) (Map.fromSet id evs)
-  return $ apply (Effect se) $ apply (Type s) t
+instantiate (Forall tv ev t) = do
+  st <- traverse (const fresh) (Map.fromSet id tv)
+  se <- traverse (const freshEffects) (maybe mempty (Map.fromSet id . Set.singleton) ev)
+  return $ apply (Effect se) $ apply (Type st) t
 
 extendVariable :: Ident -> Scheme -> Infer a -> Infer a
 extendVariable x sc = local (Map.insert x sc)
@@ -57,11 +55,9 @@ generalizeComp tc = do
   ctx <- ask
   ctx' <- applySubst ctx
   tc' <- applySubst tc
-  let freeTV     = free TV (value tc')
-      restrictTV = free TV ctx' <> free TV (effects tc')
-      freeEV     = free EV (value tc')
-      restrictEV = free EV ctx' <> free EV (effects tc')
-  return $ Forall ((freeTV Set.\\ restrictTV) <> (freeEV Set.\\ restrictEV)) (value tc')
+  let genTV = free TV (value tc') Set.\\ (free TV ctx' <> free TV (effects tc'))
+      genEV = free EV (value tc') Set.\\ (free EV ctx' <> free EV (effects tc'))
+  return $ Forall genTV (Set.lookupMin genEV) (value tc')
 
 mergeEffects :: EffectsType -> CompType -> Infer CompType
 mergeEffects es tc = do
@@ -110,8 +106,8 @@ inferComp = \case
     checkValue v (TEither tl tr)
     tl' <- applySubst tl
     tr' <- applySubst tr
-    t1 <- extendVariable x1 (Forall mempty tl') (inferComp c1)
-    t2 <- extendVariable x2 (Forall mempty tr') (inferComp c2)
+    t1 <- extendVariable x1 (Forall mempty Nothing tl') (inferComp c1)
+    t2 <- extendVariable x2 (Forall mempty Nothing tr') (inferComp c2)
     unify t1 t2
     mergeEffects (effects t2) t1
   CDeclare op arg ret c -> do
@@ -160,14 +156,14 @@ inferValue = \case
     return $ TEither t1 t2
   VFun x c -> do
     t1 <- fresh
-    t2 <- extendVariable x (Forall mempty t1) (inferComp c)
+    t2 <- extendVariable x (Forall mempty Nothing t1) (inferComp c)
     applySubst (TFun t1 t2)
   VRec f x c -> do
     t1 <- fresh
     t2 <- fresh
     e2 <- freshEffects
-    tBody <- extendVariable f (Forall mempty (TFun t1 (TComp t2 e2)))
-             $ extendVariable x (Forall mempty t1)
+    tBody <- extendVariable f (Forall mempty Nothing (TFun t1 (TComp t2 e2)))
+             $ extendVariable x (Forall mempty Nothing t1)
              $ inferComp c
     unify tBody (TComp t2 e2)
     applySubst (TFun t1 tBody)
@@ -175,8 +171,8 @@ inferValue = \case
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
-          opOut <- extendVariable x (Forall mempty opArg)
-                   $ extendVariable k (Forall mempty (TFun opRet hOut))
+          opOut <- extendVariable x (Forall mempty Nothing opArg)
+                   $ extendVariable k (Forall mempty Nothing (TFun opRet hOut))
                    $ inferComp cOp
           unify opOut hOut
           hOut' <- mergeEffects (effects opOut) hOut
@@ -184,12 +180,12 @@ inferValue = \case
           return (ops', hOut')
 
     hInVal <- fresh
-    retOut <- extendVariable xr (Forall mempty hInVal) (inferComp cr)
+    retOut <- extendVariable xr (Forall mempty Nothing hInVal) (inferComp cr)
     (ops, opsOut) <- foldM processOpClause (mempty, retOut) opClauses
     finOut <- case finClause of
       Nothing -> return opsOut
       Just (FinClause xf cf) -> do
-        finOut <- extendVariable xf (Forall mempty (value opsOut)) (inferComp cf)
+        finOut <- extendVariable xf (Forall mempty Nothing (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
         mergeEffects (effects opsOut) finOut
     applySubst (THandler (TComp hInVal (Closed ops)) (Map.fromList tInsts) finOut)
