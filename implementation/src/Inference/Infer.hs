@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 import Syntax
 import Inference.Monad
-import Inference.Unify (unify, applySubst, freshEffects)
+import Inference.Unify (unify)
 import Inference.Context
 import Inference.Effects
 import Inference.Substitutable
@@ -25,12 +25,6 @@ infer c = runInfer initialCtx $ do
     Nothing  -> return ()) (Map.toList (effectOps (effects tc)))
   tc' <- applySubst tc
   return tc'{ effects = closeEffects (effects tc') }
-
-fresh :: Infer ValueType
-fresh = do
-  count <- gets count
-  modify (\st ->  st { count = succ count } )
-  return $ TVar $ "t" ++ show count
 
 lookupVariable :: Ident -> Infer ValueType
 lookupVariable x = do

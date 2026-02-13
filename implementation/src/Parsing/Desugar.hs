@@ -12,17 +12,17 @@ import Control.Monad.State (State, evalState, get, modify)
 
 type Fresh a = State Integer a
 
-newVar :: Fresh Ident
-newVar = do
+fresh :: Fresh Ident
+fresh = do
   n <- get
   modify succ
   return ("_" ++ show n)
 
 desugar :: SugaredExpr -> Computation
-desugar s = evalState (desugarComp (makeComp s)) 0
+desugar s = evalState (desugarComp (liftValue s)) 0
   where
-    makeComp (SEComp c) = c
-    makeComp v          = SCReturn v
+    liftValue (SEComp c) = c
+    liftValue v          = SCReturn v
 
 desugarComp :: SugaredComp -> Fresh Computation
 desugarComp = \case
@@ -83,20 +83,21 @@ desugarExpr' = \case
     c' <- desugarComp c
     return (id, VRec g x (desugarVars xs c'))
   SEComp c -> do
-    x  <- newVar
+    x  <- fresh
     c' <- desugarComp c
     return (CDo x c', VVar x)
 
 desugarVars :: [Ident] -> Computation -> Computation
 desugarVars xs c = foldr (\x c' -> CReturn (VFun x c')) c xs
 
+-- TODO: We should put the op clauses and param substs into maps here
 desugarHandler :: [HandlerClause] -> Fresh Handler
 desugarHandler cs = do
   (rc, ocs, fc, tcs) <- foldM f (Nothing,[],Nothing,[]) cs
   rc' <- case rc of
     Just rc -> return rc
     Nothing -> do
-      x <- newVar
+      x <- fresh
       return $ RetClause x (CReturn (VVar x))
   return $ Handler rc' ocs fc tcs
     where

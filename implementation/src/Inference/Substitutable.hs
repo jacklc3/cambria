@@ -1,10 +1,12 @@
 module Inference.Substitutable where
 
+import Control.Monad.State (gets, modify)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import Types
 import Inference.Context (Scheme(..))
+import Inference.Monad
 
 data VariableKind = TV | PV | EV
 
@@ -12,6 +14,20 @@ data Subst
   = Type      (Map.Map Ident ValueType)
   | Parameter (Map.Map Ident ValueType)
   | Effect    (Map.Map Ident EffectsType)
+
+extendSubst :: Subst -> Infer ()
+extendSubst (Type s')     = modify (\st ->
+  st { typeSubst = Map.map (apply (Type s')) (typeSubst st) <> s' })
+extendSubst (Effect s')   = modify (\st ->
+  st { effectSubst  = Map.map (apply (Effect s'))  (effectSubst st)  <> s' })
+extendSubst (Parameter _) =
+  error "Parameter substitutions should not be added to state"
+
+applySubst :: Substitutable a => a -> Infer a
+applySubst t = do
+  ts <- gets typeSubst
+  es <- gets effectSubst
+  return (apply (Effect es) (apply (Type ts) t))
 
 class Substitutable a where
   apply :: Subst -> a -> a

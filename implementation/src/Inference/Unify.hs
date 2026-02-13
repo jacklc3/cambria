@@ -1,7 +1,7 @@
 module Inference.Unify where
 
 import Control.Monad.Except (throwError)
-import Control.Monad.State (gets, modify)
+import Control.Monad.State (gets)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -10,25 +10,6 @@ import Types
 import Inference.Monad
 import Inference.Effects (addEffectOps)
 import Inference.Substitutable
-
-extendSubst :: Subst -> Infer ()
-extendSubst (Type s')     = modify (\st ->
-  st { typeSubst = Map.map (apply (Type s')) (typeSubst st) <> s' })
-extendSubst (Effect s')   = modify (\st ->
-  st { effectSubst  = Map.map (apply (Effect s'))  (effectSubst st)  <> s' })
-extendSubst (Parameter _) = error "Parameter substitutions should not be added to state"
-
-applySubst :: Substitutable a => a -> Infer a
-applySubst t = do
-  ts <- gets typeSubst
-  es <- gets effectSubst
-  return (apply (Effect es) (apply (Type ts) t))
-
-freshEffects :: Infer EffectsType
-freshEffects = do
-  c <- gets count
-  modify (\st -> st { count = succ c })
-  return $ Open mempty ("e" ++ show c)
 
 class Unifiable a where
   unify :: a -> a -> Infer ()
@@ -72,6 +53,7 @@ instance Unifiable EffectsType where
     r2' <- applySubst r2
     unifyEffects r1' r2'
 
+-- TODO: Should we only unify the intersection here? If the closed effects dont line up this should be an error?
 unifyEffects :: EffectsType -> EffectsType -> Infer ()
 unifyEffects (Closed m1) (Closed m2) =
   mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
