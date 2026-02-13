@@ -55,12 +55,12 @@ instance Eq Value where
   (VBool b1) == (VBool b2)         = b1 == b2
   (VString s1) == (VString s2)     = s1 == s2
   VUnit == VUnit                   = True
-  (VUnique a1) == (VUnique a2)         = a1 == a2
+  (VUnique a1) == (VUnique a2)     = a1 == a2
   (VPair v1 v2) == (VPair v3 v4)   = v1 == v3 && v2 == v4
   (VEither L v1) == (VEither L v2) = v1 == v2
   (VEither R v1) == (VEither R v2) = v1 == v2
-  (VMap m1) == (VMap m2)            = m1 == m2
-  (VList l1) == (VList l2)          = l1 == l2
+  (VMap m1) == (VMap m2)           = m1 == m2
+  (VList l1) == (VList l2)         = l1 == l2
   (VVar x1) == (VVar x2)           = x1 == x2
   _ == _                           = False
 
@@ -77,7 +77,7 @@ data Computation
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v
   show (COp op v)     = "!" ++ op ++ " " ++ show v
-  show (CDo x c1 c2) = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
+  show (CDo x c1 c2)  = "do " ++ x ++ " <- " ++ show c1 ++ " in " ++ show c2
   show (CIf v c1 c2)  = "if " ++ show v ++ " then " ++ show c1 ++ " else " ++ show c2
   show (CCase v x1 c1 x2 c2) =
     "case " ++ show v ++ " of { inl " ++ show x1 ++ " -> " ++ show c1 ++ ", inr "
@@ -101,8 +101,7 @@ instance Show Handler where
     let
       tiStrs = map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) tis
       retStr = "return " ++ xr ++ " -> " ++ show cr
-      opStrs = map (\(op, OpClause x k c) ->
-        op ++ " " ++ x ++ " " ++ k ++ " -> " ++ show c) ocs
+      opStrs = map (\(op, OpClause x k c) -> op ++ " " ++ x ++ " " ++ k ++ " -> " ++ show c) ocs
       finStr = case fc of
         Just (FinClause xf cf) -> ", finally " ++ xf ++ " -> " ++ show cf
         Nothing -> ""

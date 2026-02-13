@@ -10,31 +10,31 @@ data Scheme = Forall (Set.Set Ident) ValueType
 
 type Context = Map.Map Ident Scheme
 
-open :: EffectsType
-open = Open mempty "e"
+mkPrimScheme :: [Ident] -> ValueType -> ValueType -> Scheme
+mkPrimScheme vs t1 t2 = Forall (Set.fromList ("e" : vs)) (TFun t1 (TComp t2 (Open mempty "e")))
 
 primitives :: [(String, Scheme)]
 primitives =
-  [ ("+",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
-  , ("-",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
-  , ("*",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
-  , ("max",    Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TInt open)))
-  , ("/",      Forall (Set.fromList ["e"]) (TFun (TPair TInt TInt) (TComp TDouble open)))
-  , ("++",     Forall (Set.fromList ["e"]) (TFun (TPair TString TString) (TComp TString open)))
-  , ("hash",   Forall (Set.fromList ["e"]) (TFun TUnique (TComp TString open)))
-  , ("==",     Forall (Set.fromList ["a","e"]) (TFun (TPair (TVar "a") (TVar "a")) (TComp TBool open)))
-  , ("fst",    Forall (Set.fromList ["a","b","e"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "a") open)))
-  , ("snd",    Forall (Set.fromList ["a","b","e"]) (TFun (TPair (TVar "a") (TVar "b")) (TComp (TVar "b") open)))
-  , ("empty",  Forall (Set.fromList ["k","v","e"]) (TFun TUnit (TComp (TMap (TVar "k") (TVar "v")) open)))
-  , ("insert", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TPair (TVar "k") (TVar "v")) (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) open)))
-  , ("remove", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TMap (TVar "k") (TVar "v")) open)))
-  , ("lookup", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp (TVar "v") open)))
-  , ("member", Forall (Set.fromList ["k","v","e"]) (TFun (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TComp TBool open)))
-  , ("nil",    Forall (Set.fromList ["a","e"]) (TFun TUnit (TComp (TList (TVar "a")) open)))
-  , ("cons",   Forall (Set.fromList ["a","e"]) (TFun (TPair (TVar "a") (TList (TVar "a"))) (TComp (TList (TVar "a")) open)))
-  , ("head",   Forall (Set.fromList ["a","e"]) (TFun (TList (TVar "a")) (TComp (TVar "a") open)))
-  , ("tail",   Forall (Set.fromList ["a","e"]) (TFun (TList (TVar "a")) (TComp (TList (TVar "a")) open)))
-  , ("isnil",  Forall (Set.fromList ["a","e"]) (TFun (TList (TVar "a")) (TComp TBool open)))
+  [ ("+",      mkPrimScheme [] (TPair TInt TInt) TInt)
+  , ("-",      mkPrimScheme [] (TPair TInt TInt) TInt)
+  , ("*",      mkPrimScheme [] (TPair TInt TInt) TInt)
+  , ("max",    mkPrimScheme [] (TPair TInt TInt) TInt)
+  , ("/",      mkPrimScheme [] (TPair TInt TInt) TDouble)
+  , ("++",     mkPrimScheme [] (TPair TString TString) TString)
+  , ("hash",   mkPrimScheme [] TUnique TString)
+  , ("==",     mkPrimScheme ["a"] (TPair (TVar "a") (TVar "a")) TBool)
+  , ("fst",    mkPrimScheme ["a","b"] (TPair (TVar "a") (TVar "b")) (TVar "a"))
+  , ("snd",    mkPrimScheme ["a","b"] (TPair (TVar "a") (TVar "b")) (TVar "b"))
+  , ("empty",  mkPrimScheme ["k","v"] TUnit (TMap (TVar "k") (TVar "v")))
+  , ("insert", mkPrimScheme ["k","v"] (TPair (TPair (TVar "k") (TVar "v")) (TMap (TVar "k") (TVar "v"))) (TMap (TVar "k") (TVar "v")))
+  , ("remove", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TMap (TVar "k") (TVar "v")))
+  , ("lookup", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TVar "v"))
+  , ("member", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) TBool)
+  , ("nil",    mkPrimScheme ["a"] TUnit (TList (TVar "a")))
+  , ("cons",   mkPrimScheme ["a"] (TPair (TVar "a") (TList (TVar "a"))) (TList (TVar "a")))
+  , ("head",   mkPrimScheme ["a"] (TList (TVar "a")) (TVar "a"))
+  , ("tail",   mkPrimScheme ["a"] (TList (TVar "a")) (TList (TVar "a")))
+  , ("isnil",  mkPrimScheme ["a"] (TList (TVar "a")) TBool)
   ]
 
 primitiveOps :: [(String, Arity)]
