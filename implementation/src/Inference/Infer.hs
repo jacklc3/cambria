@@ -167,7 +167,7 @@ inferValue = \case
              $ inferComp c
     unify tBody (TComp t2 e2)
     applySubst (TFun t1 tBody)
-  VHandler (Handler (RetClause xr cr) opClauses finClause tInsts) -> do
+  VHandler (Handler (RetClause xr cr) opClauses finClause pSubst) -> do
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
@@ -188,7 +188,7 @@ inferValue = \case
         finOut <- extendVariable xf (Forall mempty Nothing (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
         mergeEffects (effects opsOut) finOut
-    applySubst (THandler (TComp hInVal (Closed ops)) (Map.fromList tInsts) finOut)
+    applySubst (THandler (TComp hInVal (Closed ops)) (Map.fromList pSubst) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
 

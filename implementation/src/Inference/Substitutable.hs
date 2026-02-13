@@ -6,11 +6,16 @@ import qualified Data.Set as Set
 import Types
 import Inference.Context (Scheme(..))
 
-data Kind = TV | PV | EV
+data VariableKind = TV | PV | EV
+
+data Subst
+  = Type      (Map.Map Ident ValueType)
+  | Parameter (Map.Map Ident ValueType)
+  | Effect    (Map.Map Ident EffectsType)
 
 class Substitutable a where
   apply :: Subst -> a -> a
-  free  :: Kind -> a -> Set.Set Ident
+  free  :: VariableKind -> a -> Set.Set Ident
 
 instance Substitutable ValueType where
   apply (Type s) (TVar a)      = Map.findWithDefault (TVar a) a s

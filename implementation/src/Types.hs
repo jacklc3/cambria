@@ -6,13 +6,6 @@ import qualified Data.Map as Map
 type Ident = String
 type Op    = String
 
-type ParamSubst = Map.Map Ident ValueType
-
-data Subst
-  = Type      (Map.Map Ident ValueType)
-  | Parameter (Map.Map Ident ValueType)
-  | Effect    (Map.Map Ident EffectsType)
-
 data ValueType
   = TVar Ident
   | TParam Ident
@@ -25,7 +18,7 @@ data ValueType
   | TPair ValueType ValueType
   | TEither ValueType ValueType
   | TFun ValueType CompType
-  | THandler CompType ParamSubst CompType
+  | THandler CompType (Map.Map Ident ValueType) CompType
   | TMap ValueType ValueType
   | TList ValueType
   deriving (Eq)
