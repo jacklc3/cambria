@@ -124,7 +124,7 @@ value :: { SugaredExpr }
 
 atom :: { SugaredExpr }
   : '()'                                  { SEUnit }
-  | '[]'                                  { SEComp (SCApp (SEVar "[]") SEUnit) }
+  | '[]'                                  { SEVar "[]" }
   | boolean                               { SEBool $1 }
   | integer                               { SEInt $1 }
   | string                                { SEString $1 }

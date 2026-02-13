@@ -25,16 +25,20 @@ primitives =
   , ("==",     mkPrimScheme ["a"] (TPair (TVar "a") (TVar "a")) TBool)
   , ("fst",    mkPrimScheme ["a","b"] (TPair (TVar "a") (TVar "b")) (TVar "a"))
   , ("snd",    mkPrimScheme ["a","b"] (TPair (TVar "a") (TVar "b")) (TVar "b"))
-  , ("empty",  mkPrimScheme ["k","v"] TUnit (TMap (TVar "k") (TVar "v")))
   , ("insert", mkPrimScheme ["k","v"] (TPair (TPair (TVar "k") (TVar "v")) (TMap (TVar "k") (TVar "v"))) (TMap (TVar "k") (TVar "v")))
   , ("remove", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TMap (TVar "k") (TVar "v")))
   , ("lookup", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TVar "v"))
   , ("member", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) TBool)
-  , ("[]",     mkPrimScheme ["a"] TUnit (TList (TVar "a")))
   , ("::",     mkPrimScheme ["a"] (TPair (TVar "a") (TList (TVar "a"))) (TList (TVar "a")))
   , ("head",   mkPrimScheme ["a"] (TList (TVar "a")) (TVar "a"))
   , ("tail",   mkPrimScheme ["a"] (TList (TVar "a")) (TList (TVar "a")))
   , ("null",   mkPrimScheme ["a"] (TList (TVar "a")) TBool)
+  ]
+
+constants :: [(String, Scheme)]
+constants =
+  [ ("[]",    Forall (Set.singleton "a") Nothing (TList (TVar "a")))
+  , ("empty", Forall (Set.fromList ["k","v"]) Nothing (TMap (TVar "k") (TVar "v")))
   ]
 
 primitiveOps :: [(String, Arity)]
@@ -48,4 +52,4 @@ primitiveOps =
   ]
 
 initialCtx :: Context
-initialCtx = Map.fromList primitives
+initialCtx = Map.fromList (primitives ++ constants)

@@ -4,7 +4,7 @@ with handler {
   set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !unique () in return (fun s ->
     k a (insert (((a, x), s)))),
-  finally s -> s (empty ())
+  finally s -> s empty
 } handle (
   do a <- !ref 2 in
   do b <- !ref 3 in

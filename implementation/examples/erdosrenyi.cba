@@ -5,10 +5,10 @@ with handler {
   set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !unique () in return (fun s ->
     k a (insert (((a, x), s)))),
-  finally s -> s (empty ())
+  finally s -> s empty
 } handle (
   with handler {
-    newgraph z k -> k (!ref (empty ())),
+    newgraph z k -> k (!ref empty),
     newnode z k -> k (!unique ()),
     isedge gab k ->
       do g <- fst gab in
