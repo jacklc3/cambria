@@ -90,7 +90,6 @@ desugarExpr' = \case
 desugarVars :: [Ident] -> Computation -> Computation
 desugarVars xs c = foldr (\x c' -> CReturn (VFun x c')) c xs
 
--- TODO: We should put the op clauses and param substs into maps here
 desugarHandler :: [HandlerClause] -> Fresh Handler
 desugarHandler cs = do
   (rc, ocs, fc, tcs) <- foldM f (Nothing,[],Nothing,[]) cs

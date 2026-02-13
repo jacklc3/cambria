@@ -19,7 +19,7 @@ PATs extend algebraic theories by allowing operations to be parameterized by res
 
 * **Effects and Handlers:** Cambria is built on a standard effect calculus with a fine-grained call-by-value strategy, separating inert *values* from potentially effectful *computations*.
 * **Type and Effect System:** A type and effect system ensures that programs are well-behaved and do not get stuck due to type errors. We introduce a new parameter type that may be instantiated by handlers based on the effect implementation.
-* **Haskell Implementation:** The language is implemented in Haskell, with a parser, desugarer, and evaluator.
+* **Haskell Implementation:** The language is implemented in Haskell, with a parser, desugarer, type inference, and evaluator.
 
 ## Examples
 
@@ -27,23 +27,40 @@ Here are a few examples that demonstrate the expressive power of Cambria.
 
 ### Local State
 
-This example implements a handler for local binary state, where memory cells can be dynamically created and manipulated. The state is managed by passing a function from parameters (memory locations) to their stored values.
+This example implements a handler for local state, where memory cells can be dynamically created and manipulated. The state is managed using a map from parameters (memory locations) to their stored values.
 
 ```
 -- from implementation/examples/local_state.cba
 with handler {
   return x  -> return (fun _ -> return x),
-  get(a; k) -> return (fun s -> k (s a) s),
-  set(x; k) -> return (fun s -> k () (fun a -> if a == fst x then snd x else s a)),
-  ref(x; k) -> do a <- !new () in return (fun s ->
-    k a (fun b -> if b == a then return x else s b)),
-  finally s -> s (fun _ -> return 0)
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !unique () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s (empty ())
 } handle (
   do a <- !ref 2 in
   do b <- !ref 3 in
   (!set (a, !get b + !get a); !get a)
 )
 -- returns 5
+```
+
+### Polymorphic Map over Abstract References
+
+This example demonstrates polymorphic functions operating over lists of abstract references. The same `map` function works at types `Int -> $p` (allocation), `$p -> Int` (reading), and `Int -> Bool` (testing).
+
+```
+-- from implementation/examples/poly_fold_refs.cba (excerpt)
+do map <- return (rec map f xs ->
+  if null xs then return []
+  else f (head xs) :: map f (tail xs)
+) in
+
+do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
+do checks <- map (fun r -> !get r == 20) refs in
+return vals
+-- returns [False, True, False]
 ```
 
 ### Substitution and Jumps
@@ -54,8 +71,8 @@ This example implements a handler for a theory of substitution and jumps, which 
 -- from implementation/examples/substitution.cba
 with handler {
   return x  -> return (inl x),
-  var(a; k) -> return (inr a),
-  sub(v; k) -> do c <- !new () in
+  var a k -> return (inr a),
+  sub _ k -> do c <- !unique () in
     case k (inl c) of {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
@@ -64,9 +81,9 @@ with handler {
   case !sub () of {
     inl a -> case !sub () of {
       inl b -> !var a,
-      inr x -> return 2
+      inr _ -> return 2
     },
-    inr x -> return 3
+    inr _ -> return 3
   }
 )
 -- returns 3
@@ -86,6 +103,7 @@ with handler {
 To build the Cambria interpreter, navigate to the `implementation` directory and run:
 
 ```bash
+cd implementation
 cabal build
 ```
 
@@ -101,7 +119,8 @@ For example:
 cabal run cambria -- examples/local_state.cba
 ```
 
-## Future Work
+### Testing
 
- - Extending type inference of current effect systems (i.e. HM type inference, bidirectional type inference, row polymorphism) to handle parameter types.
- - Understand the inbuilt `!new` operator from a categorical perspective.
+```bash
+cabal test
+```

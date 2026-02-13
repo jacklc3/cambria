@@ -2,12 +2,12 @@
 do for <- return rec for fl ->
   do f <- fst fl in
   do l <- snd fl in
-  if isnil l then return () else (f (head l) ; for (f, tail l))
+  if null l then return () else (f (head l) ; for (f, tail l))
 in
 do concat <- return rec concat vv ->
   do v1 <- fst vv in
   do v2 <- snd vv in
-  if isnil v1 then return v2 else cons (head v1, concat (tail v1, v2))
+  if null v1 then return v2 else head v1 :: concat (tail v1, v2)
 in
 with handler {
   act as k ->
@@ -16,8 +16,8 @@ with handler {
     do b <- !unique () in
     (!print("n"++(hash b)++" [label=\""++s++"\"]; ") ;
     for (fun a -> !print("n"++(hash a)++" -> n"++(hash b)++"; "),a) ;
-    k (cons (b, nil ()))),
-  zero z k -> k (nil ()),
+    k (b :: [])),
+  zero z k -> k [],
   plus v k -> k (concat v)
 } handle (
   do z  <- !zero () in

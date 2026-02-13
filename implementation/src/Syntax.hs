@@ -97,9 +97,9 @@ data Handler = Handler {
 }
 
 instance Show Handler where
-  show (Handler (RetClause xr cr) ocs fc tis) =
+  show (Handler (RetClause xr cr) ocs fc ps) =
     let
-      tiStrs = map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) tis
+      tiStrs = map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) ps
       retStr = "return " ++ xr ++ " -> " ++ show cr
       opStrs = map (\(op, OpClause x k c) -> op ++ " " ++ x ++ " " ++ k ++ " -> " ++ show c) ocs
       finStr = case fc of

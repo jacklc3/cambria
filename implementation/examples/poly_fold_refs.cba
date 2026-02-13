@@ -28,26 +28,19 @@ with handler {
   declare !ref : Int ~> $p.
 
   -- Polymorphic map: forall a b. (a -> b!S) -> List(a) -> List(b)!S
-  do map <- return (rec map f -> return (fun xs ->
-    if isnil xs then nil ()
-    else do hd <- f (head xs) in
-         do mapper <- map f in
-         do tl <- mapper (tail xs) in
-         cons (hd, tl)
-  )) in
+  do map <- return (rec map f xs ->
+    if null xs then return []
+    else f (head xs) :: map f (tail xs)
+  ) in
 
   -- (1) map at (Int -> $p): allocate a ref for each number
-  do allocator <- map (fun n -> !ref n) in
-  do refs <- allocator (cons (10, cons (20, cons (30, nil ())))) in
+  do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
 
   -- (2) map at ($p -> Int): read all refs in the list
-  do reader <- map (fun r -> !get r) in
-  do vals <- reader refs in
-  do first <- return (head vals) in
+  do vals <- map (fun r -> !get r) refs in
 
   -- (3) map at (Int -> Bool): test each value
-  do tester <- map (fun n -> return (n == 20)) in
-  do checks <- tester vals in
+  do checks <- map (fun n -> !get n == 20) refs in
 
-  return (first, checks)
+  return checks
 )

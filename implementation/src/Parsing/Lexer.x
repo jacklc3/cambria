@@ -67,6 +67,8 @@ tokens :-
   ";"                        { \p s -> Token p (quotes s) TokSemiColon }
   "++"                       { \p s -> Token p (quotes s) TokConcat }
   "~>"                       { \p s -> Token p (quotes s) TokSquigglyArrow }
+  "::"                       { \p s -> Token p (quotes s) TokCons }
+  "[]"                       { \p s -> Token p (quotes s) TokNil }
   ":"                        { \p s -> Token p (quotes s) TokColon }
   "&"                        { \p s -> Token p (quotes s) TokAmpersand }
   "."                        { \p s -> Token p (quotes s) TokDot }

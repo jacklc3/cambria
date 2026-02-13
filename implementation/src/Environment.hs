@@ -35,12 +35,11 @@ primitives =
       Just v  -> v
       Nothing -> error $ "Key not found in map: " ++ show k)
   , ("member", \(VPair k (VMap m)) -> VBool (any (\(k', _) -> k' == k) m))
-  -- TODO: Make const infix `::` and nil []
-  , ("nil",    \VUnit -> VList [])
-  , ("cons",   \(VPair x (VList xs)) -> VList (x : xs))
+  , ("[]",     \VUnit -> VList [])
+  , ("::",     \(VPair x (VList xs)) -> VList (x : xs))
   , ("head",   \(VList (x:_)) -> x)
   , ("tail",   \(VList (_:xs)) -> VList xs)
-  , ("isnil",  \(VList xs) -> VBool (null xs))
+  , ("null",   \(VList xs) -> VBool (null xs))
   ]
 
 initialEnv :: Env

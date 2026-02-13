@@ -2,7 +2,7 @@
 do for <- return (rec for fl ->
   do g <- fst fl in
   do l <- snd fl in
-  if isnil l then return () else (g (head l) ; for (g, tail l)))
+  if null l then return () else (g (head l) ; for (g, tail l)))
 in
 with handler {
   act as k ->
@@ -13,11 +13,11 @@ with handler {
     for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ ";"), a);
     k b)
 } handle (
-  do hi <- !act(nil (),"hello") in
-  do o  <- !act(cons (hi, nil ()),"world") in
-  do a  <- !act(nil (),"a") in
-  do b  <- !act(nil (),"b") in
-  do c  <- !act(cons (a, cons (b, nil ())),"c") in
-  do d  <- !act(cons (b, nil ()),"d") in
+  do hi <- !act([],"hello") in
+  do o  <- !act(hi :: [],"world") in
+  do a  <- !act([],"a") in
+  do b  <- !act([],"b") in
+  do c  <- !act(a :: b :: [],"c") in
+  do d  <- !act(b :: [],"d") in
   return ()
 )

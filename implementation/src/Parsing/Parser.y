@@ -64,6 +64,8 @@ import Control.Monad.Except
   '++'                       { Token _ _ TokConcat }
   '~>'                       { Token _ _ TokSquigglyArrow }
   ':'                        { Token _ _ TokColon }
+  '::'                       { Token _ _ TokCons }
+  '[]'                       { Token _ _ TokNil }
   '&'                        { Token _ _ TokAmpersand }
   '.'                        { Token _ _ TokDot }
   '='                        { Token _ _ TokEquals }
@@ -76,6 +78,7 @@ import Control.Monad.Except
   typeparam                  { Token _ _ (TokTypeParam $$) }
 
 %right ';'
+%right '::'
 %nonassoc '=='
 %left '++'
 %left '+' '-'
@@ -121,6 +124,7 @@ value :: { SugaredExpr }
 
 atom :: { SugaredExpr }
   : '()'                                  { SEUnit }
+  | '[]'                                  { SEComp (SCApp (SEVar "[]") SEUnit) }
   | boolean                               { SEBool $1 }
   | integer                               { SEInt $1 }
   | string                                { SEString $1 }
@@ -152,7 +156,8 @@ compTerm :: { SugaredComp }
   | compInfix                             { $1 }
 
 compInfix :: { SugaredComp }
-  : exprInfix '==' exprInfix              { SCApp (SEVar "==") (SEPair $1 $3) }
+  : exprInfix '::' exprInfix              { SCApp (SEVar "::") (SEPair $1 $3) }
+  | exprInfix '==' exprInfix              { SCApp (SEVar "==") (SEPair $1 $3) }
   | exprInfix '++' exprInfix              { SCApp (SEVar "++") (SEPair $1 $3) }
   | exprInfix '+'  exprInfix              { SCApp (SEVar "+") (SEPair $1 $3) }
   | exprInfix '-'  exprInfix              { SCApp (SEVar "-") (SEPair $1 $3) }

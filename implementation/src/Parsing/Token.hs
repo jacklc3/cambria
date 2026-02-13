@@ -63,4 +63,6 @@ data TokenKind
   | TokColon
   | TokAmpersand
   | TokDot
+  | TokCons
+  | TokNil
   | TokTypeParam String

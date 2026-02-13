@@ -312,10 +312,8 @@ polyTests =
       (Right "Int!{}")
 
   , TestCase "poly: polymorphic list operations"
-      ( "do empty1 <- nil () in\n"
-     ++ "do empty2 <- nil () in\n"
-     ++ "do ints <- cons (1, empty1) in\n"
-     ++ "do bools <- cons (true, empty2) in\n"
+      ( "do ints <- 1 :: 2 :: 3 :: [] in\n"
+     ++ "do bools <- true :: false :: [] in\n"
      ++ "return (head ints, head bools)" )
       (Right "(Int & Bool)!{}")
   ]
@@ -452,14 +450,14 @@ polyParamTests =
      ++ "  declare !set : $p & Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do map <- return (rec map f -> return (fun xs ->\n"
-     ++ "    if isnil xs then nil ()\n"
+     ++ "    if null xs then return []\n"
      ++ "    else do hd <- f (head xs) in\n"
      ++ "         do mapper <- map f in\n"
      ++ "         do tl <- mapper (tail xs) in\n"
-     ++ "         cons (hd, tl)\n"
+     ++ "         hd :: tl\n"
      ++ "  )) in\n"
      ++ "  do allocator <- map (fun n -> !ref n) in\n"
-     ++ "  do refs <- allocator (cons (10, cons (20, cons (30, nil ())))) in\n"
+     ++ "  do refs <- allocator (10 :: 20 :: 30 :: []) in\n"
      ++ "  do reader <- map (fun r -> !get r) in\n"
      ++ "  do vals <- reader refs in\n"
      ++ "  do first <- return (head vals) in\n"

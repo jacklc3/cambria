@@ -30,11 +30,11 @@ primitives =
   , ("remove", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TMap (TVar "k") (TVar "v")))
   , ("lookup", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TVar "v"))
   , ("member", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) TBool)
-  , ("nil",    mkPrimScheme ["a"] TUnit (TList (TVar "a")))
-  , ("cons",   mkPrimScheme ["a"] (TPair (TVar "a") (TList (TVar "a"))) (TList (TVar "a")))
+  , ("[]",     mkPrimScheme ["a"] TUnit (TList (TVar "a")))
+  , ("::",     mkPrimScheme ["a"] (TPair (TVar "a") (TList (TVar "a"))) (TList (TVar "a")))
   , ("head",   mkPrimScheme ["a"] (TList (TVar "a")) (TVar "a"))
   , ("tail",   mkPrimScheme ["a"] (TList (TVar "a")) (TList (TVar "a")))
-  , ("isnil",  mkPrimScheme ["a"] (TList (TVar "a")) TBool)
+  , ("null",   mkPrimScheme ["a"] (TList (TVar "a")) TBool)
   ]
 
 primitiveOps :: [(String, Arity)]

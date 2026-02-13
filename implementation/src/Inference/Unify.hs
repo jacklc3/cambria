@@ -53,7 +53,7 @@ instance Unifiable EffectsType where
     r2' <- applySubst r2
     unifyEffects r1' r2'
 
--- TODO: Should we only unify the intersection here? If the closed effects dont line up this should be an error?
+-- TODO: Check that we should be using the interseaction on the maps here
 unifyEffects :: EffectsType -> EffectsType -> Infer ()
 unifyEffects (Closed m1) (Closed m2) =
   mapM_ (uncurry unify) (Map.intersectionWith (,) m1 m2)
