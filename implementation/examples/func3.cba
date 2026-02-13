@@ -1,1 +1,1 @@
-(fun x y z -> return y) (return 1) (return 2) (return 3)
+(fun x y z -> return y) 1 2 3

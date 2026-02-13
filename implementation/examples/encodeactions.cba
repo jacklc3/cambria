@@ -1,24 +1,18 @@
 -- Graphviz handler for DAG generic effects
-do for <- return rec for fl ->
-  do f <- fst fl in
-  do l <- snd fl in
-  if null l then return () else (f (head l) ; for (f, tail l))
+do for <- return rec for f l ->
+  if null l then return () else (f (head l) ; for f (tail l))
 in
-do concat <- return rec concat vv ->
-  do v1 <- fst vv in
-  do v2 <- snd vv in
-  if null v1 then return v2 else head v1 :: concat (tail v1, v2)
+do concat <- return rec concat v1 v2 ->
+  if null v1 then return v2 else head v1 :: concat (tail v1) v2
 in
 with handler {
   act as k ->
-    do a <- fst as in
-    do s <- snd as in
     do b <- !unique () in
-    (!print("n"++(hash b)++" [label=\""++s++"\"]; ") ;
-    for (fun a -> !print("n"++(hash a)++" -> n"++(hash b)++"; "),a) ;
-    k (b :: [])),
+    do _ <- !print ("n" ++ hash b ++ " [label=\"" ++ snd as ++ "\"]; ") in
+    do _ <- for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ "; ")) (fst as) in
+    k (b :: []),
   zero z k -> k [],
-  plus v k -> k (concat v)
+  plus v k -> k (concat (fst v) (snd v))
 } handle (
   do z  <- !zero () in
   do hi <- !act (z,"hello") in

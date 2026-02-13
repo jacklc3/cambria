@@ -2,7 +2,7 @@
 -- Equivalent to betabernoulli.cba
 do boolToInt <- return (fun b -> if b then return 1 else return 0) in
 do countSuccesses <- return rec countSuccesses n f ->
-   if n == 0 then return 0 else do i <- countSuccesses (n-1) f in i + boolToInt (f ())
+   if n == 0 then return 0 else do i <- countSuccesses (n - 1) f in i + boolToInt (f ())
 in
 with handler {
   $q -> Unique,
@@ -19,15 +19,15 @@ with handler {
     sample a k ->
       do ij <- !get a in
       do i <- fst ij in do j <- snd ij in
-      do b <- !bernoulli (i/(i+j)) in
-      do n <- boolToInt b in
-      (!set(a,(i+n,j+(1-n))) ; k b)
+      do b <- !bernoulli (i / (i + j)) in
+      do _ <- !set (a, (i + boolToInt b, j + (1 - boolToInt b))) in
+      k b
   } handle (
     declare !newproc : Unit ~> $p.
     declare !sample : $p ~> Bool.
 
     -- Make a new urn, and draw ten times, reporting the number of trues
-    do a1 <- !newproc() in
+    do a1 <- !newproc () in
     countSuccesses 10 (fun _ -> !sample a1)
   )
 )

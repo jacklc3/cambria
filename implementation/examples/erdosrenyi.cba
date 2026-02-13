@@ -21,7 +21,7 @@ with handler {
         lookup ((b,a), m)
       else
         do e <- !flip () in
-        do z <- !set (g, insert (((a,b),e), m)) in
+        do _ <- !set (g, insert (((a,b),e), m)) in
         return e
   } handle (
     -- Make a new graph, pick two nodes, and check an edge between them

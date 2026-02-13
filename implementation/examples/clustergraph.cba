@@ -4,11 +4,9 @@ with handler {
   newgraph _ k -> k (!unique ()),
   newnode g k -> k (!flip ()),
   isedge gab k ->
-    do a <- fst (snd gab) in
-    do b <- snd (snd gab) in
-    if a == b then return false else return true
+    if fst (snd gab) == snd (snd gab) then return false else return true
 } handle (
-  -- Make a new graph, pick two nodes, and check an edge between then
+  -- Make a new graph, pick two nodes, and check an edge between them
   do g <- !newgraph () in
   do a <- !newnode g in
   do b <- !newnode g in

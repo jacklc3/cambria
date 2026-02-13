@@ -14,7 +14,7 @@ with handler {
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !unique () in return (fun s ->
-    k a (insert (((a, x), s)))),
+    k a (insert ((a, x), s))),
   finally s -> s empty
 } handle (
   declare !get : $p ~> Int.
@@ -32,9 +32,5 @@ with handler {
   do b <- !ref 200 in
   do swapped_refs <- swap (a, b) in
 
-  -- Now fst swapped_refs is b's ref, snd swapped_refs is a's ref
-  do val_first <- !get (fst swapped_refs) in
-  do val_second <- !get (snd swapped_refs) in
-
-  return (swapped_ints, (val_first, val_second))
+  return (swapped_ints, (!get (fst swapped_refs), !get (snd swapped_refs)))
 )

@@ -2,7 +2,7 @@
 -- Equivalent to polya.cba
 do boolToInt <- return (fun b -> if b then return 1 else return 0) in
 do countSuccesses <- return rec countSuccesses n f ->
-   if n == 0 then return 0 else do i <- countSuccesses (n-1) f in i + boolToInt (f ())
+   if n == 0 then return 0 else do i <- countSuccesses (n - 1) f in i + boolToInt (f ())
 in
 with handler {
   $p -> Double,
@@ -16,4 +16,3 @@ with handler {
   do a <- !newproc () in
   countSuccesses 10 (fun _ -> !sample a)
 )
-

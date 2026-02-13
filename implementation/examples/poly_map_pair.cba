@@ -25,26 +25,18 @@ with handler {
   declare !ref : Int ~> $p.
 
   -- Define the polymorphic map_pair once
-  do map_pair <- return (fun f -> return (fun pair ->
-    do x <- f (fst pair) in
-    do y <- f (snd pair) in
-    return (x, y)
-  )) in
+  do map_pair <- return (fun f pair -> return (f (fst pair), f (snd pair))) in
 
   -- (1) Instantiate at (Int -> Int): double both
-  do double_both <- map_pair (fun n -> return (n * 2)) in
-  do doubled <- double_both (3, 7) in
+  do doubled <- map_pair (fun n -> return (n * 2)) (3, 7) in
 
   -- (2) Instantiate at ($p -> Int): read from two abstract refs
   do a <- !ref 100 in
   do b <- !ref 200 in
-  do read_both <- map_pair (fun r -> !get r) in
-  do vals <- read_both (a, b) in
-  do sum <- return (fst vals + snd vals) in
+  do vals <- map_pair (fun r -> !get r) (a, b) in
 
   -- (3) Instantiate at (Int -> $p): allocate two refs at once
-  do alloc_both <- map_pair (fun n -> !ref n) in
-  do new_refs <- alloc_both (sum, fst doubled + snd doubled) in
+  do new_refs <- map_pair (fun n -> !ref n) (fst vals + snd vals, fst doubled + snd doubled) in
 
-  return (doubled, (sum, (!get (fst new_refs), !get (snd new_refs))))
+  return (doubled, (fst vals + snd vals, (!get (fst new_refs), !get (snd new_refs))))
 )

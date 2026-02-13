@@ -27,29 +27,19 @@ with handler {
   declare !ref : Int ~> $p.
 
   -- Define the polymorphic combinator once
-  do with_ref <- return (fun init -> return (fun body ->
-    do r <- !ref init in
-    body r
-  )) in
+  do with_ref <- return (fun init body -> do r <- !ref init in body r) in
 
   -- Use 1: callback returns Int
-  do mk1 <- with_ref 42 in
-  do result1 <- mk1 (fun r -> do v <- !get r in return v) in
+  do result1 <- with_ref 42 (fun r -> !get r) in
 
   -- Use 2: callback returns Bool (different return type!)
-  do mk2 <- with_ref 0 in
-  do result2 <- mk2 (fun r ->
-    do v <- !get r in
-    return (v == 0)
-  ) in
+  do result2 <- with_ref 0 (fun r -> return (!get r == 0)) in
 
   -- Use 3: callback returns (Int, Int) — reads, doubles, writes, reads
-  do mk3 <- with_ref 5 in
-  do result3 <- mk3 (fun r ->
+  do result3 <- with_ref 5 (fun r ->
     do before <- !get r in
     do _ <- !set (r, before * 2) in
-    do after <- !get r in
-    return (before, after)
+    return (before, !get r)
   ) in
 
   return (result1, (result2, result3))
