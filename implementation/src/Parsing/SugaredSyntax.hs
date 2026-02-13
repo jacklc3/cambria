@@ -3,6 +3,11 @@ module Parsing.SugaredSyntax where
 import Types (Ident, Op, ValueType(..))
 import Syntax (Side(..))
 
+data SugaredPattern
+  = SPVar Ident
+  | SPWild
+  | SPPair SugaredPattern SugaredPattern
+
 data SugaredExpr
   = SEVar Ident
   | SEUnit
@@ -12,14 +17,14 @@ data SugaredExpr
   | SEPair SugaredExpr SugaredExpr
   | SEEither Side SugaredExpr
   | SEHandler [HandlerClause]
-  | SEFun [Ident] SugaredComp
-  | SERec Ident [Ident] SugaredComp
+  | SEFun [SugaredPattern] SugaredComp
+  | SERec Ident [SugaredPattern] SugaredComp
   | SEComp SugaredComp
 
 data SugaredComp
   = SCReturn SugaredExpr
   | SCOp Op SugaredExpr
-  | SCDo Ident SugaredComp SugaredComp
+  | SCDo SugaredPattern SugaredComp SugaredComp
   | SCIf SugaredExpr SugaredComp SugaredComp
   | SCCase SugaredExpr (Ident, SugaredComp) (Ident, SugaredComp)
   | SCApp SugaredExpr SugaredExpr
@@ -27,7 +32,7 @@ data SugaredComp
   | SCDeclare Op ValueType ValueType SugaredComp
 
 data HandlerClause
-  = RC Ident SugaredComp
-  | OC Op Ident Ident SugaredComp
-  | FC Ident SugaredComp
+  = RC SugaredPattern SugaredComp
+  | OC Op SugaredPattern Ident SugaredComp
+  | FC SugaredPattern SugaredComp
   | TC String ValueType

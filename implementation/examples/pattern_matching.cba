@@ -1,0 +1,18 @@
+-- Pattern matching on pairs
+--
+-- Demonstrates irrefutable pair patterns in:
+-- 1. do-bindings: do (x, y) <- ... in ...
+-- 2. function arguments: fun (x, y) -> ...
+-- 3. nested patterns: fun ((a, b), c) -> ...
+
+-- Pair pattern in function argument
+do swap <- return (fun (x, y) -> return (y, x)) in
+do result <- swap (1, 2) in
+
+-- Nested pair pattern in do-binding
+do ((a, b), c) <- return ((10, 20), 30) in
+
+-- Wildcard in pair pattern
+do (first, _) <- return (100, 200) in
+
+return (result, (a + b + c, first))

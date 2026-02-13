@@ -24,14 +24,51 @@ desugar s = evalState (desugarComp (liftValue s)) 0
     liftValue (SEComp c) = c
     liftValue v          = SCReturn v
 
+-- | Given a pattern and the name of a variable holding the matched value,
+--   wrap a body computation with bindings for all pattern variables.
+desugarPatBind :: SugaredPattern -> Ident -> Computation -> Fresh Computation
+desugarPatBind (SPVar x) v body
+  | x == v    = return body
+  | otherwise = return $ CDo x (CReturn (VVar v)) body
+desugarPatBind SPWild _ body = return body
+desugarPatBind (SPPair p1 p2) v body = do
+  t1 <- fresh
+  t2 <- fresh
+  inner <- desugarPatBind p2 t2 body
+  outer <- desugarPatBind p1 t1 inner
+  return $ CDo t1 (CApp (VVar "fst") (VVar v))
+         $ CDo t2 (CApp (VVar "snd") (VVar v))
+         $ outer
+
+-- | Desugar a do-binding with a pattern: if the pattern is a simple variable,
+--   emit a plain CDo; otherwise bind to a temp and destructure.
+desugarPatDo :: SugaredPattern -> Computation -> Computation -> Fresh Computation
+desugarPatDo (SPVar x) c1 body = return $ CDo x c1 body
+desugarPatDo SPWild c1 body = do
+  tmp <- fresh
+  return $ CDo tmp c1 body
+desugarPatDo pat c1 body = do
+  tmp <- fresh
+  inner <- desugarPatBind pat tmp body
+  return $ CDo tmp c1 inner
+
+-- | Desugar a function argument pattern: if the pattern is a simple variable,
+--   emit a plain VFun; otherwise bind to a temp and destructure.
+desugarPatFun :: SugaredPattern -> Computation -> Fresh Value
+desugarPatFun (SPVar x) body = return $ VFun x body
+desugarPatFun pat body = do
+  tmp <- fresh
+  inner <- desugarPatBind pat tmp body
+  return $ VFun tmp inner
+
 desugarComp :: SugaredComp -> Fresh Computation
 desugarComp = \case
   SCReturn e -> desugarExpr CReturn e
   SCOp op e  -> desugarExpr (COp op) e
-  SCDo x c1 c2 -> do
+  SCDo pat c1 c2 -> do
     c1' <- desugarComp c1
     c2' <- desugarComp c2
-    return (CDo x c1' c2')
+    desugarPatDo pat c1' c2'
   SCIf e c1 c2 -> do
     c1' <- desugarComp c1
     c2' <- desugarComp c2
@@ -76,19 +113,34 @@ desugarExpr' = \case
   SEHandler cs -> do
     handler <- desugarHandler cs
     return (id, VHandler handler)
-  SEFun (x:xs) c -> do
+  SEFun (p:ps) c -> do
     c' <- desugarComp c
-    return (id, VFun x (desugarVars xs c'))
-  SERec g (x:xs) c -> do
+    body <- desugarPatVars ps c'
+    v <- desugarPatFun p body
+    return (id, v)
+  SERec g (p:ps) c -> do
     c' <- desugarComp c
-    return (id, VRec g x (desugarVars xs c'))
+    body <- desugarPatVars ps c'
+    case p of
+      SPVar x -> return (id, VRec g x body)
+      _ -> do
+        tmp <- fresh
+        inner <- desugarPatBind p tmp body
+        return (id, VRec g tmp inner)
   SEComp c -> do
     x  <- fresh
     c' <- desugarComp c
     return (CDo x c', VVar x)
 
-desugarVars :: [Ident] -> Computation -> Computation
-desugarVars xs c = foldr (\x c' -> CReturn (VFun x c')) c xs
+-- | Desugar a list of function argument patterns into curried functions.
+desugarPatVars :: [SugaredPattern] -> Computation -> Fresh Computation
+desugarPatVars ps c = foldrM (\p c' -> CReturn <$> desugarPatFun p c') c ps
+
+foldrM :: Monad m => (a -> b -> m b) -> b -> [a] -> m b
+foldrM _ z []     = return z
+foldrM f z (x:xs) = do
+  z' <- foldrM f z xs
+  f x z'
 
 desugarHandler :: [HandlerClause] -> Fresh Handler
 desugarHandler cs = do
@@ -100,14 +152,38 @@ desugarHandler cs = do
       return $ RetClause x (CReturn (VVar x))
   return $ Handler rc' ocs fc tcs
     where
-      f (_, ocs, fc, tcs) (RC x c) = do
+      f (_, ocs, fc, tcs) (RC pat c) = do
         c' <- desugarComp c
-        return (Just (RetClause x c'), ocs, fc, tcs)
-      f (rc, ocs, fc, tcs) (OC op x k c) = do
+        rc' <- desugarPatRet pat c'
+        return (Just rc', ocs, fc, tcs)
+      f (rc, ocs, fc, tcs) (OC op pat k c) = do
         c' <- desugarComp c
-        return (rc, (op, OpClause x k c'):ocs, fc, tcs)
-      f (rc, ocs, _, tcs) (FC x c) = do
+        oc' <- desugarPatOp pat k c'
+        return (rc, (op, oc'):ocs, fc, tcs)
+      f (rc, ocs, _, tcs) (FC pat c) = do
         c' <- desugarComp c
-        return (rc, ocs, Just (FinClause x c'), tcs)
+        fc' <- desugarPatFin pat c'
+        return (rc, ocs, Just fc', tcs)
       f (rc, ocs, fc, tcs) (TC name ty) =
         return (rc, ocs, fc, (name, ty) : tcs)
+
+desugarPatRet :: SugaredPattern -> Computation -> Fresh RetClause
+desugarPatRet (SPVar x) body = return $ RetClause x body
+desugarPatRet pat body = do
+  tmp <- fresh
+  inner <- desugarPatBind pat tmp body
+  return $ RetClause tmp inner
+
+desugarPatOp :: SugaredPattern -> Ident -> Computation -> Fresh OpClause
+desugarPatOp (SPVar x) k body = return $ OpClause x k body
+desugarPatOp pat k body = do
+  tmp <- fresh
+  inner <- desugarPatBind pat tmp body
+  return $ OpClause tmp k inner
+
+desugarPatFin :: SugaredPattern -> Computation -> Fresh FinClause
+desugarPatFin (SPVar x) body = return $ FinClause x body
+desugarPatFin pat body = do
+  tmp <- fresh
+  inner <- desugarPatBind pat tmp body
+  return $ FinClause tmp inner

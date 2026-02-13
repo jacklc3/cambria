@@ -110,16 +110,21 @@ nvar :: { Ident }
   : var                                   { $1 }
   | '_'                                   { "_" }
 
-nvars :: { [Ident] }
-  : nvars nvar                            { $2 : $1 }
-  | nvar                                  { [$1] }
+pattern :: { SugaredPattern }
+  : var                                   { SPVar $1 }
+  | '_'                                   { SPWild }
+  | '(' pattern ',' pattern ')'          { SPPair $2 $4 }
+
+patterns :: { [SugaredPattern] }
+  : patterns pattern                      { $2 : $1 }
+  | pattern                               { [$1] }
 
 value :: { SugaredExpr }
   : atom                                  { $1 }
   | inl exprAtom                          { SEEither L $2 }
   | inr exprAtom                          { SEEither R $2 }
-  | fun nvars '->' comp                   { SEFun (reverse $2) $4 }
-  | rec nvar nvars '->' comp              { SERec $2 (reverse $3) $5 }
+  | fun patterns '->' comp                 { SEFun (reverse $2) $4 }
+  | rec nvar patterns '->' comp            { SERec $2 (reverse $3) $5 }
   | handler '{' handlerClauses '}'        { SEHandler $3 }
 
 atom :: { SugaredExpr }
@@ -137,18 +142,18 @@ handlerClauses :: { [HandlerClause] }
   | {- empty -}                           { [] }
 
 handlerClause :: { HandlerClause }
-  : return nvar '->' comp                 { RC $2 $4 }
-  | var nvar nvar '->' comp               { OC $1 $2 $3 $5 }
-  | finally nvar '->' comp                { FC $2 $4 }
+  : return pattern '->' comp               { RC $2 $4 }
+  | var pattern nvar '->' comp            { OC $1 $2 $3 $5 }
+  | finally pattern '->' comp             { FC $2 $4 }
   | typeparam '->' type                   { TC $1 $3 }
 
 comp :: { SugaredComp }
-  : compTerm ';' comp                     { SCDo "_" $1 $3 }
+  : compTerm ';' comp                     { SCDo SPWild $1 $3 }
   | compTerm %prec ';'                    { $1 }
 
 compTerm :: { SugaredComp }
   : return expr                           { SCReturn $2 }
-  | do nvar '<-' comp in compTerm         { SCDo $2 $4 $6 }
+  | do pattern '<-' comp in compTerm      { SCDo $2 $4 $6 }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
   | with expr handle compTerm             { SCWith $2 $4 }
