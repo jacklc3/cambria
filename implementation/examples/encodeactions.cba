@@ -7,10 +7,13 @@ do concat <- return rec concat v1 v2 ->
 in
 with handler {
   act as k ->
-    do b <- !unique () in
-    do _ <- !print ("n" ++ hash b ++ " [label=\"" ++ snd as ++ "\"]; ") in
-    do _ <- for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ "; ")) (fst as) in
-    k (b :: []),
+    do a <- fst as in
+    do s <- snd as in
+    do b <- !unique () in (
+      !print ("n" ++ hash b ++ " [label=\"" ++ s ++ "\"]; ") ;
+      for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ "; ")) a ;
+      k (b :: [])
+    ),
   zero z k -> k [],
   plus v k -> k (concat (fst v) (snd v))
 } handle (
