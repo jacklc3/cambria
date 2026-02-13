@@ -40,26 +40,18 @@ desugarPatBind (SPPair p1 p2) v body = do
          $ CDo t2 (CApp (VVar "snd") (VVar v))
          $ outer
 
--- | Desugar a do-binding with a pattern: if the pattern is a simple variable,
---   emit a plain CDo; otherwise bind to a temp and destructure.
-desugarPatDo :: SugaredPattern -> Computation -> Computation -> Fresh Computation
-desugarPatDo (SPVar x) c1 body = return $ CDo x c1 body
-desugarPatDo SPWild c1 body = do
-  tmp <- fresh
-  return $ CDo tmp c1 body
-desugarPatDo pat c1 body = do
-  tmp <- fresh
-  inner <- desugarPatBind pat tmp body
-  return $ CDo tmp c1 inner
+-- | Decompose a pattern into a variable name and a body-wrapping function.
+desugarPat :: SugaredPattern -> Fresh (Ident, Computation -> Fresh Computation)
+desugarPat (SPVar x) = return (x, return)
+desugarPat SPWild    = do tmp <- fresh; return (tmp, return)
+desugarPat pat       = do tmp <- fresh; return (tmp, desugarPatBind pat tmp)
 
--- | Desugar a function argument pattern: if the pattern is a simple variable,
---   emit a plain VFun; otherwise bind to a temp and destructure.
-desugarPatFun :: SugaredPattern -> Computation -> Fresh Value
-desugarPatFun (SPVar x) body = return $ VFun x body
-desugarPatFun pat body = do
-  tmp <- fresh
-  inner <- desugarPatBind pat tmp body
-  return $ VFun tmp inner
+-- | Apply a pattern to a body, then build a result with the bound name.
+withPat :: SugaredPattern -> Computation -> (Ident -> Computation -> a) -> Fresh a
+withPat pat body k = do
+  (x, wrap) <- desugarPat pat
+  body' <- wrap body
+  return (k x body')
 
 desugarComp :: SugaredComp -> Fresh Computation
 desugarComp = \case
@@ -68,7 +60,7 @@ desugarComp = \case
   SCDo pat c1 c2 -> do
     c1' <- desugarComp c1
     c2' <- desugarComp c2
-    desugarPatDo pat c1' c2'
+    withPat pat c2' (\x body -> CDo x c1' body)
   SCIf e c1 c2 -> do
     c1' <- desugarComp c1
     c2' <- desugarComp c2
@@ -116,17 +108,13 @@ desugarExpr' = \case
   SEFun (p:ps) c -> do
     c' <- desugarComp c
     body <- desugarPatVars ps c'
-    v <- desugarPatFun p body
+    v <- withPat p body VFun
     return (id, v)
   SERec g (p:ps) c -> do
     c' <- desugarComp c
     body <- desugarPatVars ps c'
-    case p of
-      SPVar x -> return (id, VRec g x body)
-      _ -> do
-        tmp <- fresh
-        inner <- desugarPatBind p tmp body
-        return (id, VRec g tmp inner)
+    v <- withPat p body (\x b -> VRec g x b)
+    return (id, v)
   SEComp c -> do
     x  <- fresh
     c' <- desugarComp c
@@ -134,7 +122,7 @@ desugarExpr' = \case
 
 -- | Desugar a list of function argument patterns into curried functions.
 desugarPatVars :: [SugaredPattern] -> Computation -> Fresh Computation
-desugarPatVars ps c = foldrM (\p c' -> CReturn <$> desugarPatFun p c') c ps
+desugarPatVars ps c = foldrM (\p c' -> CReturn <$> withPat p c' VFun) c ps
 
 foldrM :: Monad m => (a -> b -> m b) -> b -> [a] -> m b
 foldrM _ z []     = return z
@@ -154,36 +142,15 @@ desugarHandler cs = do
     where
       f (_, ocs, fc, tcs) (RC pat c) = do
         c' <- desugarComp c
-        rc' <- desugarPatRet pat c'
+        rc' <- withPat pat c' RetClause
         return (Just rc', ocs, fc, tcs)
       f (rc, ocs, fc, tcs) (OC op pat k c) = do
         c' <- desugarComp c
-        oc' <- desugarPatOp pat k c'
+        oc' <- withPat pat c' (\x b -> OpClause x k b)
         return (rc, (op, oc'):ocs, fc, tcs)
       f (rc, ocs, _, tcs) (FC pat c) = do
         c' <- desugarComp c
-        fc' <- desugarPatFin pat c'
+        fc' <- withPat pat c' FinClause
         return (rc, ocs, Just fc', tcs)
       f (rc, ocs, fc, tcs) (TC name ty) =
         return (rc, ocs, fc, (name, ty) : tcs)
-
-desugarPatRet :: SugaredPattern -> Computation -> Fresh RetClause
-desugarPatRet (SPVar x) body = return $ RetClause x body
-desugarPatRet pat body = do
-  tmp <- fresh
-  inner <- desugarPatBind pat tmp body
-  return $ RetClause tmp inner
-
-desugarPatOp :: SugaredPattern -> Ident -> Computation -> Fresh OpClause
-desugarPatOp (SPVar x) k body = return $ OpClause x k body
-desugarPatOp pat k body = do
-  tmp <- fresh
-  inner <- desugarPatBind pat tmp body
-  return $ OpClause tmp k inner
-
-desugarPatFin :: SugaredPattern -> Computation -> Fresh FinClause
-desugarPatFin (SPVar x) body = return $ FinClause x body
-desugarPatFin pat body = do
-  tmp <- fresh
-  inner <- desugarPatBind pat tmp body
-  return $ FinClause tmp inner
