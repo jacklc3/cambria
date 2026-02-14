@@ -10,10 +10,7 @@ with handler {
   with handler {
     newgraph z k -> k (!ref empty),
     newnode z k -> k (!unique ()),
-    isedge gab k ->
-      do g <- fst gab in
-      do a <- fst (snd gab) in
-      do b <- snd (snd gab) in
+    isedge (g, (a, b)) k ->
       do m <- !get g in
       if member ((a,b), m) then
         lookup ((a,b), m)

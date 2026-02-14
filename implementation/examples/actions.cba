@@ -3,9 +3,7 @@ do for <- return (rec for g l ->
   if null l then return () else (g (head l) ; for g (tail l)))
 in
 with handler {
-  act as k ->
-    do a <- fst as in
-    do s <- snd as in
+  act (a, s) k ->
     do b <- !unique() in (
       !print ("n" ++ hash b ++ " [label=\"" ++ s ++ "\"];") ;
       for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ ";")) a ;

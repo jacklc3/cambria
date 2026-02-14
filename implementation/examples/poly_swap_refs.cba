@@ -22,7 +22,7 @@ with handler {
   declare !ref : Int ~> $p.
 
   -- Polymorphic swap: forall a. (a, a) -> (a, a)
-  do swap <- return (fun pair -> return (snd pair, fst pair)) in
+  do swap <- return (fun (x, y) -> return (y, x)) in
 
   -- Use at (Int, Int)
   do swapped_ints <- swap (10, 20) in
@@ -30,7 +30,7 @@ with handler {
   -- Use at ($p, $p) — swapping abstract reference identifiers!
   do a <- !ref 100 in
   do b <- !ref 200 in
-  do swapped_refs <- swap (a, b) in
+  do (r1, r2) <- swap (a, b) in
 
-  return (swapped_ints, (!get (fst swapped_refs), !get (snd swapped_refs)))
+  return (swapped_ints, (!get r1, !get r2))
 )

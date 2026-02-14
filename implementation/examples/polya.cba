@@ -17,8 +17,7 @@ with handler {
     $p -> $q,
     newproc z k -> k (!ref (1,1)),
     sample a k ->
-      do ij <- !get a in
-      do i <- fst ij in do j <- snd ij in
+      do (i, j) <- !get a in
       do b <- !bernoulli (i / (i + j)) in
       do _ <- !set (a, (i + boolToInt b, j + (1 - boolToInt b))) in
       k b

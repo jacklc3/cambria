@@ -6,16 +6,14 @@ do concat <- return rec concat v1 v2 ->
   if null v1 then return v2 else head v1 :: concat (tail v1) v2
 in
 with handler {
-  act as k ->
-    do a <- fst as in
-    do s <- snd as in
+  act (a, s) k ->
     do b <- !unique () in (
       !print ("n" ++ hash b ++ " [label=\"" ++ s ++ "\"]; ") ;
       for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ "; ")) a ;
       k (b :: [])
     ),
   zero z k -> k [],
-  plus v k -> k (concat (fst v) (snd v))
+  plus (v1, v2) k -> k (concat v1 v2)
 } handle (
   do z  <- !zero () in
   do hi <- !act (z,"hello") in
