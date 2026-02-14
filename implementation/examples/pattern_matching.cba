@@ -10,9 +10,9 @@ do swap <- return (fun (x, y) -> return (y, x)) in
 do result <- swap (1, 2) in
 
 -- Nested pair pattern in do-binding
-do ((a, b), c) <- return ((10, 20), 30) in
+do ((a, b), (c, d)) <- return ((10, 20), (30, 40)) in
 
 -- Wildcard in pair pattern
 do (first, _) <- return (100, 200) in
 
-return (result, (a + b + c, first))
+return (result, (((a, b), (c, d)), first))

@@ -106,16 +106,16 @@ exprAtom :: { SugaredExpr }
   : atom                                  { $1 }
   | '(' expr ')'                          { $2 }
 
-nvar :: { Ident }
+wildvar :: { Ident }
   : var                                   { $1 }
   | '_'                                   { "_" }
 
-pattern :: { SugaredPattern }
-  : var                                   { SPVar $1 }
-  | '_'                                   { SPWild }
-  | '(' pattern ',' pattern ')'          { SPPair $2 $4 }
+pattern :: { Pattern }
+  : var                                   { PVar $1 }
+  | '_'                                   { PWild }
+  | '(' pattern ',' pattern ')'           { PPair $2 $4 }
 
-patterns :: { [SugaredPattern] }
+patterns :: { [Pattern] }
   : patterns pattern                      { $2 : $1 }
   | pattern                               { [$1] }
 
@@ -123,8 +123,8 @@ value :: { SugaredExpr }
   : atom                                  { $1 }
   | inl exprAtom                          { SEEither L $2 }
   | inr exprAtom                          { SEEither R $2 }
-  | fun patterns '->' comp                 { SEFun (reverse $2) $4 }
-  | rec nvar patterns '->' comp            { SERec $2 (reverse $3) $5 }
+  | fun patterns '->' comp                { SEFun (reverse $2) $4 }
+  | rec wildvar patterns '->' comp        { SERec $2 (reverse $3) $5 }
   | handler '{' handlerClauses '}'        { SEHandler $3 }
 
 atom :: { SugaredExpr }
@@ -142,13 +142,13 @@ handlerClauses :: { [HandlerClause] }
   | {- empty -}                           { [] }
 
 handlerClause :: { HandlerClause }
-  : return pattern '->' comp               { RC $2 $4 }
-  | var pattern nvar '->' comp            { OC $1 $2 $3 $5 }
+  : return pattern '->' comp              { RC $2 $4 }
+  | var pattern wildvar '->' comp         { OC $1 $2 $3 $5 }
   | finally pattern '->' comp             { FC $2 $4 }
   | typeparam '->' type                   { TC $1 $3 }
 
 comp :: { SugaredComp }
-  : compTerm ';' comp                     { SCDo SPWild $1 $3 }
+  : compTerm ';' comp                     { SCDo PWild $1 $3 }
   | compTerm %prec ';'                    { $1 }
 
 compTerm :: { SugaredComp }
@@ -175,15 +175,15 @@ compApp :: { SugaredComp }
   | op exprAtom %prec APP                 { SCOp $1 $2 }
   | '(' comp ')'                          { $2 }
 
-eitherMatch :: { ((Ident, SugaredComp), (Ident, SugaredComp)) }
+eitherMatch :: { ((Pattern, SugaredComp), (Pattern, SugaredComp)) }
   : inlMatch ',' inrMatch                 { ($1, $3) }
   | inrMatch ',' inlMatch                 { ($3, $1) }
 
-inlMatch :: { (Ident, SugaredComp) }
-  : inl nvar '->' comp                    { ($2, $4) }
+inlMatch :: { (Pattern, SugaredComp) }
+  : inl pattern '->' comp                 { ($2, $4) }
 
-inrMatch :: { (Ident, SugaredComp) }
-  : inr nvar '->' comp                    { ($2, $4) }
+inrMatch :: { (Pattern, SugaredComp) }
+  : inr pattern '->' comp                 { ($2, $4) }
 
 type :: { ValueType }
   : typeProd                              { $1 }

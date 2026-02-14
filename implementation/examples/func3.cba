@@ -1,1 +1,1 @@
-(fun x y z -> return y) 1 2 3
+(fun x (_, y) z -> return y) 1 (4,2) 3
