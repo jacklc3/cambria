@@ -116,13 +116,6 @@ desugarHandler cs = do
       f (rc, ocs, fc, ps) (TC p t) =
         return (rc, ocs, fc, (p, t) : ps)
 
-desugarVariables :: [Pattern] -> Computation -> Fresh Computation
-desugarVariables [] c = return c
-desugarVariables (p:ps) c = do
-  c1 <- desugarVariables ps c
-  (x, c2) <- desugarPattern p c1
-  return (CReturn (VFun x c2))
-
 desugarPattern :: Pattern -> Computation -> Fresh (Ident, Computation)
 desugarPattern PWild c = return ("_", c)
 desugarPattern (PVar x) c = return (x, c)
@@ -130,5 +123,12 @@ desugarPattern (PPair p1 p2) c = do
   tmp <- fresh
   (x2, c1) <- desugarPattern p2 c
   (x1, c2) <- desugarPattern p1 c1
-  return (tmp, CDo x1 (CApp (VVar "fst") (VVar tmp))
-    $ CDo x2 (CApp (VVar "snd") (VVar tmp)) c2)
+  return (tmp, CDo x1 (CApp (VVar "fst") (VVar tmp)) $
+    CDo x2 (CApp (VVar "snd") (VVar tmp)) c2)
+
+desugarVariables :: [Pattern] -> Computation -> Fresh Computation
+desugarVariables [] c = return c
+desugarVariables (p:ps) c = do
+  c1 <- desugarVariables ps c
+  (x, c2) <- desugarPattern p c1
+  return (CReturn (VFun x c2))
