@@ -78,12 +78,12 @@ desugarExpr = \case
     return (id, VHandler handler)
   SEFun (p:ps) s -> do
     c <- desugarComp s
-    c1 <- desugarVars ps c
+    c1 <- desugarVariables ps c
     (x, c2) <- desugarPattern p c1
     return (id, VFun x c2)
   SERec g (p:ps) s -> do
     c <- desugarComp s
-    c1 <- desugarVars ps c
+    c1 <- desugarVariables ps c
     (x, c2) <- desugarPattern p c1
     return (id, VRec g x c2)
   SEComp s -> do
@@ -116,10 +116,10 @@ desugarHandler cs = do
       f (rc, ocs, fc, ps) (TC p t) =
         return (rc, ocs, fc, (p, t) : ps)
 
-desugarVars :: [Pattern] -> Computation -> Fresh Computation
-desugarVars [] c = return c
-desugarVars (p:ps) c = do
-  c1 <- desugarVars ps c
+desugarVariables :: [Pattern] -> Computation -> Fresh Computation
+desugarVariables [] c = return c
+desugarVariables (p:ps) c = do
+  c1 <- desugarVariables ps c
   (x, c2) <- desugarPattern p c1
   return (CReturn (VFun x c2))
 
