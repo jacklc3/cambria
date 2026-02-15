@@ -1,8 +1,0 @@
--- Declare an operation and handle it
-declare !ask : Unit ~> Int.
-with handler {
-  return x -> return x,
-  ask u k -> k 42
-} handle (
-  !ask ()
-)
