@@ -7,9 +7,11 @@
 *.log
 *.out
 *.pdf
+*.toc
 *.run.xml
 *.synctex.gz
 implementation/dist-newstyle/*
 *.DS_Store
 *Parser.hs
 *Lexer.hs
+.claude*

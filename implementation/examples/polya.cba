@@ -15,18 +15,18 @@ with handler {
 } handle (
   with handler {
     $p -> $q,
-    newproc z k -> k (!ref (1,1)),
+    urn z k -> k (!ref (1,1)),
     sample a k ->
       do (i, j) <- !get a in
       do b <- !bernoulli (i / (i + j)) in
       do _ <- !set (a, (i + boolToInt b, j + (1 - boolToInt b))) in
       k b
   } handle (
-    declare !newproc : Unit ~> $p.
+    declare !urn : Unit ~> $p.
     declare !sample : $p ~> Bool.
 
     -- Make a new urn, and draw ten times, reporting the number of trues
-    do a1 <- !newproc () in
+    do a1 <- !urn () in
     countSuccesses 10 (fun _ -> !sample a1)
   )
 )

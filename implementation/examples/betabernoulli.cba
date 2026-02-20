@@ -6,13 +6,13 @@ do countSuccesses <- return rec countSuccesses n f ->
 in
 with handler {
   $p -> Double,
-  newproc _ k -> k (!uniform ()),
+  urn _ k -> k (!uniform ()),
   sample a k -> k (!bernoulli a)
 } handle (
-  declare !newproc : Unit ~> $p.
+  declare !urn : Unit ~> $p.
   declare !sample : $p ~> Bool.
 
   -- Make a new urn, and draw ten times, reporting the number of trues
-  do a <- !newproc () in
+  do a <- !urn () in
   countSuccesses 10 (fun _ -> !sample a)
 )
