@@ -1,4 +1,0 @@
-do x <- !unique () in
-do y <- !unique () in
-do z <- !unique () in
-return ((x,y),z)
