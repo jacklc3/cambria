@@ -18,15 +18,15 @@ type Infer a = ReaderT Context (StateT InferState (Except String)) a
 
 fresh :: Infer ValueType
 fresh = do
-  count <- gets count
-  modify (\st ->  st { count = succ count } )
-  return $ TVar $ "t" ++ show count
+  n <- gets count
+  modify (\st -> st { count = succ n })
+  return $ TVar $ "t" ++ show n
 
 freshEffects :: Map.Map Op Arity -> Infer EffectsType
 freshEffects ops = do
-  c <- gets count
-  modify (\st -> st { count = succ c })
-  return $ Open ops ("e" ++ show c)
+  n <- gets count
+  modify (\st -> st { count = succ n })
+  return $ Open ops ("e" ++ show n)
 
 runInfer :: Context -> Infer a -> Either String a
 runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty mempty))

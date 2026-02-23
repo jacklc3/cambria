@@ -1,6 +1,6 @@
 module Syntax (module Syntax, module Types) where
 
-import Data.List (intersperse)
+import Data.List (intercalate)
 import qualified Data.Map as Map
 import Data.Unique (Unique, hashUnique)
 
@@ -41,8 +41,8 @@ instance Show Value where
   show (VEither L v)    = "inl " ++ show v
   show (VEither R v)    = "inr " ++ show v
   show (VHandler h)     = show h
-  show (VMap entries)   = "{" ++ concat (intersperse ", " (map (\(k,v) -> show k ++ ": " ++ show v) entries)) ++ "}"
-  show (VList vs)       = "[" ++ concat (intersperse ", " (map show vs)) ++ "]"
+  show (VMap entries)   = "{" ++ intercalate ", " (map (\(k,v) -> show k ++ ": " ++ show v) entries) ++ "}"
+  show (VList vs)       = "[" ++ intercalate ", " (map show vs) ++ "]"
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
@@ -106,4 +106,4 @@ instance Show Handler where
         Just (FinClause xf cf) -> ", finally " ++ xf ++ " -> " ++ show cf
         Nothing -> ""
     in
-      "handler { " ++ (concat $ intersperse ", " (tiStrs ++ retStr : opStrs)) ++ finStr ++ " }"
+      "handler { " ++ intercalate ", " (tiStrs ++ retStr : opStrs) ++ finStr ++ " }"

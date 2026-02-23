@@ -1,5 +1,6 @@
 module Main where
 
+import Data.List (isInfixOf)
 import System.Exit (exitFailure, exitSuccess)
 import Parsing.Parser (parse)
 import Parsing.Desugar (desugar)
@@ -629,18 +630,6 @@ runTest tc =
     (Left expectedErr, Right actual) -> (False, "FAIL: " ++ testName tc
                                              ++ "\n  Expected error containing: " ++ expectedErr
                                              ++ "\n  Got type: " ++ actual)
-
-isInfixOf :: String -> String -> Bool
-isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
-
-isPrefixOf :: String -> String -> Bool
-isPrefixOf [] _          = True
-isPrefixOf _ []          = False
-isPrefixOf (x:xs) (y:ys) = x == y && isPrefixOf xs ys
-
-tails :: [a] -> [[a]]
-tails []     = [[]]
-tails xs@(_:xs') = xs : tails xs'
 
 main :: IO ()
 main = do

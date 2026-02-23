@@ -105,10 +105,10 @@ desugarHandler cs = do
         c <- desugarComp s
         (x, c') <- desugarPattern p c
         return (Just (RetClause x c'), ocs, fc, ps)
-      f (rc, ocs, fc, ps) (OC op p f s) = do
+      f (rc, ocs, fc, ps) (OC op p k s) = do
         c <- desugarComp s
         (x, c') <- desugarPattern p c
-        return (rc, (op, OpClause x f c') : ocs, fc, ps)
+        return (rc, (op, OpClause x k c') : ocs, fc, ps)
       f (rc, ocs, _, ps) (FC p s) = do
         c <- desugarComp s
         (x, c') <- desugarPattern p c

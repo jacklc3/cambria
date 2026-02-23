@@ -24,9 +24,6 @@ infer c = runInfer initialCtx $ do
     Nothing  -> return ()) (Map.toList (effectOps (effects tc)))
   tc' <- applySubst tc
   return tc'{ effects = closeEffects (effects tc') }
-    where
-      closeEffects (Closed m) = Closed m
-      closeEffects (Open m _) = Closed m
 
 lookupVariable :: Ident -> Infer ValueType
 lookupVariable x = do

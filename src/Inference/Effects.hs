@@ -16,3 +16,6 @@ nullifyEffects :: EffectsType -> EffectsType
 nullifyEffects (Closed _) = Closed mempty
 nullifyEffects (Open _ e) = Open mempty e
 
+closeEffects :: EffectsType -> EffectsType
+closeEffects (Closed m) = Closed m
+closeEffects (Open m _) = Closed m

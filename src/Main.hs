@@ -15,12 +15,12 @@ import Inference.Infer (infer)
 
 handlerIO :: [(Op, Value -> Value -> IO Computation)]
 handlerIO =
-  [ ("unique",    \_           k -> newUnique  >>= return . CApp k . VUnique)
-  , ("print",     \(VString s) k -> putStrLn s >>= return . CApp k . const VUnit)
-  , ("read",      \_           k -> getLine    >>= return . CApp k . VString)
-  , ("flip",      \_           k -> randomIO   >>= return . CApp k . VBool)
-  , ("bernoulli", \(VDouble n) k -> randomIO   >>= return . CApp k . VBool . (< n))
-  , ("uniform",   \_           k -> randomIO   >>= return . CApp k . VDouble)
+  [ ("unique",    \_           k -> CApp k . VUnique       <$> newUnique)
+  , ("print",     \(VString s) k -> CApp k . const VUnit   <$> putStrLn s)
+  , ("read",      \_           k -> CApp k . VString       <$> getLine)
+  , ("flip",      \_           k -> CApp k . VBool         <$> randomIO)
+  , ("bernoulli", \(VDouble n) k -> CApp k . VBool . (< n) <$> randomIO)
+  , ("uniform",   \_           k -> CApp k . VDouble       <$> randomIO)
   ]
 
 -- Catches any inbuilt effects at the top level and handles them

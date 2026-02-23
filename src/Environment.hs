@@ -19,7 +19,7 @@ primitives =
   [ ("+",      \(VPair (VInt x) (VInt y)) -> VInt (x + y))
   , ("-",      \(VPair (VInt x) (VInt y)) -> VInt (x - y))
   , ("*",      \(VPair (VInt x) (VInt y)) -> VInt (x * y))
-  , ("/",      \(VPair (VInt x) (VInt y)) -> VDouble ((fromIntegral x) / (fromIntegral y)))
+  , ("/",      \(VPair (VInt x) (VInt y)) -> VDouble (fromIntegral x / fromIntegral y))
   , ("++",     \(VPair (VString x) (VString y)) -> VString (x ++ y))
   , ("max",    \(VPair (VInt x) (VInt y)) -> VInt (max x y))
   , ("fst",    \(VPair x _) -> x)
