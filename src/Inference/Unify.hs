@@ -65,8 +65,7 @@ unifyEffects (Open m1 r1) (Closed m2)
   | otherwise = do
       unify m1 m2
       bindEffects r1 (Closed (m2 Map.\\ m1))
-unifyEffects (Open m1 r1) (Open m2 r2)
-  | otherwise = do
+unifyEffects (Open m1 r1) (Open m2 r2) = do
       unify m1 m2
       r3 <- freshEffects mempty
       bindEffects r1 (addEffectOps (m2 Map.\\ m1) r3)

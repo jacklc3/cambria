@@ -178,7 +178,6 @@ inferValue = \case
         finOut <- extendVariable xf (Forall mempty mempty (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
         applySubst finOut
-
     applySubst (THandler (TComp hInVal eIn) (Map.fromList pSubst) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
