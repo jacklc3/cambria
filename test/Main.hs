@@ -469,6 +469,104 @@ polyParamTests =
   ]
 
 -- ============================================================
+-- Handler effect combination tests
+-- ============================================================
+
+handlerEffectTests :: [TestCase]
+handlerEffectTests =
+  [ TestCase "handler-fx: inline reuse with different pass-through effects"
+      ( "do r1 <- with handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  emit v k -> do (r, acc) <- k () in\n"
+     ++ "    return (r, v :: acc)\n"
+     ++ "} handle (\n"
+     ++ "  !emit 1; !emit 2; !print \"hello\"; return 42\n"
+     ++ ") in\n"
+     ++ "do r2 <- with handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  emit v k -> do (r, acc) <- k () in\n"
+     ++ "    return (r, v :: acc)\n"
+     ++ "} handle (\n"
+     ++ "  !emit 3; !flip (); return true\n"
+     ++ ") in\n"
+     ++ "return (r1, r2)" )
+      (Right "((Int & List Int) & (Bool & List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }")
+
+  , TestCase "handler-fx: inline reuse with no pass-through effects"
+      ( "do r1 <- with handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  emit v k -> do (r, acc) <- k () in\n"
+     ++ "    return (r, v :: acc)\n"
+     ++ "} handle (\n"
+     ++ "  !emit 1; !emit 2; return 10\n"
+     ++ ") in\n"
+     ++ "do r2 <- with handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  emit v k -> do (r, acc) <- k () in\n"
+     ++ "    return (r, v :: acc)\n"
+     ++ "} handle (\n"
+     ++ "  !emit 3; !emit 4; !emit 5; return 20\n"
+     ++ ") in\n"
+     ++ "return (r1, r2)" )
+      (Right "((Int & List Int) & (Int & List Int))!{}")
+
+  , TestCase "handler-fx: inline reuse with different return types (polymorphic)"
+      ( "do r1 <- with handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  log s k -> do (r, acc) <- k () in return (r, s :: acc)\n"
+     ++ "} handle (\n"
+     ++ "  !log \"start\"; return 42\n"
+     ++ ") in\n"
+     ++ "do r2 <- with handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  log s k -> do (r, acc) <- k () in return (r, s :: acc)\n"
+     ++ "} handle (\n"
+     ++ "  !log \"check\"; return true\n"
+     ++ ") in\n"
+     ++ "return (r1, r2)" )
+      (Right "((Int & List Str) & (Bool & List Str))!{}")
+
+  , TestCase "handler-fx: bound to variable, reused with different pass-through"
+      ( "do h <- return (handler {\n"
+     ++ "  return x -> return (x, []),\n"
+     ++ "  emit v k -> do (r, acc) <- k () in\n"
+     ++ "    return (r, v :: acc)\n"
+     ++ "}) in\n"
+     ++ "do r1 <- with h handle (\n"
+     ++ "  !emit 1; !print \"hello\"; return 42\n"
+     ++ ") in\n"
+     ++ "do r2 <- with h handle (\n"
+     ++ "  !emit 3; !flip (); return true\n"
+     ++ ") in\n"
+     ++ "return (r1, r2)" )
+      (Right "((Int & List Int) & (Bool & List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }")
+
+  , TestCase "handler-fx: clause uses effect that also passes through"
+      ( "with handler {\n"
+     ++ "  decide v k -> (do _ <- !print \"deciding\" in max (k true, k false))\n"
+     ++ "} handle (\n"
+     ++ "  do x <- if !decide () then return 10 else return 20 in\n"
+     ++ "  do _ <- !print \"done\" in\n"
+     ++ "  return x\n"
+     ++ ")" )
+      (Right "Int!{ print : Str ~> Unit }")
+
+  , TestCase "handler-fx: nested handlers with inner passing effects to outer"
+      ( "with handler {\n"
+     ++ "  return x -> return (x, 0),\n"
+     ++ "  tick v k -> do (r, n) <- k () in return (r, n + 1)\n"
+     ++ "} handle (\n"
+     ++ "  with handler {\n"
+     ++ "    return x -> return (x, []),\n"
+     ++ "    emit v k -> do (r, acc) <- k () in return (r, v :: acc)\n"
+     ++ "  } handle (\n"
+     ++ "    !tick (); !emit 1; !tick (); !emit 2; !tick (); return 42\n"
+     ++ "  )\n"
+     ++ ")" )
+      (Right "((Int & List Int) & Int)!{}")
+  ]
+
+-- ============================================================
 -- Error tests (programs that should fail type checking)
 -- ============================================================
 
@@ -553,6 +651,7 @@ main = do
         , compTests
         , polyTests
         , polyParamTests
+        , handlerEffectTests
         , errorTests
         ]
   let results = map runTest allTests

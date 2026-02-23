@@ -45,7 +45,8 @@
 
 \newcommand{\G}{\Gamma}
 \newcommand{\Sig}{\Sigma}
-\newcommand{\ftv}{\mathrm{ftv}}
+\newcommand{\ftv}{\mathsf{ftv}}
+\newcommand{\ftp}{\mathsf{ftp}}
 
 \newcommand{\vj}[3]{#1 \vdash #2 : #3}                   % value judgement
 \newcommand{\cj}[4]{#1 \vdash #2 : \comp{#3}{#4}}        % comp judgement
@@ -121,7 +122,7 @@ Rules for judgements of the form $\vj{\G}{v}{A}$.
     \quad (\textsc{Fun})
 
   \inferrule
-    {\cj{\G, f : \tfun{A}{\comp{B}{\emptyset}},\, x : A}{c}{B}{\Sig}}
+    {\cj{\G, f : \tfun{A}{\comp{B}{\Sig§}},\, x : A}{c}{B}{\Sig}}
     {\vj{\G}{\rec f\; x \mapsto c}{\tfun{A}{\comp{B}{\Sig}}}}
     \quad (\textsc{Rec})
 \end{mathpar}
@@ -143,39 +144,29 @@ A handler has the form:
 
 \noindent
 Optionally, a handler may include type parameter instantiations $\$p_j \mapsto T_j$, which are collected into a substitution $\sigma = \{p_j \mapsto T_j\}_{j=1}^{m}$. When no parameter instantiations are present, $\sigma = \emptyset$.
-
 \begin{mathpar}
-  \inferrule
-    {\sigma = \{ p_j \mapsto T_j \}_{j=1}^{m}
-    \\\\
+  \inferrule{
     \cj{\G, x_r : A}{c_r}{B}{\Sig'}
+    \\
+    \Sig \setminus \{\op_1, \ldots, \op_n\} \subseteq \Sig'
     \\\\
     \left[
       (\op_i : A_i \leadsto B_i) \in \Sig \quad
-      \cj{\G, x_i : \sigma(A_i),\, k_i : \tfun{\sigma(B_i)}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
+      \cj{\G, x_i : A_i,\, k_i : \tfun{B_i}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
     \right]_{i = 1}^{n}
-    \\\\
-    \Sig \setminus \{\op_1, \ldots, \op_n\} \subseteq \Sig'
-    \\
-    \ftv_{\mathrm{params}}(\Sig') \cap \mathrm{dom}(\sigma) = \emptyset
     }
     {\vj{\G}{
-      \hhandler\;\{\ret x_r \to c_r,\;
-        \op_i\; x_i\; k_i \to c_i,\;
-        \$p_j \to T_j
+      \hhandler\;\{\ret x_r \mapsto c_r,\;
+        \op_i\; x_i\; k_i \mapsto c_i,\;
+        \$p_j \mapsto T_j
       \}
     }{\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}}}
     \quad (\textsc{Handler})
 \end{mathpar}
 
 The handler type $\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}$ indicates that the handler transforms computations of type $\comp{A}{\Sig}$ into computations of type $\comp{B}{\Sig'}$, instantiating type parameters according to $\sigma$.
-
-The operation clauses are typed with \emph{post-substitution} arities: if $\op_i$ has arity $A_i' \leadsto B_i'$ in~$\Sig$, the clause binds $x_i : \sigma(A_i')$ and $k_i : \sigma(B_i') \to \comp{B}{\Sig'}$.
 The handled operations $\{\op_1, \ldots, \op_n\}$ must appear in~$\Sig$.
 Unhandled operations are forwarded, requiring $\Sig \setminus \{\op_1, \ldots, \op_n\} \subseteq \Sig'$.
-
-The final premise ensures that no operation in the output signature $\Sig'$ still references any type parameter being instantiated by $\sigma$.
-This guarantees that operations whose arities depend on abstract type parameters are always handled by the handler that instantiates them, preventing the escape of uninstantiated parameters.
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Computation Typing}\label{sec:computations}
@@ -239,6 +230,8 @@ Rules for judgements of the form $\cj{\G}{c}{A}{\Sig}$.
     \cjp{\G}{c}{C'}
     \\
     \sigma(C') = C
+    \\
+    \mathrm{dom}(\sigma) \cap \ftp(D) = \emptyset
     }
     {\cjp{\G}{\with v \handle c}{D}}
     \quad (\textsc{Handle})
@@ -249,5 +242,7 @@ The handler's substitution $\sigma$ is applied to $C'$, and the result must equa
 This allows the body to use abstract type parameters (e.g., $\$q$) in its effect arities, which are resolved to concrete types (e.g., $\tunique$) by the handler's parameter instantiation.
 
 When $\sigma = \emptyset$, the premise $\sigma(C') = C$ reduces to $C' = C$, recovering the standard handler application rule.
+The final premise ensures that no operation in the output signature $\Sig'$ still references any type parameter being instantiated by $\sigma$.
+This guarantees that operations whose arities depend on abstract type parameters are always handled by the handler that instantiates them, preventing the escape of uninstantiated parameters.
 
 \end{document}

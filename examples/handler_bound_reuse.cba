@@ -1,0 +1,13 @@
+-- Test: handler bound to variable and applied twice with different pass-through effects
+do h <- return (handler {
+  return x -> return (x, []),
+  emit v k -> do (r, acc) <- k () in
+    return (r, v :: acc)
+}) in
+do r1 <- with h handle (
+  !emit 1; !print "hello"; return 42
+) in
+do r2 <- with h handle (
+  !emit 3; !flip (); return true
+) in
+return (r1, r2)

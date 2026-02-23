@@ -1,0 +1,9 @@
+-- Test: handler whose clauses use an effect that also passes through
+-- The decide handler handles !decide, but its clause uses !print (which also passes through)
+with handler {
+  decide v k -> (!print "deciding"; max (k true, k false))
+} handle (
+  do x <- if !decide () then return 10 else return 20 in
+  do _ <- !print "done" in
+  return x
+)

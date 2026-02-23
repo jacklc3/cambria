@@ -5,13 +5,13 @@ import qualified Data.Set as Set
 
 import Types
 
-data Scheme = Forall (Set.Set Ident) (Maybe Ident) ValueType
+data Scheme = Forall (Set.Set Ident) (Set.Set Ident) ValueType
   deriving (Eq, Show)
 
 type Context = Map.Map Ident Scheme
 
 mkPrimScheme :: [Ident] -> ValueType -> ValueType -> Scheme
-mkPrimScheme vs t1 t2 = Forall (Set.fromList vs) (Just "e") (TFun t1 (TComp t2 (Open mempty "e")))
+mkPrimScheme vs t1 t2 = Forall (Set.fromList vs) (Set.singleton "e") (TFun t1 (TComp t2 (Open mempty "e")))
 
 primitives :: [(String, Scheme)]
 primitives =
@@ -37,8 +37,8 @@ primitives =
 
 constants :: [(String, Scheme)]
 constants =
-  [ ("[]",    Forall (Set.singleton "a") Nothing (TList (TVar "a")))
-  , ("empty", Forall (Set.fromList ["k","v"]) Nothing (TMap (TVar "k") (TVar "v")))
+  [ ("[]",    Forall (Set.singleton "a") mempty (TList (TVar "a")))
+  , ("empty", Forall (Set.fromList ["k","v"]) mempty (TMap (TVar "k") (TVar "v")))
   ]
 
 primitiveOps :: [(String, Arity)]

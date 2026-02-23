@@ -5,13 +5,13 @@ import Control.Monad.State
 import Control.Monad.Reader
 import qualified Data.Map as Map
 
-import Types (Ident, ValueType(TVar), EffectsType(Open))
+import Types (Ident, Op, Arity, ValueType(TVar), EffectsType(Open))
 import Inference.Context (Context)
 
 data InferState = InferState {
   count       :: Int,
   typeSubst   :: Map.Map Ident ValueType,
-  effectSubst :: Map.Map Ident EffectsType
+  effectSubst :: Map.Map Op EffectsType
 }
 
 type Infer a = ReaderT Context (StateT InferState (Except String)) a
@@ -22,11 +22,11 @@ fresh = do
   modify (\st ->  st { count = succ count } )
   return $ TVar $ "t" ++ show count
 
-freshEffects :: Infer EffectsType
-freshEffects = do
+freshEffects :: Map.Map Op Arity -> Infer EffectsType
+freshEffects ops = do
   c <- gets count
   modify (\st -> st { count = succ c })
-  return $ Open mempty ("e" ++ show c)
+  return $ Open ops ("e" ++ show c)
 
 runInfer :: Context -> Infer a -> Either String a
 runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty mempty))

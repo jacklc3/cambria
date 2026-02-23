@@ -1,0 +1,14 @@
+-- Test: same handler structure reused with different return value types (Int then Bool)
+do r1 <- with handler {
+  return x -> return (x, []),
+  log s k -> do (r, acc) <- k () in return (r, s :: acc)
+} handle (
+  !log "start"; return 42
+) in
+do r2 <- with handler {
+  return x -> return (x, []),
+  log s k -> do (r, acc) <- k () in return (r, s :: acc)
+} handle (
+  !log "check"; return true
+) in
+return (r1, r2)

@@ -10,7 +10,7 @@
 *.toc
 *.run.xml
 *.synctex.gz
-implementation/dist-newstyle/*
+*dist-newstyle*
 *.DS_Store
 *Parser.hs
 *Lexer.hs

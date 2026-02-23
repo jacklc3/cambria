@@ -30,7 +30,7 @@ Here are a few examples that demonstrate the expressive power of Cambria.
 This example implements a handler for local state, where memory cells can be dynamically created and manipulated. The state is managed using a map from parameters (memory locations) to their stored values.
 
 ```
--- from implementation/examples/local_state.cba
+-- from examples/local_state.cba
 with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
@@ -68,7 +68,7 @@ return vals
 This example implements a handler for a theory of substitution and jumps, which models a form of non-local control flow.
 
 ```
--- from implementation/examples/substitution.cba
+-- from examples/substitution.cba
 with handler {
   return x  -> return (inl x),
   var a k -> return (inr a),
@@ -100,10 +100,9 @@ with handler {
 
 ### Building
 
-To build the Cambria interpreter, navigate to the `implementation` directory and run:
+To build the Cambria interpreter run:
 
 ```bash
-cd implementation
 cabal build
 ```
 

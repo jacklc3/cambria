@@ -1,0 +1,12 @@
+-- Test: nested handlers where inner handler passes effects through to outer handler
+with handler {
+  return x -> return (x, 0),
+  tick v k -> do (r, n) <- k () in return (r, n + 1)
+} handle (
+  with handler {
+    return x -> return (x, []),
+    emit v k -> do (r, acc) <- k () in return (r, v :: acc)
+  } handle (
+    !tick (); !emit 1; !tick (); !emit 2; !tick (); return 42
+  )
+)

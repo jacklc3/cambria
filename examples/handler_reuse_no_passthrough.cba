@@ -1,0 +1,16 @@
+-- Test: same handler structure applied twice, no extra effects pass through
+do r1 <- with handler {
+  return x -> return (x, []),
+  emit v k -> do (r, acc) <- k () in
+    return (r, v :: acc)
+} handle (
+  !emit 1; !emit 2; return 10
+) in
+do r2 <- with handler {
+  return x -> return (x, []),
+  emit v k -> do (r, acc) <- k () in
+    return (r, v :: acc)
+} handle (
+  !emit 3; !emit 4; !emit 5; return 20
+) in
+return (r1, r2)

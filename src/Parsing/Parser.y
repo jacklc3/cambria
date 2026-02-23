@@ -6,7 +6,7 @@ module Parsing.Parser (
 import Parsing.Token
 import Parsing.Lexer
 import Parsing.SugaredSyntax
-import Types (Ident, Op, ValueType(..))
+import Types (Ident, Op, Arity(Arity), ValueType(..))
 import Syntax (Side(..))
 
 import Control.Monad.Except
@@ -157,7 +157,7 @@ compTerm :: { SugaredComp }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
   | with expr handle compTerm             { SCWith $2 $4 }
-  | declare op ':' type '~>' type '.' compTerm  { SCDeclare $2 $4 $6 $8 }
+  | declare op ':' type '~>' type '.' compTerm  { SCDeclare $2 (Arity $4 $6) $8 }
   | compInfix                             { $1 }
 
 compInfix :: { SugaredComp }

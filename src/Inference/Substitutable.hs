@@ -79,9 +79,9 @@ instance Substitutable CompType where
   free k (TComp t e)           = free k t <> free k e
 
 instance Substitutable Scheme where
-  apply (Type m) (Forall tvs mev t)   = Forall tvs mev (apply (Type (m `Map.withoutKeys` tvs)) t)
-  apply (Effect m) (Forall tvs mev t) = Forall tvs mev (apply (Effect (maybe m (\ev -> Map.delete ev m) mev)) t)
-  apply s (Forall tvs mev t)          = Forall tvs mev (apply s t)
+  apply (Type m) (Forall tvs evs t)   = Forall tvs evs (apply (Type (m `Map.withoutKeys` tvs)) t)
+  apply (Effect m) (Forall tvs evs t) = Forall tvs evs (apply (Effect (m `Map.withoutKeys` evs)) t)
+  apply s (Forall tvs evs t)          = Forall tvs evs (apply s t)
   free TV (Forall tvs _ t)            = free TV t Set.\\ tvs
-  free EV (Forall _ mev t)            = free EV t Set.\\ maybe mempty Set.singleton mev
+  free EV (Forall _ evs t)            = free EV t Set.\\ evs
   free k (Forall _ _ t)               = free k t
