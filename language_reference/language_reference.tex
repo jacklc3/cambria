@@ -864,17 +864,13 @@ These are available in every program without any declaration.
 \toprule
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
-\texttt{::}   & \texttt{a \& List a -> List a} & Prepend element \\
-\texttt{head} & \texttt{List a -> a}            & First element (partial) \\
-\texttt{tail} & \texttt{List a -> List a}       & All but first (partial) \\
-\texttt{null} & \texttt{List a -> Bool}         & Is empty? \\
-\texttt{[]}   & \texttt{List a}                 & Empty list constant \\
+\texttt{::}     & \texttt{a \& List a -> List a}        & Prepend element \\
+\texttt{uncons} & \texttt{List a -> Unit + a \& List a} & List destructor \\
+\texttt{null}   & \texttt{List a -> Bool}               & Is empty? \\
+\texttt{[]}     & \texttt{List a}                       & Empty list constant \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-Note: \texttt{head} and \texttt{tail} will error at runtime if the key is not found.
-Check with \texttt{null} first if unsure.
 
 \subsection{Map Operations}
 
@@ -892,8 +888,8 @@ Check with \texttt{null} first if unsure.
 \end{tabular}
 \end{center}
 
-Note: \texttt{lookup} will error at runtime if the key is not found.  Check
-with \texttt{member} first if unsure.
+Note: \texttt{lookup} will error at runtime if the key is not found.
+Check with \texttt{member} first if unsure.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Built-in IO Effects}
@@ -976,8 +972,10 @@ Recursive functions are also polymorphic:
 
 \begin{lstlisting}
 do map <- return (rec map f xs ->
-  if null xs then return []
-  else f (head xs) :: map f (tail xs)
+  case uncons xs of {
+    inl _        -> return [],
+    inr (x, xs') -> f x :: map f xs'
+  }
 ) in
 -- map : forall a b. (a -> b!S) -> List a -> List b!S
 \end{lstlisting}
@@ -1318,8 +1316,10 @@ with handler {
   declare !ref : Int ~> $p.
 
   do map <- return (rec map f xs ->
-    if null xs then return []
-    else f (head xs) :: map f (tail xs)
+    case uncons xs of {
+      inl _        -> return [],
+      inr (x, xs') -> f x :: map f xs'
+    }
   ) in
 
   do refs <- map (fun n -> !ref n)

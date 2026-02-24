@@ -1,9 +1,15 @@
 -- Graphviz handler for DAG generic effects
-do for <- return rec for f l ->
-  if null l then return () else (f (head l) ; for f (tail l))
+do for <- return (rec for g xs ->
+  case uncons xs of {
+    inl _       -> return (),
+    inr (x, xs') -> (g x ; for g xs')
+  })
 in
 do concat <- return rec concat v1 v2 ->
-  if null v1 then return v2 else head v1 :: concat (tail v1) v2
+  case uncons v1 of {
+    inl _      -> return v2,
+    inr (v,vs) -> v :: concat vs v2
+  })
 in
 with handler {
   act (a, s) k ->

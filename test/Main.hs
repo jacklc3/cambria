@@ -315,8 +315,8 @@ polyTests =
   , TestCase "poly: polymorphic list operations"
       ( "do ints <- 1 :: 2 :: 3 :: [] in\n"
      ++ "do bools <- true :: false :: [] in\n"
-     ++ "return (head ints, head bools)" )
-      (Right "(Int & Bool)!{}")
+     ++ "return (null ints, null bools)" )
+      (Right "(Bool & Bool)!{}")
   ]
 
 -- ============================================================
@@ -450,23 +450,21 @@ polyParamTests =
      ++ "  declare !get : $p ~> Int.\n"
      ++ "  declare !set : $p & Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
-     ++ "  do map <- return (rec map f -> return (fun xs ->\n"
-     ++ "    if null xs then return []\n"
-     ++ "    else do hd <- f (head xs) in\n"
-     ++ "         do mapper <- map f in\n"
-     ++ "         do tl <- mapper (tail xs) in\n"
-     ++ "         hd :: tl\n"
-     ++ "  )) in\n"
+     ++ "  do map <- return (rec map f xs ->\n"
+     ++ "    case uncons xs of {\n"
+     ++ "      inl _       -> return [],\n"
+     ++ "      inr (x,xs') -> f x :: map f xs'\n"
+     ++ "    })\n"
+     ++ "  in\n"
      ++ "  do allocator <- map (fun n -> !ref n) in\n"
      ++ "  do refs <- allocator (10 :: 20 :: 30 :: []) in\n"
      ++ "  do reader <- map (fun r -> !get r) in\n"
      ++ "  do vals <- reader refs in\n"
-     ++ "  do first <- return (head vals) in\n"
      ++ "  do tester <- map (fun n -> return (n == 20)) in\n"
      ++ "  do checks <- tester vals in\n"
-     ++ "  return (first, checks)\n"
+     ++ "  return (vals, checks)\n"
      ++ ")" )
-      (Right "(Int & List Bool)!{ unique : Unit ~> Unique }")
+      (Right "(List Int & List Bool)!{ unique : Unit ~> Unique }")
   ]
 
 -- ============================================================

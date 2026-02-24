@@ -29,9 +29,11 @@ with handler {
 
   -- Polymorphic map: forall a b. (a -> b!S) -> List(a) -> List(b)!S
   do map <- return (rec map f xs ->
-    if null xs then return []
-    else f (head xs) :: map f (tail xs)
-  ) in
+    case uncons xs of {
+      inl _        -> return [],
+      inr (x, xs') -> f x :: map f xs'
+    })
+  in
 
   -- (1) map at (Int -> $p): allocate a ref for each number
   do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in

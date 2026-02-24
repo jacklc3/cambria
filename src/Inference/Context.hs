@@ -11,7 +11,8 @@ data Scheme = Forall (Set.Set Ident) (Set.Set Ident) ValueType
 type Context = Map.Map Ident Scheme
 
 mkPrimScheme :: [Ident] -> ValueType -> ValueType -> Scheme
-mkPrimScheme vs t1 t2 = Forall (Set.fromList vs) (Set.singleton "e") (TFun t1 (TComp t2 (Open mempty "e")))
+mkPrimScheme vs t1 t2 = Forall (Set.fromList vs) (Set.singleton "e")
+  (TFun t1 (TComp t2 (Open mempty "e")))
 
 primitives :: [(String, Scheme)]
 primitives =
@@ -30,9 +31,8 @@ primitives =
   , ("lookup", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) (TVar "v"))
   , ("member", mkPrimScheme ["k","v"] (TPair (TVar "k") (TMap (TVar "k") (TVar "v"))) TBool)
   , ("::",     mkPrimScheme ["a"] (TPair (TVar "a") (TList (TVar "a"))) (TList (TVar "a")))
-  , ("head",   mkPrimScheme ["a"] (TList (TVar "a")) (TVar "a"))
-  , ("tail",   mkPrimScheme ["a"] (TList (TVar "a")) (TList (TVar "a")))
   , ("null",   mkPrimScheme ["a"] (TList (TVar "a")) TBool)
+  , ("uncons", mkPrimScheme ["a"] (TList (TVar "a")) (TEither TUnit (TPair (TVar "a") (TList (TVar "a")))))
   ]
 
 constants :: [(String, Scheme)]

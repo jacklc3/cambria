@@ -1,7 +1,8 @@
 module Environment where
 
-import Data.Unique (hashUnique)
 import qualified Data.Map as Map
+import Data.Unique (hashUnique, newUnique)
+import System.Random (randomIO)
 
 import Syntax
 
@@ -33,15 +34,26 @@ primitives =
       Nothing -> error $ "Key not found in map: " ++ show k)
   , ("member", \(VPair k (VMap m)) -> VBool (any (\(k', _) -> k' == k) m))
   , ("::",     \(VPair x (VList xs)) -> VList (x : xs))
-  , ("head",   \(VList (x:_)) -> x)
-  , ("tail",   \(VList (_:xs)) -> VList xs)
   , ("null",   \(VList xs) -> VBool (null xs))
+  , ("uncons", \(VList xs') -> case xs' of
+      []     -> VEither L VUnit
+      (x:xs) -> VEither R (VPair x (VList xs)))
   ]
 
 constants :: [(Ident, Value)]
 constants =
   [ ("[]",    VList [])
   , ("empty", VMap [])
+  ]
+
+primitiveOps :: [(Op, Value -> Value -> IO Computation)]
+primitiveOps =
+  [ ("unique",    \_           k -> CApp k . VUnique       <$> newUnique)
+  , ("print",     \(VString s) k -> CApp k . const VUnit   <$> putStrLn s)
+  , ("read",      \_           k -> CApp k . VString       <$> getLine)
+  , ("flip",      \_           k -> CApp k . VBool         <$> randomIO)
+  , ("bernoulli", \(VDouble n) k -> CApp k . VBool . (< n) <$> randomIO)
+  , ("uniform",   \_           k -> CApp k . VDouble       <$> randomIO)
   ]
 
 initialEnv :: Env

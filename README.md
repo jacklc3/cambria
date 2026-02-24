@@ -53,10 +53,11 @@ This example demonstrates polymorphic functions operating over lists of abstract
 ```
 -- from implementation/examples/poly_fold_refs.cba (excerpt)
 do map <- return (rec map f xs ->
-  if null xs then return []
-  else f (head xs) :: map f (tail xs)
+  case uncons xs of {
+    inl _        -> return [],
+    inr (x, xs') -> f x :: map f xs'
+  }
 ) in
-
 do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
 do checks <- map (fun r -> !get r == 20) refs in
 return vals
