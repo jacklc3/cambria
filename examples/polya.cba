@@ -5,7 +5,7 @@ do countSuccesses <- return rec countSuccesses n f ->
    if n == 0 then return 0 else do i <- countSuccesses (n - 1) f in i + boolToInt (f ())
 in
 with handler {
-  $q -> Unique,
+  $cell -> Unique,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
@@ -14,7 +14,7 @@ with handler {
   finally s -> s empty
 } handle (
   with handler {
-    $p -> $q,
+    $urn -> $cell,
     urn z k -> k (!ref (1,1)),
     sample a k ->
       do (i, j) <- !get a in
@@ -22,8 +22,8 @@ with handler {
       do _ <- !set (a, (i + boolToInt b, j + (1 - boolToInt b))) in
       k b
   } handle (
-    declare !urn : Unit ~> $p.
-    declare !sample : $p ~> Bool.
+    declare !urn : Unit ~> $urn.
+    declare !sample : $urn ~> Bool.
 
     -- Make a new urn, and draw ten times, reporting the number of trues
     do a1 <- !urn () in

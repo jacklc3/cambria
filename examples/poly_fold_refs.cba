@@ -24,7 +24,7 @@ with handler {
   finally s -> s empty
 } handle (
   declare !get : $p ~> Int.
-  declare !set : $p & Int ~> Unit.
+  declare !set : $p * Int ~> Unit.
   declare !ref : Int ~> $p.
 
   -- Polymorphic map: forall a b. (a -> b!S) -> List(a) -> List(b)!S

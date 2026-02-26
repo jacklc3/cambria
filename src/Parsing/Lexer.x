@@ -70,7 +70,6 @@ tokens :-
   "::"                       { \p s -> Token p (quotes s) TokCons }
   "[]"                       { \p s -> Token p (quotes s) TokNil }
   ":"                        { \p s -> Token p (quotes s) TokColon }
-  "&"                        { \p s -> Token p (quotes s) TokAmpersand }
   "."                        { \p s -> Token p (quotes s) TokDot }
 
   \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (drop 1 s)) }

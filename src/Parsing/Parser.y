@@ -66,7 +66,6 @@ import Control.Monad.Except
   ':'                        { Token _ _ TokColon }
   '::'                       { Token _ _ TokCons }
   '[]'                       { Token _ _ TokNil }
-  '&'                        { Token _ _ TokAmpersand }
   '.'                        { Token _ _ TokDot }
   '='                        { Token _ _ TokEquals }
 
@@ -191,7 +190,7 @@ type :: { ValueType }
 
 typeProd :: { ValueType }
   : typeAtom                              { $1 }
-  | typeAtom '&' typeAtom                 { TPair $1 $3 }
+  | typeAtom '*' typeAtom                 { TPair $1 $3 }
 
 typeAtom :: { ValueType }
   : Unit                                  { TUnit }

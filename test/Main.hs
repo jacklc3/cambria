@@ -33,7 +33,7 @@ coreTests :: [TestCase]
 coreTests =
   [ TestCase "unique: fresh resource identifiers"
       "do x <- !unique () in\ndo y <- !unique () in\ndo z <- !unique () in\nreturn ((x,y),z)"
-      (Right "((Unique & Unique) & Unique)!{ unique : Unit ~> Unique }")
+      (Right "((Unique * Unique) * Unique)!{ unique : Unit ~> Unique }")
 
   , TestCase "print: string output effect"
       "!print \"test\""
@@ -61,7 +61,7 @@ coreTests =
      ++ "} handle (\n"
      ++ "  !print \"A\"; !print \"B\"; !print \"C\"\n"
      ++ ")" )
-      (Right "(Unit & Str)!{}")
+      (Right "(Unit * Str)!{}")
   ]
 
 -- ============================================================
@@ -76,7 +76,7 @@ bidiTests =
 
   , TestCase "checkValue: pair checked structurally"
       "return ((1, true), \"hello\")"
-      (Right "((Int & Bool) & Str)!{}")
+      (Right "((Int * Bool) * Str)!{}")
 
   , TestCase "checkValue: either left branch"
       "case inl 42 of {\n  inl x -> return (x + 1),\n  inr y -> return (y - 1)\n}"
@@ -173,7 +173,7 @@ handlerTests =
      ++ "  ref x k -> k ()\n"
      ++ "} handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do a <- !ref 0 in\n"
      ++ "  !set (a, !get a)\n"
@@ -189,7 +189,7 @@ handlerTests =
      ++ "} in\n"
      ++ "with h handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do a <- !ref 0 in\n"
      ++ "  !set (a, !get a)\n"
@@ -205,7 +205,7 @@ compTests :: [TestCase]
 compTests =
   [ TestCase "do: sequential binding"
       "do x <- return 1 in\ndo y <- return 2 in\nreturn (x + y, ())"
-      (Right "(Int & Unit)!{}")
+      (Right "(Int * Unit)!{}")
 
   , TestCase "do: effects accumulate across bindings"
       "do x <- !flip () in\ndo _ <- !print \"hello\" in\nreturn x"
@@ -247,28 +247,28 @@ polyTests =
      ++ "do a <- id 1 in\n"
      ++ "do b <- id true in\n"
      ++ "return (a, b)" )
-      (Right "(Int & Bool)!{}")
+      (Right "(Int * Bool)!{}")
 
   , TestCase "poly: const function used at two types"
       ( "do const <- return (fun x -> return (fun y -> return x)) in\n"
      ++ "do a <- const 42 true in\n"
      ++ "do b <- const \"hello\" 99 in\n"
      ++ "return (a, b)" )
-      (Right "(Int & Str)!{}")
+      (Right "(Int * Str)!{}")
 
   , TestCase "poly: swap function used at two pair types"
       ( "do swap <- return (fun p -> return (snd p, fst p)) in\n"
      ++ "do a <- swap (1, true) in\n"
      ++ "do b <- swap (\"hello\", 42) in\n"
      ++ "return (fst a, fst b)" )
-      (Right "(Bool & Int)!{}")
+      (Right "(Bool * Int)!{}")
 
   , TestCase "poly: higher-order polymorphic apply"
       ( "do apply <- return (fun f -> f ()) in\n"
      ++ "do a <- apply (fun x -> return 42) in\n"
      ++ "do b <- apply (fun x -> return true) in\n"
      ++ "return (a, b)" )
-      (Right "(Int & Bool)!{}")
+      (Right "(Int * Bool)!{}")
 
   , TestCase "poly: generalization works alongside effects"
       ( "do _ <- !flip () in\n"
@@ -276,7 +276,7 @@ polyTests =
      ++ "do a <- id 42 in\n"
      ++ "do b <- id true in\n"
      ++ "return (a, b)" )
-      (Right "(Int & Bool)!{ flip : Unit ~> Bool }")
+      (Right "(Int * Bool)!{ flip : Unit ~> Bool }")
 
   , TestCase "poly: polymorphic function used across effectful sequencing"
       ( "do id <- return (fun x -> return x) in\n"
@@ -284,7 +284,7 @@ polyTests =
      ++ "do _ <- !print \"between\" in\n"
      ++ "do b <- id true in\n"
      ++ "return (a, b)" )
-      (Right "(Int & Bool)!{ print : Str ~> Unit }")
+      (Right "(Int * Bool)!{ print : Str ~> Unit }")
 
   , TestCase "poly: nested polymorphic bindings"
       ( "do id <- return (fun x -> return x) in\n"
@@ -292,14 +292,14 @@ polyTests =
      ++ "do a <- f 1 in\n"
      ++ "do b <- f true in\n"
      ++ "return (a, b)" )
-      (Right "((Int & Int) & (Bool & Bool))!{}")
+      (Right "((Int * Int) * (Bool * Bool))!{}")
 
   , TestCase "poly: effect return type var NOT generalized (soundness)"
       ( "do r <- !myeffect () in\n"
      ++ "do a <- return r in\n"
      ++ "do b <- return r in\n"
      ++ "return (a, b)" )
-      (Right "(t0 & t0)!{ myeffect : Unit ~> t0 }")
+      (Right "(t0 * t0)!{ myeffect : Unit ~> t0 }")
 
   , TestCase "poly: polymorphic function with handler"
       ( "do id <- return (fun x -> return x) in\n"
@@ -316,7 +316,7 @@ polyTests =
       ( "do ints <- 1 :: 2 :: 3 :: [] in\n"
      ++ "do bools <- true :: false :: [] in\n"
      ++ "return (null ints, null bools)" )
-      (Right "(Bool & Bool)!{}")
+      (Right "(Bool * Bool)!{}")
   ]
 
 -- ============================================================
@@ -336,7 +336,7 @@ polyParamTests =
      ++ "  finally s -> s empty\n"
      ++ "} handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do swap <- return (fun pair -> return (snd pair, fst pair)) in\n"
      ++ "  do swapped_ints <- swap (10, 20) in\n"
@@ -347,7 +347,7 @@ polyParamTests =
      ++ "  do v2 <- !get (snd swapped_refs) in\n"
      ++ "  return (swapped_ints, (v1, v2))\n"
      ++ ")" )
-      (Right "((Int & Int) & (Int & Int))!{ unique : Unit ~> Unique }")
+      (Right "((Int * Int) * (Int * Int))!{ unique : Unit ~> Unique }")
 
   , TestCase "poly+param: with_ref combinator — poly callback return type"
       ( "with handler {\n"
@@ -360,7 +360,7 @@ polyParamTests =
      ++ "  finally s -> s empty\n"
      ++ "} handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do with_ref <- return (fun init -> return (fun body ->\n"
      ++ "    do r <- !ref init in body r\n"
@@ -378,7 +378,7 @@ polyParamTests =
      ++ "  ) in\n"
      ++ "  return (r1, (r2, r3))\n"
      ++ ")" )
-      (Right "(Int & (Bool & (Int & Int)))!{ unique : Unit ~> Unique }")
+      (Right "(Int * (Bool * (Int * Int)))!{ unique : Unit ~> Unique }")
 
   , TestCase "poly+param: map_pair at Int, $p->Int, and Int->$p"
       ( "with handler {\n"
@@ -391,7 +391,7 @@ polyParamTests =
      ++ "  finally s -> s empty\n"
      ++ "} handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do map_pair <- return (fun f -> return (fun pair ->\n"
      ++ "    do x <- f (fst pair) in\n"
@@ -409,7 +409,7 @@ polyParamTests =
      ++ "  do new_refs <- alloc_both (sum, fst doubled + snd doubled) in\n"
      ++ "  return (doubled, (sum, (!get (fst new_refs), !get (snd new_refs))))\n"
      ++ ")" )
-      (Right "((Int & Int) & (Int & (Int & Int)))!{ unique : Unit ~> Unique }")
+      (Right "((Int * Int) * (Int * (Int * Int)))!{ unique : Unit ~> Unique }")
 
   , TestCase "poly+param: polymorphic incr on abstract refs"
       ( "with handler {\n"
@@ -422,7 +422,7 @@ polyParamTests =
      ++ "  finally s -> s empty\n"
      ++ "} handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do incr <- return (fun r ->\n"
      ++ "    do v <- !get r in\n"
@@ -448,7 +448,7 @@ polyParamTests =
      ++ "  finally s -> s empty\n"
      ++ "} handle (\n"
      ++ "  declare !get : $p ~> Int.\n"
-     ++ "  declare !set : $p & Int ~> Unit.\n"
+     ++ "  declare !set : $p * Int ~> Unit.\n"
      ++ "  declare !ref : Int ~> $p.\n"
      ++ "  do map <- return (rec map f xs ->\n"
      ++ "    case uncons xs of {\n"
@@ -464,7 +464,7 @@ polyParamTests =
      ++ "  do checks <- tester vals in\n"
      ++ "  return (vals, checks)\n"
      ++ ")" )
-      (Right "(List Int & List Bool)!{ unique : Unit ~> Unique }")
+      (Right "(List Int * List Bool)!{ unique : Unit ~> Unique }")
   ]
 
 -- ============================================================
@@ -489,7 +489,7 @@ handlerEffectTests =
      ++ "  !emit 3; !flip (); return true\n"
      ++ ") in\n"
      ++ "return (r1, r2)" )
-      (Right "((Int & List Int) & (Bool & List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }")
+      (Right "((Int * List Int) * (Bool * List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }")
 
   , TestCase "handler-fx: inline reuse with no pass-through effects"
       ( "do r1 <- with handler {\n"
@@ -507,7 +507,7 @@ handlerEffectTests =
      ++ "  !emit 3; !emit 4; !emit 5; return 20\n"
      ++ ") in\n"
      ++ "return (r1, r2)" )
-      (Right "((Int & List Int) & (Int & List Int))!{}")
+      (Right "((Int * List Int) * (Int * List Int))!{}")
 
   , TestCase "handler-fx: inline reuse with different return types (polymorphic)"
       ( "do r1 <- with handler {\n"
@@ -523,7 +523,7 @@ handlerEffectTests =
      ++ "  !log \"check\"; return true\n"
      ++ ") in\n"
      ++ "return (r1, r2)" )
-      (Right "((Int & List Str) & (Bool & List Str))!{}")
+      (Right "((Int * List Str) * (Bool * List Str))!{}")
 
   , TestCase "handler-fx: bound to variable, reused with different pass-through"
       ( "do h <- return (handler {\n"
@@ -538,7 +538,7 @@ handlerEffectTests =
      ++ "  !emit 3; !flip (); return true\n"
      ++ ") in\n"
      ++ "return (r1, r2)" )
-      (Right "((Int & List Int) & (Bool & List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }")
+      (Right "((Int * List Int) * (Bool * List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }")
 
   , TestCase "handler-fx: clause uses effect that also passes through"
       ( "with handler {\n"
@@ -562,7 +562,7 @@ handlerEffectTests =
      ++ "    !tick (); !emit 1; !tick (); !emit 2; !tick (); return 42\n"
      ++ "  )\n"
      ++ ")" )
-      (Right "((Int & List Int) & Int)!{}")
+      (Right "((Int * List Int) * Int)!{}")
   ]
 
 -- ============================================================

@@ -61,7 +61,6 @@ data TokenKind
   | TokDeclare
   | TokSquigglyArrow
   | TokColon
-  | TokAmpersand
   | TokDot
   | TokCons
   | TokNil

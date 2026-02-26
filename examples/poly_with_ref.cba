@@ -23,7 +23,7 @@ with handler {
   finally s -> s empty
 } handle (
   declare !get : $p ~> Int.
-  declare !set : $p & Int ~> Unit.
+  declare !set : $p * Int ~> Unit.
   declare !ref : Int ~> $p.
 
   -- Define the polymorphic combinator once

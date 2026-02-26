@@ -6,7 +6,7 @@ with handler {
   ref x k -> k ()
 } handle (
   declare !get : $p ~> Int.
-  declare !set : $p & Int ~> Unit.
+  declare !set : $p * Int ~> Unit.
   declare !ref : Int ~> $p.
   do a <- !ref 0 in
   !set (a, !get a)
