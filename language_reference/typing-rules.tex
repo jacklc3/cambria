@@ -41,16 +41,17 @@
 \newcommand{\hhandler}{\mathsf{handler}}
 \newcommand{\with}{\mathsf{with}\;}
 \newcommand{\handle}{\;\mathsf{handle}\;}
-\newcommand{\declare}{\mathsf{declare}\;}
+\newcommand{\dom}{\mathsf{dom}}
 
 \newcommand{\G}{\Gamma}
 \newcommand{\Sig}{\Sigma}
 \newcommand{\ftv}{\mathsf{ftv}}
-\newcommand{\ftp}{\mathsf{ftp}}
+\newcommand{\fpv}{\mathsf{fpv}}
 
-\newcommand{\vj}[3]{#1 \vdash #2 : #3}                   % value judgement
-\newcommand{\cj}[4]{#1 \vdash #2 : \comp{#3}{#4}}        % comp judgement
-\newcommand{\cjp}[3]{#1 \vdash #2 : #3}                  % comp judgement (pre-formed)
+\newcommand{\tj}[3]{#1; #2 \vdash #3}                            % type judgement
+\newcommand{\vj}[5]{#1; #2; #3 \vdash #4 : #5}                   % value judgement
+\newcommand{\cj}[6]{#1; #2; #3 \vdash #4 : \comp{#5}{#6}}        % comp judgement
+\newcommand{\cjp}[5]{#1; #2; #3 \vdash #4 : #5}                  % comp judgement (pre-formed)
 
 \title{Typing Rules for Cambria}
 \author{}
@@ -65,65 +66,75 @@
 
 \[
 \begin{array}{lrcl}
-  \text{Value types}       & A, B & ::= & \void \mid \unit \mid \tpair{A}{B} \mid \teither{A}{B} \mid \tfun{A}{C} \mid \thandlerp{C}{\sigma}{D} \\[6pt]
-  \text{Computation types} & C, D & ::= & \comp{A}{\Sig} \\[6pt]
-  \text{Effect signatures} & \Sig & ::= & \{ \op_1 : A_1 \leadsto B_1,\; \ldots,\; \op_n : A_n \leadsto B_n \} \\[6pt]
-  \text{Param.\ subst.}    & \sigma & ::= & \{ \$p_1 \mapsto A_1,\; \ldots,\; \$p_m \mapsto A_m \}
+  \text{Monotypes}           & A, B  & ::=   & \alpha \mid \psi \mid \void \mid \unit \mid \tpair{\tau}{\tau} \mid \teither{\tau}{\tau} \mid \tfun{\tau}{C} \mid \thandlerp{C}{\sigma}{D} \\[6pt]
+  \text{Computation types}   & C, D  & ::= & \comp{A}{\Sig} \\[6pt]
+  \text{Effect signatures}   & \Sig          & ::= & \{ \op_1 : A_1 \leadsto B_1,\; \ldots,\; \op_n : A_n \leadsto B_n \} \\[6pt]
+  \text{Param.\ subst.}      & \sigma        & ::= & \{ \psi_1 \mapsto A_1,\; \ldots,\; \psi_m \mapsto A_m \} \\[6pt]
+  \text{Type Variables}      & \Theta        & ::= & \{ \alpha_1, \; \ldots, \; \alpha_n \} \\[6pt]
+  \text{Parameter Variables} & \Psi          & ::= & \{ \psi_1, \; \ldots, \; \psi_n \} \\[6pt]
+  \text{Contexts}            & \G            & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
 \end{array}
 \]
 
-A judgement $\vj{\G}{v}{A}$ types a value $v$ under context $\G$.
-A judgement $\cj{\G}{c}{A}{\Sig}$ types a computation $c$ that produces a value of type $A$ and may perform effects in $\Sig$.
-
-Type parameters $\$p$ may appear free in effect signatures.
-We write $\sigma(\Sig)$ for the application of a parameter substitution to an effect signature, replacing each $\$p \in \mathrm{dom}(\sigma)$ with $\sigma(\$p)$ in all arities.
+Contexts contain three kinds of entry: term variable bindings $x : \forall \vec{\alpha}. A$, type variable declarations $\alpha$, and parameter declarations $\psi$.
+We write $x : A$ for $x : \forall \vec{\alpha}. A$ if $\vec{\alpha}$ ranges over an empty set of tuples.
+We assume all types appearing in a judgement conclusion are well-formed in their context.
 We write $\Sig \setminus \{\op_1, \ldots, \op_n\}$ for the restriction of $\Sig$ to operations not in $\{\op_1, \ldots, \op_n\}$.
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Value Typing}\label{sec:values}
 %% ═══════════════════════════════════════════════════════════════
 
-Rules for judgements of the form $\vj{\G}{v}{A}$.
+Well-formed value types:
+\begin{mathpar}
+  \inferrule{\alpha \in \Theta}{\tj \Theta \Psi \alpha}
 
+  \inferrule{\psi \in \Psi}{\tj \Theta \Psi \psi}
+
+  \inferrule{ }{\tj \Theta \Psi \tbool}
+
+  \inferrule{ \tj \Theta \Psi A \and \tj \Theta \Psi C }{\tj \Theta \Psi \tfun{A}{C}}
+\end{mathpar}
+and so on. Rules for value judgements (assuming $\tj \Theta \Psi {\G, A}$).
 \begin{mathpar}
   \inferrule
-    {(x : A) \in \G}
-    {\vj{\G}{x}{A}}
-    \quad (\textsc{Var})
+  {(x : \forall \vec{\alpha}.B) \in \G \\ [\tj \Theta \Psi {A_i}]_{i=1}^{|\vec{\alpha}|}}
+  {\vj{\Theta}{\Psi}{\G}{x}{B[A_i / \alpha_i]_{i=1}^{|\vec{\alpha}|}]}}
+  \quad (\textsc{Var})
 
   \inferrule
     { }
-    {\vj{\G}{()}{\unit}}
+    {\vj{\Theta}{\Psi}{\G}{()}{\unit}}
     \quad (\textsc{Unit})
 
   \inferrule
     {b \in \{\mathsf{true}, \mathsf{false}\}}
-    {\vj{\G}{b}{\tbool}}
+    {\vj{\Theta}{\Psi}{\G}{b}{\tbool}}
     \quad (\textsc{Bool})
 
   \inferrule
-    {\vj{\G}{v_1}{A} \\ \vj{\G}{v_2}{B}}
-    {\vj{\G}{(v_1, v_2)}{\tpair{A}{B}}}
+  {\vj{\Theta}{\Psi}{\G}{v_1}{A} \\ \vj{\Theta}{\Psi}{\G}{v_2}{B}}
+  {\vj{\Theta}{\Psi}{\G}{(v_1, v_2)}{\tpair{A}{B}}}
     \quad (\textsc{Pair})
 
   \inferrule
-    {\vj{\G}{v}{A}}
-    {\vj{\G}{\inl v}{\teither{A}{B}}}
+  {\vj{\Theta}{\Psi}{\G}{v}{A}}
+  {\vj{\Theta}{\Psi}{\G}{\inl v}{\teither{A}{B}}}
     \quad (\textsc{Inl})
 
   \inferrule
-    {\vj{\G}{v}{B}}
-    {\vj{\G}{\inr v}{\teither{A}{B}}}
+  {\vj{\Theta}{\Psi}{\G}{v}{B}}
+  {\vj{\Theta}{\Psi}{\G}{\inr v}{\teither{A}{B}}}
     \quad (\textsc{Inr})
 
   \inferrule
-    {\cjp{\G, x : A}{c}{C}}
-    {\vj{\G}{\fun x \mapsto c}{\tfun{A}{C}}}
+  {\cjp{\Theta}{\Psi}{\G, x : A}{c}{C}}
+    {\vj{\Theta}{\Psi}{\G}{\fun x \mapsto c}{\tfun{A}{C}}}
     \quad (\textsc{Fun})
 
   \inferrule
-    {\cj{\G, f : \tfun{A}{\comp{B}{\Sig§}},\, x : A}{c}{B}{\Sig}}
-    {\vj{\G}{\rec f\; x \mapsto c}{\tfun{A}{\comp{B}{\Sig}}}}
+  {\cj{\Theta}{\Psi}{\G, f : \tfun{A}{\comp{B}{\Sig}},\, x : A}{c}{B}{\Sig}}
+    {\vj{\Theta}{\Psi}{\G}{\rec f\; x \mapsto c}{\tfun{A}{\comp{B}{\Sig}}}}
     \quad (\textsc{Rec})
 \end{mathpar}
 
@@ -134,31 +145,35 @@ Rules for judgements of the form $\vj{\G}{v}{A}$.
 A handler has the form:
 \[
   \hhandler\;\{
-    \$p_1 \mapsto A_1, \ldots, \$p_m \mapsto A_m,\;
+    \psi_1 \mapsto A_1, \ldots, \psi_m \mapsto A_m,\;
     \ret x_r \mapsto c_r,\;
     \op_1\; x_1\; k_1 \mapsto c_1,\;
     \ldots,\;
     \op_n\; x_n\; k_n \mapsto c_n
   \}
 \]
-
-\noindent
-Optionally, a handler may include type parameter instantiations $\$p_j \mapsto T_j$, which are collected into a substitution $\sigma = \{p_j \mapsto T_j\}_{j=1}^{m}$. When no parameter instantiations are present, $\sigma = \emptyset$.
+A handler includes type parameter instantiations $\psi_j \mapsto T_j$,
+which are collected into a substitution $\sigma = \{\psi_j \mapsto T_j\}_{j=1}^{m}$.
+When no parameter instantiations are present, $\sigma = \emptyset$.
 \begin{mathpar}
   \inferrule{
-    \cj{\G, x_r : A}{c_r}{B}{\Sig'}
+    \cj{\Theta}{\Psi}{\G, x_r : A}{c_r}{B}{\Sig'}
     \\
     \Sig \setminus \{\op_1, \ldots, \op_n\} \subseteq \Sig'
     \\\\
     \left[
       (\op_i : A_i \leadsto B_i) \in \Sig \quad
-      \cj{\G, x_i : A_i,\, k_i : \tfun{B_i}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
+      \cj{\Theta}{\Psi}{\G,\, x_i : A_i,\, k_i : \tfun{B_i}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
     \right]_{i = 1}^{n}
+    \\\\
+    \left[
+      \tj \Theta \Psi {T_j}
+    \right]_{j = 1}^{m}
     }
-    {\vj{\G}{
+    {\vj{\Theta}{\Psi}{\G}{
       \hhandler\;\{\ret x_r \mapsto c_r,\;
         \op_i\; x_i\; k_i \mapsto c_i,\;
-        \$p_j \mapsto T_j
+        \psi_j \mapsto T_j
       \}
     }{\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}}}
     \quad (\textsc{Handler})
@@ -167,82 +182,90 @@ Optionally, a handler may include type parameter instantiations $\$p_j \mapsto T
 The handler type $\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}$ indicates that the handler transforms computations of type $\comp{A}{\Sig}$ into computations of type $\comp{B}{\Sig'}$, instantiating type parameters according to $\sigma$.
 The handled operations $\{\op_1, \ldots, \op_n\}$ must appear in~$\Sig$.
 Unhandled operations are forwarded, requiring $\Sig \setminus \{\op_1, \ldots, \op_n\} \subseteq \Sig'$.
+There is no restriction on the parameter substitutions apart from the types being well-formed. The disjointness of the introduced parameters $\dom(\sigma)$
+from the parameters in the context $\Psi$ is enforced by the $\textsc{Handle}$ clause.
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Computation Typing}\label{sec:computations}
 %% ═══════════════════════════════════════════════════════════════
 
-Rules for judgements of the form $\cj{\G}{c}{A}{\Sig}$.
+Rules for judgements of the form $\cj{\Theta}{\Psi}{\G}{c}{A}{\Sig}$.
+In \textsc{Do}, generalization quantifies the type variables $\bar{\alpha}$ that are free in $\tau$ but not free in the ambient context $\G$ or the shared effect signature $\Sig$.
+Effect parameters $\psi$ are never generalized: they are scoped by the enclosing \textsc{Handle}, not by \textsc{Do}.
 
 \begin{mathpar}
   \inferrule
-    {\vj{\G}{v}{A}}
-    {\cj{\G}{\ret v}{A}{\Sig}}
+  {\vj{\Theta}{\Psi}{\G}{v}{A}}
+  {\cj{\Theta}{\Psi}{\G}{\ret v}{A}{\Sig}}
     \quad (\textsc{Return})
 
   \inferrule
-    {\cj{\G}{c_1}{A}{\Sig}
+  {\cj{\Theta}{\Psi}{\G}{c_1}{\forall \vec{\alpha}. A}{\Sig}
     \\
-    \cj{\G, x : A}{c_2}{B}{\Sig}
+    \cj{\Theta}{\Psi}{\G, x : \forall\bar{\alpha}.A}{c_2}{B}{\Sig}
     }
-    {\cj{\G}{\ddo x \leftarrow c_1 \iin c_2}{B}{\Sig}}
+    {\cj{\Theta}{\Psi}{\G}{\ddo x \leftarrow c_1 \iin c_2}{B}{\Sig}}
     \quad (\textsc{Do})
 
   \inferrule
     {(\op : \arity{A_{\op}}{B_{\op}}) \in \Sig
     \\
-    \vj{\G}{v}{A_{\op}}
+    \vj{\Theta}{\Psi}{\G}{v}{A_{\op}}
     }
-    {\cj{\G}{!\op \ v}{B_\op}{\Sig}}
+    {\cj{\Theta}{\Psi}{\G}{!\op \ v}{B_\op}{\Sig}}
     \quad (\textsc{Op})
 
   \inferrule
-    {\vj{\G}{v}{\tbool}
+  {\vj{\Theta}{\Psi}{\G}{v}{\tbool}
     \\
-    \cj{\G}{c_1}{A}{\Sig}
+    \cj{\Theta}{\Psi}{\G}{c_1}{A}{\Sig}
     \\
-    \cj{\G}{c_2}{A}{\Sig}
+    \cj{\Theta}{\Psi}{\G}{c_2}{A}{\Sig}
     }
-    {\cj{\G}{\iif v \then c_1 \eelse c_2}{A}{\Sig}}
+    {\cj{\Theta}{\Psi}{\G}{\iif v \then c_1 \eelse c_2}{A}{\Sig}}
     \quad (\textsc{If})
 
   \inferrule
-    {\vj{\G}{v}{\teither{A}{B}}
+  {\vj{\Theta}{\Psi}{\G}{v}{\teither{A}{B}}
     \\\\
-    \cjp{\G, x_1 : A}{c_1}{C}
+    \cjp{\Theta}{\Psi}{\G, x_1 : A}{c_1}{C}
     \\
-    \cjp{\G, x_2 : B}{c_2}{C}
+    \cjp{\Theta}{\Psi}{\G, x_2 : B}{c_2}{C}
     }
-    {\cjp{\G}{\ccase v \oof \inl x_1 \to c_1,\; \inr x_2 \to c_2}{C}}
+    {\cjp{\Theta}{\Psi}{\G}{\ccase v \oof \inl x_1 \to c_1,\; \inr x_2 \to c_2}{C}}
     \quad (\textsc{Case})
 
   \inferrule
-    {\vj{\G}{v_1}{\tfun{A}{C}}
+  {\vj{\Theta}{\Psi}{\G}{v_1}{\tfun{A}{C}}
     \\
-    \vj{\G}{v_2}{A}
+    \vj{\Theta}{\Psi}{\G}{v_2}{A}
     }
-    {\cjp{\G}{v_1\; v_2}{C}}
+    {\cjp{\Theta}{\Psi}{\G}{v_1\; v_2}{C}}
     \quad (\textsc{App})
 
-  \inferrule
-    {\vj{\G}{v}{\thandlerp{C}{\sigma}{D}}
+  \inferrule{
+    \vj{\Theta}{\Psi}{\G}{v}{\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}}
     \\
-    \cjp{\G}{c}{C'}
+    \cjp{\Theta}{\Psi}{\G,\, \dom(\sigma)}{c}{C}
     \\
-    \sigma(C') = C
-    \\
-    \mathrm{dom}(\sigma) \cap \ftp(D) = \emptyset
-    }
-    {\cjp{\G}{\with v \handle c}{D}}
-    \quad (\textsc{Handle})
+    \sigma(C) = \comp{A}{\Sig}
+  }{
+    \cjp{\Theta}{\Psi}{\G}{\with v \handle c}{\comp{B}{\Sig'}}
+  }
+  \quad (\textsc{Handle})
+
+  \inferrule{
+    \cj {\Theta, \vec{\alpha}} \Psi \G c A \Sig
+  }{
+    \cj \Theta \Psi \G c {\forall \vec{\alpha}.A} \Sig
+  }
+  \quad (\textsc{Gen})
 \end{mathpar}
 
-In the \textsc{Handle} rule, the body $c$ is typed with computation type $C'$, which may contain free type parameters in its effect signature.
-The handler's substitution $\sigma$ is applied to $C'$, and the result must equal the handler's input type $C$.
-This allows the body to use abstract type parameters (e.g., $\$q$) in its effect arities, which are resolved to concrete types (e.g., $\tunique$) by the handler's parameter instantiation.
-
-When $\sigma = \emptyset$, the premise $\sigma(C') = C$ reduces to $C' = C$, recovering the standard handler application rule.
-The final premise ensures that no operation in the output signature $\Sig'$ still references any type parameter being instantiated by $\sigma$.
-This guarantees that operations whose arities depend on abstract type parameters are always handled by the handler that instantiates them, preventing the escape of uninstantiated parameters.
+In \textsc{Handle}, the body $c$ is typed in the extended context $\G, \dom(\sigma)$, which adds each $\psi_j \in \dom(\sigma)$ as an abstract parameter declaration.
+Inside the body, the $\psi_j$ are unknown types; the handler resolves them via $\sigma$.
+The premise $\sigma(C) = \comp{A}{\Sig}$ states that applying the handler's substitution to the body's type yields the handler's input type.
+Since the output type $\comp{B}{\Sig'}$ is typed in the outer $\G$ (which does not contain $\dom(\sigma)$), well-formedness of the conclusion directly prevents the instantiated parameters from escaping.
+When $\sigma = \emptyset$, the rule reduces to the standard handler application rule.
 
 \end{document}
