@@ -3,17 +3,28 @@
 \usepackage{amsfonts}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{hyperref}
+\usepackage{cleveref}
 \usepackage{mathtools}
 \usepackage[margin=1in]{geometry}
 \usepackage{mathpartir}
-\usepackage{amsthm}
 \usepackage{stmaryrd}
 
-\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{prop}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{conjecture}[theorem]{Conjecture}
+\newtheorem{claim}[theorem]{Claim}
 
-\newtheorem{lemma}{Lemma}
-\newtheorem{theorem}{Theorem}
-\newtheorem{remark}{Remark}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{question}[theorem]{Question}
+
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
 
 % ── Macros ──────────────────────────────────────────────────────
 \newcommand{\void}{\mathsf{Void}}
@@ -49,12 +60,14 @@
 \newcommand{\hhandler}{\mathsf{handler}}
 \newcommand{\with}{\mathsf{with}\;}
 \newcommand{\handle}{\;\mathsf{handle}\;}
+\newcommand{\effect}{\mathsf{effect}\;}
 \newcommand{\dom}{\mathsf{dom}}
 
 \newcommand{\G}{\Gamma}
 \newcommand{\Sig}{\Sigma}
 \newcommand{\ftv}{\mathsf{ftv}}
 \newcommand{\fpv}{\mathsf{fpv}}
+\newcommand{\ops}{\mathsf{ops}}
 
 \newcommand{\tj}[3]{#1; #2 \vdash #3}                            % type judgement
 \newcommand{\vj}[5]{#1; #2; #3 \vdash #4 : #5}                   % value judgement
@@ -74,31 +87,36 @@
 
 \[
 \begin{array}{lrcl}
-  \text{Monotypes}           & A, B  & ::=   & \alpha \mid \psi \mid \void \mid \unit \mid \tpair{A}{B} \mid \teither{A}{B} \mid \tfun{A}{C} \mid \thandlerp{C}{\sigma}{D} \\[6pt]
-  \text{Computation types}   & C, D  & ::= & \comp{A}{\Sig} \\[6pt]
-  \text{Effect signatures}   & \Sig          & ::= & \{ \op_1 : A_1 \leadsto B_1,\; \ldots,\; \op_n : A_n \leadsto B_n \} \\[6pt]
-  \text{Param.\ subst.}      & \sigma        & ::= & \{ \psi_1 \mapsto A_1,\; \ldots,\; \psi_m \mapsto A_m \} \\[6pt]
-  \text{Type Variables}      & \Theta        & ::= & \{ \alpha_1, \; \ldots, \; \alpha_n \} \\[6pt]
-  \text{Parameter Variables} & \Psi          & ::= & \{ \psi_1, \; \ldots, \; \psi_n \} \\[6pt]
-  \text{Contexts}            & \G            & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
+  \text{Value types}         & A, B   & ::= & \alpha \mid \psi \mid \void \mid \unit \mid \tpair{A}{B} \mid \teither{A}{B} \mid \tfun{A}{C} \mid \thandler{C}{D} \\[6pt]
+  \text{Computation types}   & C, D   & ::= & \comp{A}{\Sig} \\[6pt]
+  \text{Effect signatures}   & \Sig   & ::= & \{ \op_1 : A_1 \leadsto B_1,\; \ldots,\; \op_n : A_n \leadsto B_n \} \\[6pt]
+  \text{Type variables}      & \Theta & ::= & \{ \alpha_1, \; \ldots, \; \alpha_n \} \\[6pt]
+  \text{Parameter variables} & \Psi   & ::= & \{ \psi_1, \; \ldots, \; \psi_n \} \\[6pt]
+  \text{Contexts}            & \G     & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
 \end{array}
 \]
-
-The syntax of values and computations is as follows, where $h$ denotes a handler form defined in Section~\ref{sec:handler}.
+The syntax of values and computations is as follows.
 \[
 \begin{array}{lrcl}
   \text{Values}       & v, w & ::= & x \mid () \mid b \mid n \mid (v_1, v_2) \mid \inl v \mid \inr v
                                      \mid \fun x \mapsto c \mid \rec f\;x \mapsto c \mid h \\[6pt]
+  \text{Handler}      & h    & ::= &
+    \hhandler\;\{
+      \ret x_r \mapsto c_r,\;
+      \op_1\; x_1\; k_1 \mapsto c_1,\;
+      \ldots,\;
+      \op_n\; x_n\; k_n \mapsto c_n
+    \} \\[6pt]
   \text{Computations} & c, d & ::= & \ret v \mid \ddo x \leftarrow c \iin d \mid \op(v;\;x.c)
                                      \mid \with v \handle c \\[2pt]
                       &      &     & \mid\; v_1\;v_2 \mid \iif v \then c_1 \eelse c_2
                                      \mid \ccase v \oof \inl x_1 \to c_1,\;\inr x_2 \to c_2
 \end{array}
 \]
-The form $\op(v;\;x.c)$ denotes an operation call: $\op$ is invoked with argument $v$, the result is bound to $x$, and execution continues as $c$.
-The surface syntax $\ddo x \leftarrow {!}\op\;v \iin c$ desugars to $\op(v;\;x.c)$.
+The form $\op(v;\;x.c)$ denotes an operation call; $\op$ is invoked with argument $v$, the result is bound to $x$, and execution continues as $c$.
+The surface syntax ${!}\op\;v$ desugars to $\op(v;\;x.\ret x)$.
 
-There are three types of contexts: one for type variables $\Theta$, one for parameter variables $\Psi$ and one for variable schemes $\G$.
+There are three types of contexts: one for type variables $\Theta$, one for parameter variables $\Psi$, and one for variable schemes $\G$.
 We write $x : A$ for $x : \forall \vec{\alpha}. A$ if $\vec{\alpha}$ ranges over an empty set of tuples.
 We assume all types appearing in a judgement conclusion are well-formed in their context.
 We write $\Sig \setminus \{\op_1, \ldots, \op_n\}$ for the restriction of $\Sig$ to operations not in $\{\op_1, \ldots, \op_n\}$.
@@ -158,28 +176,7 @@ and so on. Rules for value judgements (assuming $\tj \Theta \Psi {\G, A}$).
   {\cj{\Theta}{\Psi}{\G, f : \tfun{A}{\comp{B}{\Sig}},\, x : A}{c}{B}{\Sig}}
     {\vj{\Theta}{\Psi}{\G}{\rec f\; x \mapsto c}{\tfun{A}{\comp{B}{\Sig}}}}
     \quad (\textsc{Rec})
-\end{mathpar}
 
-%% ═══════════════════════════════════════════════════════════════
-\section{Handler Typing}\label{sec:handler}
-%% ═══════════════════════════════════════════════════════════════
-
-A handler has the form:
-\[
-  \hhandler\;\{
-    \psi_1 \mapsto A_1, \ldots, \psi_m \mapsto A_m,\;
-    \ret x_r \mapsto c_r,\;
-    \op_1\; x_1\; k_1 \mapsto c_1,\;
-    \ldots,\;
-    \op_n\; x_n\; k_n \mapsto c_n
-  \}
-\]
-A handler includes type parameter instantiations $\psi_j \mapsto T_j$,
-which are collected into a substitution $\sigma = \{\psi_j \mapsto T_j\}_{j=1}^{m}$.
-When no parameter instantiations are present, $\sigma = \emptyset$.
-
-Rules for value judgements (assuming $\tj \Theta \Psi {\G, \forall \vec{\alpha}.A, \Sig}$).
-\begin{mathpar}
   \inferrule{
     \cj{\Theta}{\Psi}{\G, x_r : A}{c_r}{B}{\Sig'}
     \\
@@ -189,32 +186,24 @@ Rules for value judgements (assuming $\tj \Theta \Psi {\G, \forall \vec{\alpha}.
       (\op_i : A_i \leadsto B_i) \in \Sig \quad
       \cj{\Theta}{\Psi}{\G,\, x_i : A_i,\, k_i : \tfun{B_i}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
     \right]_{i = 1}^{n}
-    \\\\
-    \left[
-      \tj \Theta \Psi {T_j}
-    \right]_{j = 1}^{m}
     }
     {\vj{\Theta}{\Psi}{\G}{
       \hhandler\;\{\ret x_r \mapsto c_r,\;
-        \op_i\; x_i\; k_i \mapsto c_i,\;
-        \psi_j \mapsto T_j
-      \}
-    }{\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}}}
+        \op_i\; x_i\; k_i \mapsto c_i
+      \}_{i = 1}^{n}
+    }{\thandler{\comp{A}{\Sig}}{\comp{B}{\Sig'}}}}
     \quad (\textsc{Handler})
 \end{mathpar}
-
-The handler type $\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}$ indicates that the handler transforms computations of type $\comp{A}{\Sig}$ into computations of type $\comp{B}{\Sig'}$, instantiating type parameters according to $\sigma$.
-The handled operations $\{\op_1, \ldots, \op_n\}$ must appear in~$\Sig$.
+In the handler rule, the handled operations $\{\op_1, \ldots, \op_n\}$ must appear in~$\Sig$.
 Unhandled operations are forwarded, requiring $\Sig \setminus \{\op_1, \ldots, \op_n\} \subseteq \Sig'$.
-There is no restriction on the parameter substitutions apart from the types being well-formed. The disjointness of the introduced parameters $\dom(\sigma)$
-from the parameters in the context $\Psi$ is enforced by the $\textsc{Handle}$ clause.
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Computation Typing}\label{sec:computations}
 %% ═══════════════════════════════════════════════════════════════
 
 Rules for judgements of the form $\cj{\Theta}{\Psi}{\G}{c}{A}{\Sig}$.
-In \textsc{Do}, generalization quantifies the type variables $\bar{\alpha}$ that are free in $A$ but not free in the ambient context $\G$ or the shared effect signature $\Sig$.
+In \textsc{Do}, generalization quantifies the type variables $\vec{\alpha}$ that are free in $A$
+but not free in the ambient context $\G$ or the shared effect signature $\Sig$.
 Effect parameters $\psi$ are never generalized.
 
 \begin{mathpar}
@@ -226,7 +215,7 @@ Effect parameters $\psi$ are never generalized.
   \inferrule
   {\cj{\Theta}{\Psi}{\G}{c_1}{\forall \vec{\alpha}. A}{\Sig}
     \\
-    \cj{\Theta}{\Psi}{\G, x : \forall\bar{\alpha}.A}{c_2}{B}{\Sig}
+    \cj{\Theta}{\Psi}{\G, x : \forall\vec{\alpha}.A}{c_2}{B}{\Sig}
     }
     {\cj{\Theta}{\Psi}{\G}{\ddo x \leftarrow c_1 \iin c_2}{B}{\Sig}}
     \quad (\textsc{Do})
@@ -270,13 +259,13 @@ Effect parameters $\psi$ are never generalized.
     \quad (\textsc{App})
 
   \inferrule{
-    \vj{\Theta}{\Psi}{\G}{v}{\thandlerp{\comp{A}{\Sig}}{\sigma}{\comp{B}{\Sig'}}}
+    \vj{\Theta}{\Psi}{\G}{v}{\thandler{C[\vec{T} / \vec{\psi}]}{D}}
     \\
-    \cjp{\Theta}{\Psi, \dom(\sigma)}{\G}{c}{C}
+    \cjp{\Theta}{\Psi, \vec{\psi}}{\G}{c}{C}
     \\
-    \sigma(C) = \comp{A}{\Sig}
+    \left[\tj \Theta \Psi {T_j}\right]_{j=1}^{|\vec{T}|}
   }{
-    \cjp{\Theta}{\Psi}{\G}{\with v \handle c}{\comp{B}{\Sig'}}
+    \cjp{\Theta}{\Psi}{\G}{\with v, \{\vec{\psi}\mapsto\vec{T}\} \handle c}{D}
   }
   \quad (\textsc{Handle})
 
@@ -288,13 +277,15 @@ Effect parameters $\psi$ are never generalized.
   \quad (\textsc{Gen})
 \end{mathpar}
 
-In \textsc{Handle}, the body $c$ is typed in the extended parameter context $\Psi, \dom(\sigma)$,
-which adds each $\psi_j \in \dom(\sigma)$ as an abstract parameter declaration.
-Inside the body, the $\psi_j$ are unknown types; the handler resolves them via $\sigma$.
-The premise $\sigma(C) = \comp{A}{\Sig}$ states that applying the handler's substitution to the body's type yields the handler's input type.
-Since the output type $\comp{B}{\Sig'}$ is typed in the outer $\G$ (which does not contain $\dom(\sigma)$),
+
+In \textsc{Handle}, the body $c$ is typed in the extended parameter context $\Psi, \vec{\psi}$.
+Inside the body, the $\psi_j$ are unknown types. They are only resolved by a handle clause.
+A handle clause these types with parameter instantiations $\vec{\psi} \mapsto \vec{T}$,
+which are collected into a substitution $\sigma = \{\vec{\psi} \mapsto \vec{T}\}$.
+The handler domain $C[\vec{T} / \vec{\psi}]$ states that applying the parameter substitution to the body's type yields the handler's input type.
+Since the output type $\comp{B}{\Sig'}$ is typed in the outer $\G$ (which does not contain $\vec{\psi}$),
 well-formedness of the conclusion directly prevents the instantiated parameters from escaping.
-When $\sigma = \emptyset$, the rule reduces to the standard handler application rule.
+When $\vec{\psi} = \emptyset$, the rule reduces to the standard handler application rule.
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Operational Semantics}\label{sec:opsem}
@@ -302,11 +293,10 @@ When $\sigma = \emptyset$, the rule reduces to the standard handler application 
 
 Evaluation contexts identify where the next reduction step occurs:
 \[
-  E \;::=\; [\,]
-    \;\mid\; \ddo x \leftarrow E \iin c
-    \;\mid\; \with v \handle E
+  E \;::=\; \square
+    \mid \ddo x \leftarrow E \iin c
+    \mid \with v \handle E
 \]
-
 Single-step reduction $c \leadsto c'$ is defined by the axioms below, closed under the congruence rule: if $c \leadsto c'$ then $E[c] \leadsto E[c']$.
 
 \paragraph{Pure reductions.}
@@ -320,7 +310,10 @@ Single-step reduction $c \leadsto c'$ is defined by the axioms below, closed und
     & (\beta\text{-rec}) \\[4pt]
   \ddo x \leftarrow \ret v \iin c
     & \leadsto & c[v/x]
-    & (\beta\text{-do}) \\[4pt]
+    & (\beta\text{-do-ret}) \\[4pt]
+  \ddo x \leftarrow \op(v; y.c) \iin c'
+    & \leadsto & \op(v; y.\ddo x \leftarrow c \iin c')
+    & (\beta\text{-do-op}) \\[4pt]
   \iif \mathsf{true} \then c_1 \eelse c_2
     & \leadsto & c_1
     & (\beta\text{-if}_T) \\[4pt]
@@ -338,34 +331,38 @@ Single-step reduction $c \leadsto c'$ is defined by the axioms below, closed und
 
 \paragraph{Handler reductions.}
 
-Let $h = \hhandler\;\{\psi_j \mapsto T_j,\;\ret x_r \mapsto c_r,\;\op_i\;x_i\;k_i \mapsto c_i\}_{i=1}^{n}$.
+Let $h = \hhandler\;\{\ret x_r \mapsto c_r,\;\op_i\;x_i\;k_i \mapsto c_i\}_{i=1}^{n}$.
 
 \[
 \begin{array}{lcll}
-  \with h \handle \ret v
+  \with h, \sigma \handle \ret v
     & \leadsto & c_r[v/x_r]
-    & (\textsc{Handle-Ret}) \\[6pt]
-  \with h \handle \op_i(v;\;y.c)
+    & (\beta\text{-ret}) \\[4pt]
+    \with h,\sigma \handle \op_i(v;\;y.c)
     & \leadsto & c_i\bigl[v/x_i,\;(\fun y \mapsto \with h \handle c)/k_i\bigr]
-    & (\textsc{Handle-Op}) \\[6pt]
-  \with h \handle \op(v;\;y.c)
+    & (\beta\text{-op}) \\[4pt]
+  \with h,\sigma \handle \op(v;\;y.c)
     & \leadsto & \op(v;\;y.\;\with h \handle c)
-    & (\textsc{Handle-Fwd})
+    & (\beta\text{-fwd})
 \end{array}
 \]
 
 \noindent
-\textsc{Handle-Op} applies when $\op \in \{\op_1, \ldots, \op_n\}$;
-\textsc{Handle-Fwd} applies when $\op \notin \{\op_1, \ldots, \op_n\}$.
-The continuation supplied to the clause in \textsc{Handle-Op} is $\fun y \mapsto \with h \handle c$:
-the handler is reinstated around the remaining computation $c$, giving \emph{deep} handler semantics.
+($\beta$-op) applies when $\op \in \{\op_1, \ldots, \op_n\}$, while
+($\beta$-fwd) applies when $\op \notin \{\op_1, \ldots, \op_n\}$.
+The continuation supplied to the clause in ($\beta$-op) is $\fun y \mapsto \with h \handle c$,
+reinstating the handler to give \emph{deep} handler semantics.
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Metatheory}\label{sec:meta}
+%% ═══════════════════════════════════════════════════════════════
 
 \begin{definition}
   \emph{Parameter erasure} is a map $\lfloor - \rfloor$ on values and computations given by
   \[
-    \bigl\lfloor \hhandler\;\{\psi_j \mapsto T_j,\;\ret x_r \mapsto c_r,\;\op_i\;x_i\;k_i \mapsto c_i\} \bigr\rfloor
+    \bigl\lfloor \with h, \sigma \handle c \bigr\rfloor
     \;=\;
-    \hhandler\;\{\ret x_r \mapsto \lfloor c_r \rfloor,\;\op_i\;x_i\;k_i \mapsto \lfloor c_i \rfloor\},
+    \with \lfloor h \rfloor, \emptyset \handle \lfloor c \rfloor
   \]
   and structural identity on all other value and computation forms.
 \end{definition}
@@ -376,14 +373,10 @@ the handler is reinstated around the remaining computation $c$, giving \emph{dee
 \end{lemma}
 
 \begin{proof}
-  The parameter instantiations $\psi_j \mapsto T_j$ carried by a handler value appear in no
-  premise or conclusion of any reduction rule.  Consequently, erasing all parameter annotations
+  The parameter instantiations $\sigma$ in a \textsc{Handle} term do not appear in
+  the conclusion of any reduction rule. Consequently, erasing all parameter annotations
   from a well-typed closed program yields a program with an identical reduction sequence.
 \end{proof}
-
-%% ═══════════════════════════════════════════════════════════════
-\section{Metatheory}\label{sec:meta}
-%% ═══════════════════════════════════════════════════════════════
 
 \begin{lemma}[Parameter Substitution]\label{lem:param-subst}
   If $\tj{\Theta}{\Psi}{T}$, then:
@@ -399,9 +392,9 @@ the handler is reinstated around the remaining computation $c$, giving \emph{dee
   All other cases follow by straightforward induction: $\psi$ is a type variable and $[T/\psi]$ distributes uniformly over all type constructors without affecting the term structure.
 \end{proof}
 
-The following results extend those of Kammar and Pretnar to the parameterised setting.
+The following results extend~\cite{kammar_handlers_2013} to the parameterized setting.
 Progress and preservation for all rules except \textsc{Handle} carry over unchanged;
-the \textsc{Handle-Op} case of preservation uses Lemma~\ref{lem:param-subst}.
+the ($\beta$-op) case of preservation uses \Cref{lem:param-subst}.
 
 \begin{theorem}[Progress]\label{thm:progress}
   If $\cj{\emptyset}{\emptyset}{\emptyset}{c}{A}{\emptyset}$, then either $c = \ret v$ for some value $v$,
@@ -409,8 +402,9 @@ the \textsc{Handle-Op} case of preservation uses Lemma~\ref{lem:param-subst}.
 \end{theorem}
 
 \begin{proof}
-  By Lemma~\ref{lem:erasure}, $\lfloor c \rfloor$ is a well-typed K\&P program with an identical reduction sequence.
-  Progress for $\lfloor c \rfloor$ follows from Kammar and Pretnar: either $\lfloor c \rfloor = \ret v$, in which case $c = \ret v$ since erasure does not alter the term structure; or $\lfloor c \rfloor \leadsto d$, in which case Lemma~\ref{lem:erasure} gives $c \leadsto c'$ for some $c'$.
+  By \Cref{lem:erasure}, $\lfloor c \rfloor$ is a well-typed program in the plain algebraic effects system with an identical reduction sequence.
+  Progress for $\lfloor c \rfloor$ follows from \cite{kammar_handlers_2013}: either $\lfloor c \rfloor = \ret v$, in which case $c = \ret v'$ for some value $v'$,
+  since erasure does not alter the term structure; or $\lfloor c \rfloor \leadsto d$, in which case \Cref{lem:erasure} gives $c \leadsto c'$ for some $c'$.
 \end{proof}
 
 \begin{theorem}[Preservation]\label{thm:preservation}
@@ -419,78 +413,179 @@ the \textsc{Handle-Op} case of preservation uses Lemma~\ref{lem:param-subst}.
 
 \begin{proof}
   By induction on the derivation of $c \leadsto c'$.
-  All cases except \textsc{Handle-Op} are identical to Kammar and Pretnar.
-  For \textsc{Handle-Op}: the body is typed in $\Theta;\Psi, \dom(\sigma);\G$ with $\sigma(C) = \comp{A}{\Sig}$, and each clause body $c_i$ is typed with concrete argument and continuation types $\sigma(A_i)$, $\sigma(B_i)$.
-  Applying Lemma~\ref{lem:param-subst} once for each $\psi_j \in \dom(\sigma)$ yields the required typing for the substituted reduct $c_i[v/x_i,\;(\fun y \mapsto \with h \handle c)/k_i]$.
+  All cases except ($\beta$-op) are identical to \cite{kammar_handlers_2013}.
+  For ($\beta$-op), the premise of the reduction rule arises in the following way:
+  \[
+    {\scriptsize
+    \inferrule{
+      \vj{\Theta}{\Psi}{\G}{h}{\thandler{\comp{A}{\Sig}}{\comp{B}{\Sig'}}}
+      \\
+      \inferrule{
+        (\op : \widetilde{A}_\op \to \widetilde{B}_\op) \in \widetilde \Sig
+        \\
+        \vj{\Theta}{\Psi, \dom(\sigma)}{\G}{v}{\widetilde{A}_\op}
+        \\
+        \cj{\Theta}{\Psi, \dom(\sigma)}{\G, y : \widetilde{B}_\op}{c}{\widetilde{A}}{\widetilde \Sig}
+      }{
+        \cj{\Theta}{\Psi, \dom(\sigma)}{\G}{\op(v; y.c)}{\widetilde A}{\widetilde \Sig}
+      }
+    }{
+      \cj{\Theta}{\Psi}{\G}{\with h, \sigma \handle \op(v; y.c)}{B}{\Sig'}
+    }}
+  \]
+  where $\sigma(\comp{\widetilde A}{\widetilde \Sig}) = \comp{A}{\Sig}$.
+  Applying \Cref{lem:param-subst} for each $\psi \in \dom(\sigma)$ yields the following typing derivation.
+  \[
+    {\scriptsize
+    \inferrule{
+      \vj{\Theta}{\Psi}{\G}{h}{\thandler{\comp{A}{\Sig}}{\comp{B}{\Sig'}}}
+      \\
+      \inferrule{
+        (\op : A_\op \to B_\op) \in \Sig
+        \\
+        \vj{\Theta}{\Psi}{\G}{v}{A_\op}
+        \\
+        \cj{\Theta}{\Psi}{\G, y : B_\op}{c}{A}{\Sig}
+      }{
+        \cj{\Theta}{\Psi}{\G}{\op(v; y.c)}{A}{\Sig}
+      }
+    }{
+      \cj{\Theta}{\Psi}{\G}{\with h, \emptyset \handle \op(v; y.c)}{B}{\Sig'}
+    } }
+  \]
+  So we can appeal to~\cite{kammar_no_2017} for preservation of this reduction rule.
 \end{proof}
 
-%% ── Logical relation and parametricity ─────────────────────────
+%% ═══════════════════════════════════════════════════════════════
+\section{Parametricity}\label{sec:parametricity}
+%% ═══════════════════════════════════════════════════════════════
 
-\begin{definition}[Kripke relational environment]
-  A \emph{possible-worlds structure} is a preorder $(W, \leq)$.
-  A \emph{Kripke relational environment} over $(W, \leq)$ is a family
-  $\mathcal{R} = \{\mathcal{R}_w\}_{w \in W}$ where each $\mathcal{R}_w$ assigns a binary relation
-  $\mathcal{R}_w(\tau)$ to each type variable $\tau \in \Theta \cup \Psi$, subject to
-  \emph{monotonicity}: if $w \leq w'$ then $\mathcal{R}_w(\tau) \subseteq \mathcal{R}_{w'}(\tau)$.
-\end{definition}
+...
 
-The world $w$ records the \emph{instance correspondence} established so far between two runs:
-which concrete instances on one side have been paired with which on the other.
-Monotonicity says that once two instances are paired, they remain paired in all future worlds;
-worlds only grow as new instances are created.
+%% ═══════════════════════════════════════════════════════════════
+\section{Type Inference}\label{sec:inference}
+%% ═══════════════════════════════════════════════════════════════
 
-The \emph{logical relation} $\llbracket A \rrbracket_w$ is defined by induction on $A$, at each world $w$:
-\[
-\begin{array}{lcl}
-  \llbracket \tau \rrbracket_w               & = & \mathcal{R}_w(\tau) \quad (\tau \in \Theta \cup \Psi) \\[4pt]
-  \llbracket \tpair{A}{B} \rrbracket_w   & = & \{((v_1,v_2),(w_1,w_2)) \mid (v_1,w_1)\in\llbracket A\rrbracket_w,\;(v_2,w_2)\in\llbracket B\rrbracket_w\} \\[4pt]
-  \llbracket \teither{A}{B} \rrbracket_w & = & \{(\inl v,\inl w')\mid(v,w')\in\llbracket A\rrbracket_w\} \;\cup\; \{(\inr v,\inr w')\mid(v,w')\in\llbracket B\rrbracket_w\} \\[4pt]
-  \llbracket \tfun{A}{C} \rrbracket_w    & = & \{(f_1,f_2) \mid \forall w' \geq w,\; \forall(v_1,v_2)\in\llbracket A\rrbracket_{w'}.\;(f_1\,v_1,\,f_2\,v_2)\in\llbracket C\rrbracket_{w'}\}
-\end{array}
-\]
-For computation types, $(c_1, c_2) \in \llbracket \comp{A}{\Sig} \rrbracket_w$ is defined coinductively:
-\begin{itemize}
-  \item if $c_i \leadsto^{*} \ret v_i$ then $(v_1, v_2) \in \llbracket A \rrbracket_w$;
-  \item if $c_i \leadsto^{*} \op_k(v_i;\;y.\,c'_i)$ for some $(\op_k : \arity{A_k}{B_k}) \in \Sig$,
-        then $(v_1, v_2) \in \llbracket A_k \rrbracket_w$ and
-        for all $w' \geq w$ and $(r_1, r_2) \in \llbracket B_k \rrbracket_{w'}$,\quad
-        $(c'_1[r_1/y],\, c'_2[r_2/y]) \in \llbracket \comp{A}{\Sig} \rrbracket_{w'}$.
-\end{itemize}
-The step to $w' \geq w$ in the operation case is what accommodates instance creation:
-when an operation returns a freshly allocated instance, the two runs extend the world to $w'$
-by recording the new correspondence, and the continuation runs in that larger world.
+The inference algorithm extends Hindley--Milner~\cite{damas_principal_1982} allowing for explicit effect annotations.
+Otherwise, the algorithm is ordinary HM inference.
+Two completeness results relate the algorithm to the declarative system of \Cref{sec:computations}.
 
-Write $C = \comp{A_r}{\Sig}$.
-Because $\sigma_1 \neq \sigma_2$ in general, the handler types $\sigma_1(C) \xRightarrow{\sigma_1} D$ and
-$\sigma_2(C) \xRightarrow{\sigma_2} D$ differ; the following is therefore a \emph{heterogeneous} relation
-in the spirit of Reynolds' parametricity.
-Handlers $h_1 : \sigma_1(C) \xRightarrow{\sigma_1} D$ and $h_2 : \sigma_2(C) \xRightarrow{\sigma_2} D$
-are \emph{$\mathcal{R}$-related at world $w$} if:
-\begin{itemize}
-  \item \emph{Return:} for all $w' \geq w$ and $(v_1, v_2) \in \llbracket A_r \rrbracket_{w'}$,\quad
-        $(c_{r,1}[v_1/x_r],\; c_{r,2}[v_2/x_r]) \in \llbracket D \rrbracket_{w'}$;
-  \item \emph{Operations:} for each $(\op_i : \arity{A_i}{B_i}) \in \Sig$,
-        for all $w' \geq w$, $(v_1,v_2) \in \llbracket A_i \rrbracket_{w'}$ and
-        $(k_1,k_2) \in \llbracket \tfun{B_i}{D} \rrbracket_{w'}$,\quad
-        $(c_{i,1}[v_1/x_i,k_1/k_i],\; c_{i,2}[v_2/x_i,k_2/k_i]) \in \llbracket D \rrbracket_{w'}$.
-\end{itemize}
+\begin{lemma}[Ground Completeness] \label{thm:ground-complete}
+  Suppose every handle expression in $t$ has $\sigma = \emptyset$.
+  If\/ $\cjp{\Theta}{\Psi}{\G}{t}{C}$ is derivable declaratively, the algorithm infers
+  a type $C'$ of which $C$ is an instance.
+\end{lemma}
 
-\begin{theorem}[Effect Parametricity]\label{thm:parametricity}
-  Let $\cjp{\Theta}{\Psi, \vec{\psi}}{\G}{c}{C}$.
-  Let $\sigma_1, \sigma_2$ be parameter instantiations for $\vec{\psi}$, let $(W, \leq)$ be a
-  possible-worlds structure, and let $\mathcal{R}$ be a Kripke relational environment such that
-  $\mathcal{R}_w(\psi_j) \subseteq \sigma_1(\psi_j) \times \sigma_2(\psi_j)$ for each $\psi_j$ and $w \in W$.
-  For any world $w_0 \in W$, if $h_1 : \sigma_1(C) \xRightarrow{\sigma_1} D$ and
-  $h_2 : \sigma_2(C) \xRightarrow{\sigma_2} D$ are $\mathcal{R}$-related at $w_0$, then
-  \[
-    (\with h_1 \handle c,\;\with h_2 \handle c) \;\in\; \llbracket D \rrbracket_{w_0}.
-  \]
+\begin{proof}
+  Any derivation in this fragment is identical to a derivation in the plain algebraic effects system,
+  for which completeness has been established~\cite{kammar_no_2017}.
+\end{proof}
+
+The second result covers the full parameterized system.
+An \emph{annotated term} is one in which every handle expression
+$\with v \handle c$ carries an explicit type annotation
+$\with v \handle (c : C)$.
+
+\begin{theorem}[Parameterized Completeness]\label{thm:param-complete}
+  Let $t$ be an annotated term and let $\G$ contain principal types for all variables.
+  If $\cjp{\Theta}{\Psi}{\G}{t}{C}$ is derivable in the declarative system, then the
+  algorithm infers a principal type $C'$ of which $C$ is an instance.
 \end{theorem}
 
 \begin{proof}
-  By the fundamental theorem of the logical relation, applied to the \textsc{Handle} rule.
-  The body $c$ is typed in $\Theta;\Psi,\vec{\psi};\G$ with $\vec{\psi}$ abstract, so it interacts with $\vec{\psi}$ only through the operation clauses.
-  At each operation call the two runs step to a common future world $w' \geq w_0$ recording any new instance correspondence; the $\mathcal{R}$-relatedness of $h_1$ and $h_2$ at every $w' \geq w_0$ ensures the executions remain related throughout, and the return clause closes the argument at termination.
+  By induction on the size of the declarative derivation. The only non-standard cases are:
+  \begin{itemize}
+    \item \emph{\textsc{Do}.}
+          By \emph{gen admissibility}~\cite{damas_principal_1982}, any declarative derivation
+          can be rearranged so that \textsc{Gen} appears only immediately below
+          \textsc{Do}. This extends to our system because effect parameters are never generalized.
+
+    \item \emph{\textsc{Handle}.}
+          The algorithm infers the handler type
+          $\sigma(C) \xRightarrow{\sigma} D$ by the induction hypothesis, and checks the body against the explicitly given $C$
+          where the parameter context is extended by $\dom(\sigma)$.
+          Verification that $\sigma(C)$ is the handler's input type is a single pass of
+          substitution followed by equality checking.
+          No additional unification is required.
+  \end{itemize}
 \end{proof}
+
+The annotation in \Cref{thm:param-complete} specifies the full type $C$ of the body.
+The following theorem strengthens this to a minimal annotation consisting only of the
+operation arities that mention $\dom(\sigma)$.
+
+\begin{definition}[$\sigma$-relevant operations] \label{def:relevant}
+  Given a handler $v$ with parameter substitution $\sigma$, the
+  \emph{$\sigma$-relevant subset} of the handled signature is
+  \[
+    \ops_\sigma(v)
+    \;=\;
+    \bigl\{\,\op_i : A_i \leadsto B_i \mid
+      \op_i \text{ handled by } v
+      \text{ and }
+      \dom(\sigma) \cap (\fpv(A_i) \cup \fpv(B_i)) \neq \emptyset
+    \,\bigr\}.
+  \]
+  A \emph{minimally annotated term} is one in which each handle expression
+  $\with v \handle c$ carries an annotation listing only $\ops_\sigma(v)$;
+  the return type and all other operations are omitted.
+\end{definition}
+
+\begin{corollary}[Minimal Annotation Completeness]\label{thm:minimal-complete}
+  Let $t$ be a minimally annotated term and let $\G$ contain principal types for all
+  variables.
+  If\/ $\cjp{\Theta}{\Psi}{\G}{t}{A}$ is derivable declaratively, then the algorithm
+  infers a principal type $A'$ of which $A$ is an instance.
+\end{corollary}
+
+\begin{proof}
+  We extend the proof of \Cref{thm:param-complete}, strengthening the \textsc{Handle} case.
+  Partition the body's effect signature into three groups:
+
+  \begin{enumerate}
+    \item \emph{$\sigma$-relevant handled ops.}
+          The annotation seeds each $\psi_j \in \dom(\sigma)$ as a rigid constant
+          into $\Psi$, and the argument proceeds as in \Cref{thm:param-complete}.
+
+    \item \emph{$\sigma$-free handled ops.}
+          For any such $\op_i : A_i \leadsto B_i$ we have
+          $\dom(\sigma) \cap (\fpv(A_i) \cup \fpv(B_i)) = \emptyset$,
+          so $\sigma(A_i) = A_i$ and $\sigma(B_i) = B_i$.
+          Typing subterms against the handler's concrete arity already gives the correct
+          abstract type; no annotation is needed.
+          Moreover, since $\psi$ does not appear in $A_i$ or $B_i$, every unification
+          constraint arising from $\op_i$ is $\sigma$-free, so the rigid $\psi$
+          established by group~(1) is not disturbed.
+
+    \item \emph{Forwarded ops.}
+          Forwarded operations flow from the body's signature into $D$ unchanged, so
+          their arities are $\sigma$-free.
+          The argument is then identical to group~(2).
+  \end{enumerate}
+  \emph{Return type.}
+  With each $\psi_j$ rigid in $\Psi$, the unification variable the algorithm introduces
+  for the return type is constrained only by value-level subterms of $c$.
+  Since $\psi_j$ acts as a ground constant to the unifier, the resulting value type is
+  principal without any annotation on the return position.
+\end{proof}
+
+The annotation $\ops_\sigma(v)$ is a term-independent sufficient condition.
+However, individual operations in $\ops_\sigma(v)$ may be omitted when
+$\psi$ propagates to their arity via term-level value flow.
+For example, consider operations $\mathsf{get} : \unit \leadsto \psi$ and
+$\mathsf{set} : \psi \leadsto \unit$. Annotating only $\mathsf{get}$ in a computation body
+$\ddo x \leftarrow {!}\mathsf{get}\; () \iin {!}\mathsf{set}\;x$ permits the algorithm
+to infer $\mathsf{set} : \psi \leadsto \unit$ from $x : \psi$.
+
+For this reason, Cambria allows individual effect operations to be types with the
+syntax,
+\[
+\effect !\op : A \leadsto B. \; c,
+\]
+but enforces no constraints on which operations need to be annotated,
+leaving the programmer to manage the interface on their own.
+
+\bibliography{library}
+\bibliographystyle{plainurl}
 
 \end{document}
