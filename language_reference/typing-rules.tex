@@ -483,8 +483,8 @@ Two completeness results relate the algorithm to the declarative system of \Cref
 
 The second result covers the full parameterized system.
 An \emph{annotated term} is one in which every handle expression
-$\with v \handle c$ carries an explicit type annotation
-$\with v \handle (c : C)$.
+$\with h, \sigma \handle c$ carries an explicit type annotation
+$\with h, \sigma \handle (c : C)$.
 
 \begin{theorem}[Parameterized Completeness]\label{thm:param-complete}
   Let $t$ be an annotated term and let $\G$ contain principal types for all variables.
@@ -502,7 +502,7 @@ $\with v \handle (c : C)$.
 
     \item \emph{\textsc{Handle}.}
           The algorithm infers the handler type
-          $\sigma(C) \xRightarrow{\sigma} D$ by the induction hypothesis, and checks the body against the explicitly given $C$
+          $\sigma(C) \Rightarrow D$ by the induction hypothesis, and checks the body against the explicitly given $C$
           where the parameter context is extended by $\dom(\sigma)$.
           Verification that $\sigma(C)$ is the handler's input type is a single pass of
           substitution followed by equality checking.
@@ -515,26 +515,26 @@ The following theorem strengthens this to a minimal annotation consisting only o
 operation arities that mention $\dom(\sigma)$.
 
 \begin{definition}[$\sigma$-relevant operations] \label{def:relevant}
-  Given a handler $v$ with parameter substitution $\sigma$, the
+  Given a handler $h$ with parameter substitution $\sigma$, the
   \emph{$\sigma$-relevant subset} of the handled signature is
   \[
-    \ops_\sigma(v)
+    \ops_\sigma(h)
     \;=\;
     \bigl\{\,\op_i : A_i \leadsto B_i \mid
-      \op_i \text{ handled by } v
+      \op_i \text{ handled by } h
       \text{ and }
       \dom(\sigma) \cap (\fpv(A_i) \cup \fpv(B_i)) \neq \emptyset
     \,\bigr\}.
   \]
   A \emph{minimally annotated term} is one in which each handle expression
-  $\with v \handle c$ carries an annotation listing only $\ops_\sigma(v)$;
+  $\with h, \sigma \handle c$ carries an annotation listing only $\ops_\sigma(h)$;
   the return type and all other operations are omitted.
 \end{definition}
 
 \begin{corollary}[Minimal Annotation Completeness]\label{thm:minimal-complete}
   Let $t$ be a minimally annotated term and let $\G$ contain principal types for all
   variables.
-  If\/ $\cjp{\Theta}{\Psi}{\G}{t}{A}$ is derivable declaratively, then the algorithm
+  If $\cjp{\Theta}{\Psi}{\G}{t}{A}$ is derivable declaratively, then the algorithm
   infers a principal type $A'$ of which $A$ is an instance.
 \end{corollary}
 
@@ -544,7 +544,7 @@ operation arities that mention $\dom(\sigma)$.
 
   \begin{enumerate}
     \item \emph{$\sigma$-relevant handled ops.}
-          The annotation seeds each $\psi_j \in \dom(\sigma)$ as a rigid constant
+          The annotation seeds each $\psi \in \dom(\sigma)$ as a rigid constant
           into $\Psi$, and the argument proceeds as in \Cref{thm:param-complete}.
 
     \item \emph{$\sigma$-free handled ops.}
@@ -563,9 +563,9 @@ operation arities that mention $\dom(\sigma)$.
           The argument is then identical to group~(2).
   \end{enumerate}
   \emph{Return type.}
-  With each $\psi_j$ rigid in $\Psi$, the unification variable the algorithm introduces
+  With each $\psi$ rigid in $\Psi$, the unification variable the algorithm introduces
   for the return type is constrained only by value-level subterms of $c$.
-  Since $\psi_j$ acts as a ground constant to the unifier, the resulting value type is
+  Since $\psi$ acts as a ground constant to the unifier, the resulting value type is
   principal without any annotation on the return position.
 \end{proof}
 
@@ -577,7 +577,7 @@ $\mathsf{set} : \psi \leadsto \unit$. Annotating only $\mathsf{get}$ in a comput
 $\ddo x \leftarrow {!}\mathsf{get}\; () \iin {!}\mathsf{set}\;x$ permits the algorithm
 to infer $\mathsf{set} : \psi \leadsto \unit$ from $x : \psi$.
 
-For this reason, Cambria allows individual effect operations to be types with the
+For this reason, Cambria allows individual effect operations to be typed with the
 syntax,
 \[
 \effect !\op : A \leadsto B. \; c,
