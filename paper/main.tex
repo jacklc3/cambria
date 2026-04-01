@@ -1,0 +1,885 @@
+\documentclass[acmsmall,screen,review,anonymous]{acmart}
+
+\usepackage{cleveref}
+\usepackage{mathtools}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{booktabs}
+
+% ── Cambria listing style ──────────────────────────────────────
+\definecolor{kwcolor}{RGB}{0,0,160}
+\definecolor{commentcolor}{RGB}{100,100,100}
+\definecolor{strcolor}{RGB}{160,32,32}
+\definecolor{paramcolor}{RGB}{160,80,0}
+
+\lstdefinelanguage{cambria}{
+  morekeywords={with,handle,handler,return,do,in,fun,rec,if,then,else,case,of,inl,inr,effect,finally},
+  sensitive=true,
+  morecomment=[l]{--},
+  morestring=[b]",
+  literate={->}{$\to$}2 {<-}{$\leftarrow$}2 {~>}{$\leadsto$}2 {=>}{$\Rightarrow$}2 {++}{$\mathbin{+\!\!+}$}2 {\$p}{{\textcolor{paramcolor}{\$p}}}2 {\$cell}{{\textcolor{paramcolor}{\$cell}}}5 {\$urn}{{\textcolor{paramcolor}{\$urn}}}4,
+}
+
+\lstset{
+  language=cambria,
+  basicstyle=\small\ttfamily,
+  keywordstyle=\color{kwcolor}\bfseries,
+  commentstyle=\color{commentcolor}\itshape,
+  stringstyle=\color{strcolor},
+  columns=flexible,
+  keepspaces=true,
+  xleftmargin=1em,
+  escapeinside={(*}{*)},
+  numbers=none,
+  aboveskip=0.5em,
+  belowskip=0.5em,
+}
+
+% ── Macros ──────────────────────────────────────────────────────
+\newcommand{\cambria}{\textsc{Cambria}}
+\newcommand{\eff}{\textsc{Eff}}
+
+\newcommand{\void}{\mathsf{Void}}
+\newcommand{\unit}{\mathsf{Unit}}
+\newcommand{\tint}{\mathsf{Int}}
+\newcommand{\tbool}{\mathsf{Bool}}
+\newcommand{\tdouble}{\mathsf{Double}}
+\newcommand{\tstring}{\mathsf{Str}}
+\newcommand{\tunique}{\mathsf{Unique}}
+\newcommand{\tlist}[1]{\mathsf{List}(#1)}
+
+\newcommand{\tfun}[2]{#1 \to #2}
+\newcommand{\tpair}[2]{#1 \times #2}
+\newcommand{\teither}[2]{#1 + #2}
+\newcommand{\thandler}[2]{#1 \Rightarrow #2}
+\newcommand{\thandlerp}[3]{#1 \xRightarrow{#2} #3}
+
+\newcommand{\comp}[2]{#1\;!\;#2}
+\newcommand{\arity}[2]{#1 \to #2}
+
+\newcommand{\op}{\mathsf{op}}
+\newcommand{\ret}{\mathsf{return}\;}
+\newcommand{\ddo}{\mathsf{do}\;}
+\newcommand{\iin}{\;\mathsf{in}\;}
+\newcommand{\iif}{\mathsf{if}\;}
+\newcommand{\then}{\;\mathsf{then}\;}
+\newcommand{\eelse}{\;\mathsf{else}\;}
+\newcommand{\ccase}{\mathsf{case}\;}
+\newcommand{\oof}{\;\mathsf{of}\;}
+\newcommand{\inmark}[1]{\mathsf{in{#1}}\;}
+\newcommand{\fun}{\mathsf{fun}\;}
+\newcommand{\rec}{\mathsf{rec}\;}
+\newcommand{\recmark}{\mathsf{rec}\;}
+\newcommand{\hhandler}{\mathsf{handler}}
+\newcommand{\with}{\mathsf{with}\;}
+\newcommand{\handle}{\;\mathsf{handle}\;}
+\newcommand{\effect}{\mathsf{effect}\;}
+\newcommand{\dom}{\mathsf{dom}}
+\newcommand{\ttrue}{\mathsf{true}}
+\newcommand{\ffalse}{\mathsf{false}}
+
+\newcommand{\G}{\Gamma}
+\newcommand{\Sig}{\Sigma}
+\newcommand{\ftv}{\mathsf{ftv}}
+\newcommand{\fpv}{\mathsf{fpv}}
+\newcommand{\rel}{\mathsf{rel}}
+
+\newcommand{\tj}[3]{#1; #2 \vdash #3}
+\newcommand{\vj}[5]{#1; #2; #3 \vdash #4 : #5}
+\newcommand{\cj}[6]{#1; #2; #3 \vdash #4 : \comp{#5}{#6}}
+\newcommand{\cjp}[5]{#1; #2; #3 \vdash #4 : #5}
+
+% Step-indexed LR macros
+\newcommand{\Rel}{\mathbf{Rel}}
+\newcommand{\VV}{\mathcal{V}}
+\newcommand{\CC}{\mathcal{C}}
+\newcommand{\GG}{\mathcal{G}}
+
+\setcopyright{none}
+\acmJournal{PACMPL}
+\acmVolume{1}
+\acmNumber{POPL}
+\acmArticle{1}
+\acmYear{2027}
+\acmMonth{1}
+\acmDOI{}
+
+\begin{document}
+
+\title{Cambria: A Language for Parametrized Effects and Handlers}
+
+\author{Anonymous}
+\affiliation{\institution{Anonymous}}
+
+\begin{abstract}
+Parametrized algebraic theories are a generalization of algebraic theories where operations may bind abstract parameter types.
+Models of these theories are essential for modelling computational effects with dynamically created resources, such as local state,
+quantum computation, and dynamically threaded concurrency.
+Algebraic effects and handlers is a programming language paradigm that separated the syntax from the semantics of computational effects,
+allowing the programmer full control over their effect implementations.
+
+We present \cambria{}, a langauage that extends the algebraic effects and handlers framework into the parametrized setting.
+Parameters appear as abstract types introduced in the body of a handled computation and instantiated by the handler.
+Parameters are first-class in the type system but erased at runtime, requiring no coersions or type-directed reduction.
+
+We formally prove the abstraction guaruntee via a step-indexed logical relation to establish parametricity.
+The handled computation cannot inspect the concrete instantiation.
+We also establish type safety, and a minimal annotation result for completeness of the type inference algorithm.
+We demonstrate \cambria{}'s effectiveness with a working implementation, and provide examples including local state,
+probabilistic programming, and concurrent thread management. The latter is a parametrized effect that does not reduce to
+effect instances, and thus this is the first language which can express such an effect in the handler framework.
+\end{abstract}
+
+\maketitle
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Introduction}\label{sec:intro}
+%% ═══════════════════════════════════════════════════════════════
+
+Algebraic effects and handlers~\cite{plotkin_handling_2009} provide a principled approach to programming with side effects. A computation performs abstract \emph{operations} (reading state, spawning threads, flipping coins), and a \emph{handler} gives these operations meaning by intercepting them and supplying an implementation. This separation of interface from implementation has made algebraic effects an increasingly popular foundation for effect systems in both research and practice~\cite{bauer_programming_2015, hillerström_continuation_2017, leijen_koka_2014}.
+
+Many practically important effects are \emph{parameterized}: their operation signatures mention a type that varies across instances. Local mutable state is the canonical example --- a state handler manages memory cells whose \emph{address type} is an implementation detail. The handler knows addresses are integers (or unique tokens), but the client code should not: it should treat addresses as opaque identifiers, using only the operations the handler provides. This abstraction is essential for safety and modularity --- a client that forges addresses or inspects their representation can violate the handler's invariants.
+
+\paragraph{The problem of instances.}
+In unparameterized effect systems, the state effect has a single, global signature $\mathsf{get} : \unit \to \tint$, $\mathsf{set} : \tint \to \unit$. This is inadequate when a program creates \emph{multiple} memory cells, each with its own identity. The type of a cell's address --- the \emph{parameter} of the effect --- must be abstract from the client's perspective but concrete from the handler's.
+
+Prior work addresses this ``problem of instances'' through existential types~\cite{biernacki2018handle} or explicit effect instance mechanisms. These approaches have two limitations. First, they impose a runtime cost: existential types require pack/unpack coercions, and instance-based systems need type-directed reduction rules. Second, they have an expressiveness ceiling: some parameterized effects --- notably concurrent thread management~\cite{kammar2025equational} --- cannot be reduced to simple effect instances, and thus fall outside their scope.
+
+\paragraph{Parameter variables.}
+\cambria{} takes a different approach. We extend the type system with \emph{parameter variables} $\psi$, written \lstinline{$p} in concrete syntax. A parameter variable is introduced in the body of a handled computation (via \lstinline{effect}) and instantiated by the handler:
+
+\begin{lstlisting}
+with handler { $cell -> Unique, get a k -> ..., set x k -> ..., ref x k -> ... }
+handle (
+  effect !get : $cell ~> Int.
+  effect !set : $cell * Int ~> Unit.
+  effect !ref : Int ~> $cell.
+  -- here $cell is abstract: the program cannot inspect it
+  do a <- !ref 42 in !get a
+)
+\end{lstlisting}
+
+Inside the body, \lstinline{$cell} is an abstract type. The program cannot inspect values of type \lstinline{$cell} --- it can only manipulate them through the declared operations. The handler instantiates \lstinline{$cell -> Unique}, revealing the representation to its own implementation but not to the client. This achieves the same data abstraction as existential types, but through a purely static mechanism: parameter variables are erased at runtime, requiring no coercions or type-directed reduction.
+
+\paragraph{Contributions.} We make the following contributions:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Language design.} We present \cambria{}, a core calculus combining algebraic effect handlers, parameter variables, let-polymorphism, and general recursion (\Cref{sec:overview}--\Cref{sec:calculus}). Parameter variables provide type abstraction orthogonally to the effect handling mechanism, leading to a clean separation of concerns.
+
+  \item \textbf{Parametricity.} We prove a parametricity theorem via a step-indexed logical relation (\Cref{sec:parametricity}). This is, to our knowledge, the first logical relation combining algebraic effect handlers with general recursion, universal polymorphism, and step-indexing. The proof is modular: each type constructor contributes an independent clause to the value relation, and each typing rule contributes an independent case to the fundamental theorem.
+
+  \item \textbf{Type inference.} We establish a minimal annotation completeness result (\Cref{sec:inference}): only operations whose signatures mention instantiated parameters require type annotations. All other types, including polymorphic ones, are inferred.
+
+  \item \textbf{Expressiveness.} We demonstrate that \cambria{} can express parameterized effects that prior work cannot, including concurrent thread management from recent work on dynamic threads~\cite{kammar2025equational}. We provide an implementation with runnable examples (\Cref{sec:overview}).
+\end{enumerate}
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Overview}\label{sec:overview}
+%% ═══════════════════════════════════════════════════════════════
+
+We introduce \cambria{} through a series of examples that exercise its key features: parameter variables, let-polymorphism, general recursion, and their interactions. Each example is executable in our implementation.
+
+\subsection{Local State and Fresh Name Generation} \label{sec:local-state}
+
+The following program declares the three operations involved in the local state effect and runs a program allocating and updating two memory cells:
+
+\begin{lstlisting}
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
+effect !ref : Int ~> $loc.
+do a <- !ref 2 in
+do b <- !ref 3 in (
+  !set (a, !get b); !get a
+)
+\end{lstlisting}
+
+One possible method of handling this program is to instantiate the memory cells as maps from integers to the value.
+Here, \lstinline|empty| is the empty map, and \lstinline|insert ((a, x), s)| inserts value \lstinline|x| at key \lstinline|a| in map \lstinline|s|.
+
+\begin{lstlisting}
+local_state_handler = handler {
+  $loc -> Int,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !fresh () in return (fun s -> k a (insert ((a, x), s))),
+  finally s -> s empty
+}
+\end{lstlisting}
+
+A fresh identifier for each memory location can be acquired by parameter passing an integer around much like a global state handler.
+This shows that the parametrized handlers in \cambria{} integrate seamlessly with classic handlers, which need no updating to their syntax.
+
+\begin{lstlisting}
+fresh_handler = handler {
+  return x -> return (fun _ -> x),
+  fresh _ k -> return (fun n -> k n (n+1)),
+  finally f -> f 0
+}
+\end{lstlisting}
+
+However, as we will see in the later sections, the effects and parameter instances may be instantiated in any way the programmer pleases.
+\cambria{} guaruntees that the body cannot inspect the parameters of type \lstinline|$loc|.
+It cannot compare them for equality, perform arithmetic, or forge new locations.
+Even if the parameter \lstinline|$loc| is handled to in integer type,
+the following code will not type-check because \lstinline|a| remains abstract until handled.
+
+\begin{lstlisting}
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
+effect !ref : Int ~> $loc.
+do a <- !ref 2 in !set (a+1, 3)
+\end{lstlisting}
+
+\subsection{Polymorphism Meets Abstraction}\label{sec:poly-refs}
+
+Although the parameters in \cambria{} cannot be inspected, they still integrate seamlessly with let-polymorphism.
+The following example illustrates a powerful pattern of mapping over a list of values, instantiating a memory location for each one,
+and returning the list of locations.
+
+\begin{lstlisting}
+do map <- return (rec map (f, xs) ->
+  case uncons xs of {
+    inl _        -> return [],
+    inr (x, xs') -> f x :: map f xs'
+  }) in
+with local_state_handler handle (
+  effect !get : $p ~> Int.
+  effect !ref : Int ~> $p.
+  do refs  <- map ((fun n -> !ref n), (10 :: 20 :: 30 :: [])) in
+  do bools <- map ((fun r -> !get r == 20), refs) in
+  return bools
+)
+\end{lstlisting}
+
+The function \lstinline{map} has type $\forall\alpha_1\alpha_2.(\alpha_1 \to \comp{\alpha_2}{\Sig}) \times \tlist{\alpha_1} \to \comp{\tlist{\alpha_2}}{\Sig}$.
+Even though the programmer cannot determine what the parameter \lstinline|loc| will be instantiated to, let-polymorphism is universally quantifying, and so
+still capture the parameter types.
+
+This combination of recursion, polymorphism, and parameter abstraction is not available in any prior handler calculus.
+Biernacki et al.~\cite{biernacki2018handle} have no recursion or universal types.
+The $\lambda^{\mathsf{HEL}}$ line of work~\cite{} adds instances but requires runtime coercions and lacks parametricity guarantees.
+
+\subsection{Representation Independence: Two Implementations of Urns}\label{sec:polya}
+
+The key idea behind parametrized handlers is that they provide a means for different implementations of the same effect interface,
+and parametricity guarantees that the client code behaves the identically with both.
+
+Polya's urn is a probabilistic process where an urn contains a red ball and a blue ball.
+After each sample from the urn, an additional ball of the sampled colour is places back in the urn.
+That is, the urn gets biased towards the previous samples.
+
+Consider a probabilistic program that samples from a Polya urn ten times and accumulates the result.
+\begin{lstlisting}
+effect !newurn : Unit ~> $urn.
+effect !sample : $urn ~> Bool.
+do x <- !newurn () in
+countSuccesses 10 (fun _ -> !sample x) 
+\end{lstlisting}
+This effect can be handled via the local state effect, where the memory locations track the number of balls in each urn.
+\begin{lstlisting}
+handler {
+  $urn -> $loc,
+  newurn _ k -> k (!ref (1, 1)),
+  sample urn k ->
+    do (red, blue) <- !get urn in
+    do ball <- !bernoulli (red / (red + blue)) in
+    do _ <- !set (a, (i + boolToInt ball, j + (1 - boolToInt ball))) in
+    k ball
+}
+\end{lstlisting}
+Here, the parameter parameter instantiation is to another parameter \lstinline|$urn -> $loc|, rather than a comcrete type,
+composing the urn abstraction with the state abstraction.
+The effect operation \lstinline|!bernoulli : Double ~> Bool| is an inbuilt \cambria{} command that samples from a Bernoulli distribution.
+Polya famously showed that the distribution of the urn is equivalent to a distribution given by first uniformly sampling from the interval
+between 0 and 1, and then constantly sampling from a Bernoulli distribution with the resulting random variable instead.
+Hence, we can bypass local state to produce a more efficient implementation of the Polya urn effect by instantiating \lstinline|$urn| as a double instead.
+\begin{lstlisting}
+handler {
+  $urn -> Double,
+  newurn _ k -> k (!uniform ()),
+  sample a k -> k (!bernoulli a)
+}
+\end{lstlisting}
+The client code is identical in both cases. It sees only \lstinline{$urn} and the operations \lstinline{!newurn} and \lstinline{!sample}.
+Parametricity guarantees that it cannot distinguish the two implementations.
+
+\subsection{Dynamically Threaded Concurrency} \label{sec:concurrency}
+
+All of the previous examples can be expressed as individual instances of the same global effect.
+The following example of concurrent thread management~\cite{kammar2025equational} is not such a case.
+Instances interact non-trivially with one another and so cannot be expressed via multiple copies of handlers.
+
+A concurrent program performs four operations: \lstinline{!act} performs a labelled observable action, \lstinline{!fork} spawns a child thread,
+\lstinline{!wait} stalls the thread unill other threads have finished, and \lstinline{!stop} terminates the current thread.
+The thread identifiers \lstinline|$tids| are abstract and so cannot be forged, compared, or inspected.
+
+The following program constructs an N-shaped dependency between four actions.
+
+\begin{lstlisting}
+nshape = (
+  effect !fork : Unit ~> Unit + $tids.
+  effect !wait : $tids ~> Unit.
+  effect !act  : Str ~> Unit.
+  effect !stop : Unit ~> Unit.
+
+  case !fork () of {
+    inl _ -> !act "action1" ; return (),
+    inr a1 -> case !fork () of {
+      inl _  -> !wait a1 ; !act "action2" ; !stop () ; return (),
+      inr a2 -> !wait a2; case !fork () of {
+        inl _  -> !wait a1 ; !act "action3" ; !stop () ; return (),
+        inr a3 -> !wait a3 ; !act "action4" ; !stop () ; return ()
+      }
+    }
+  } 
+)
+\end{lstlisting}
+This program could be handled by a handler that spawns new threads for each fork instance, and then copying hte continuation to be run on each thread.
+However, we may want to better understand the dependencies between the observable actions.
+For concurrent program of this scale, this can be parsed from the program, but at larger scales with interleaving parts this is near impossible.
+Instead, we can build a handler that converts the program into a DAG in graphviz format.
+We first handle the threads effect into a simpler labelled poset algebra~\cite{kammar_handlers_2013} that is parametrized by a type of nodes.
+\begin{lstlisting}
+effect !get : $loc ~> $tids.
+effect !set : $loc * $tids ~> Unit.
+effect !ref : $tids ~> $loc.
+effect !emptytids : Unit ~> $tids.
+effect !addtids : $tids * $tids ~> $tids.
+effect !node : $tids ~> $tids.
+do loc <- !ref (!emptytids ()) in
+with handler {
+  return x -> return (inr x),
+  act s k ->
+    do deps <- !get loc in
+    do a <- !node (deps, s) in
+    !set (loc, a) ; k (),
+  wait deps k ->
+    do deps' <- !get loc in
+    !set (loc, !addtids (deps, deps')) ; k (),
+  stop _ k ->
+    return (inl ()),
+  fork _ k ->
+    do deps <- !get loc in
+    do _ <- k (inr ()) in
+    do child_deps <- !get loc in (
+      !set (loc, deps) ;
+      k (inl child_deps)
+    )
+} handle nshape
+\end{lstlisting}
+This handling scheme also shows that we may interleave handlers with multiple parameters without worry.
+The local state effect is storing the abstract thread identifiers in its memory locations.
+The labelled poset algebra in this implementation has the effect operations \lstinline|node|, \lstinline|addtids|, and \lstinline|emptytids|,
+rather than the single one established in~\cite{kammar2025equational}. This is because we have encoded the parameter operations
+of merging two compound thread ids and producing the empty compound id as effect operations to keep the parameters completely abstract.
+This can be done mechanically for any operations on the parameters.
+We can finally implement the node effect interface by printing the nodes and dependencies in graphviz format, using the fresh name handler from \Cref{sec:local-state}.
+\begin{lstlisting}
+handler {
+  $tids -> List(Int),
+  return x -> return x,
+  addtid (a1,a2) k -> k (concat a1 a2),
+  emptytid _ k -> k [],
+  node (deps, s) k ->
+    do a <- !fresh () in (
+      for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps ;
+      !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
+      k (a :: [])
+    )
+}
+\end{lstlisting}
+This example cannot be expressed using effect instances or existential types because the \lstinline{fork} operation
+uses multi-shot continuations to run both child and parent threads. The thread identifiers must pass between threads while remaining abstract.
+The parameter must genuinely \emph{vary}, rather than being a fixed existential witness.
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Core Calculus}\label{sec:calculus}
+%% ═══════════════════════════════════════════════════════════════
+
+In this section, we introduce the core calculus for \cambria{}. We introduce only the constructs which are directly involved with parametrized handlers.
+The full language includes integers, strings, product types and sum types with pattern matching. These are standard extensions.
+All metatheoretic results extend straightforwardly.
+
+\subsection{Types and Syntax}
+
+The syntax of the language is the following.
+\[
+\begin{array}{lrcl}
+  \text{Value types}                & A, B   & ::= & \alpha \mid \psi \mid \tbool \mid \tfun{A}{C} \mid \thandler{C}{D} \\[4pt]
+  \text{Computation types}          & C, D   & ::= & \comp{A}{\Sig} \\[4pt]
+\text{Effect signatures}            & \Sig   & ::= & \{ \op_i : \arity{A_i}{B_i} \}_{i=1}^{m} \\[4pt]
+  \text{Type variable context}      & \Theta & ::= & \emptyset \mid \Theta, \alpha \\[4pt]
+  \text{Parameter variable context} & \Psi   & ::= & \emptyset \mid \Psi, \psi \\[4pt]
+  \text{Term context}               & \G     & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
+\end{array}
+\]
+
+There are three contexts: $\Theta$ for type variables, $\Psi$ for parameter variables, and $\Gamma$ for term variables.
+Notably, the only extension to the type system beyond a standard handler calculus is the parameter variables $\psi$.
+These types can be thought of as existential type variables, because they represent an implementation detail in the effect interface.
+
+The syntax of values and computations is the following.
+\[
+\begin{array}{lrcl}
+  \text{Values}       & v, w & ::= & x \mid () \mid \ttrue \mid \ffalse
+                                     \mid \fun x \mapsto c \mid \recmark f\;x \mapsto c \mid h \\[4pt]
+  \text{Handlers}      & h    & ::= &
+    \hhandler\;\{
+      \ret x \mapsto c_r,\;
+      \op_i\; x\; k \mapsto c_i
+    \}_{i=1}^{m} \\[4pt]
+  \text{Computations} & c, d & ::= & \ret v \mid \op(v;\;x.c)\mid \ddo x \leftarrow c \iin d 
+                                     \mid \with \sigma, v \handle c \\[2pt]
+                      &      &     & \mid\; v_1\;v_2 \mid \iif v \then c_1 \eelse c_2 \\[4pt]
+  \text{Parameter subst.} & \sigma & ::= & \{\psi_1 \mapsto A_1,\; \ldots,\; \psi_n \mapsto A_n \}
+\end{array}
+\]
+
+The surface syntax $!\op\;v$ desugars to $\op(v;\;x.\ret x)$.
+The key novelty is the \emph{parameter substitution}, often written $\sigma = \{\vec{\psi} \mapsto \vec{A}\}$, in the handle form,
+which bridges the abstract types in the body to their concrete representations in the handler.
+
+\subsection{Typing Rules}\label{sec:typing}
+
+We highlight the rules that are novel or interact with parameter variables; the remaining rules are standard.
+
+\paragraph{Value Judgements.} The rules for value judgements are standard.
+
+\begin{mathpar}
+  \inferrule
+  {(x : \forall \vec{\alpha}.B) \in \G \\ [\tj \Theta \Psi {A_i}]_{i=1}^{|\vec{\alpha}|}}
+  {\vj{\Theta}{\Psi}{\G}{x}{B[A_i / \alpha_i]_{i=1}^{|\vec{\alpha}|}}}
+  \; (\textsc{Var})
+
+  \inferrule
+    {b \in \{\ttrue, \ffalse\}}
+    {\vj{\Theta}{\Psi}{\G}{b}{\tbool}}
+    \; (\textsc{Bool})
+
+  \inferrule
+  {\cjp{\Theta}{\Psi}{\G, x : A}{c}{C}}
+    {\vj{\Theta}{\Psi}{\G}{\fun x \mapsto c}{\tfun{A}{C}}}
+    \; (\textsc{Fun})
+
+  \inferrule
+  {\cj{\Theta}{\Psi}{\G, f : \tfun{A}{\comp{B}{\Sig}},\, x : A}{c}{B}{\Sig}}
+    {\vj{\Theta}{\Psi}{\G}{\rec f\; x \mapsto c}{\tfun{A}{\comp{B}{\Sig}}}}
+    \; (\textsc{Rec})
+
+  \inferrule{
+    \cj{\Theta}{\Psi}{\G, x_r : A}{c_r}{B}{\Sig'}
+    \\
+    \Sig \setminus \{ \op_i : \arity{A_i}{B_i} \}_{i=1}^{m} \subseteq \Sig'
+    \\\\
+    \left[
+      (\op_i : A_i \to B_i) \in \Sig \quad
+      \cj{\Theta}{\Psi}{\G,\, x_i : A_i,\, k_i : \tfun{B_i}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
+    \right]_{i = 1}^{m}
+    }
+    {\vj{\Theta}{\Psi}{\G}{
+      \hhandler\;\{\ret x_r \mapsto c_r,\;
+        \op_i\; x\; k \mapsto c_i
+      \}_{i = 1}^{m}
+    }{\thandler{\comp{A}{\Sig}}{\comp{B}{\Sig'}}}}
+    \; (\textsc{Handler})
+\end{mathpar}
+The handled operations do not need to cover the full set of operations in the computation effect signature.
+The remaining operations are forwarded, which is indicated by the $ \Sig \setminus \{ \op_i \}_{i=1}^{m} \subseteq \Sig' $
+premise in the \textsc{Handler} rule.
+
+\paragraph{Computation Judgements.} Computation judgements are also defined inductively.
+\begin{mathpar}
+  \inferrule
+  {\vj{\Theta}{\Psi}{\G}{v}{A}}
+  {\cj{\Theta}{\Psi}{\G}{\ret v}{A}{\Sig}}
+    \; (\textsc{Return})
+
+  \inferrule{
+    \cj {\Theta, \vec{\alpha}} \Psi \G c A \Sig
+  }{
+    \cj \Theta \Psi \G c {\forall \vec{\alpha}.A} \Sig
+  }
+  \; (\textsc{Gen})
+
+  \inferrule
+  {\cj{\Theta}{\Psi}{\G}{c_1}{\forall \vec{\alpha}. A}{\Sig}
+    \\
+    \cj{\Theta}{\Psi}{\G, x : \forall\vec{\alpha}.A}{c_2}{B}{\Sig}
+    }
+    {\cj{\Theta}{\Psi}{\G}{\ddo x \leftarrow c_1 \iin c_2}{B}{\Sig}}
+    \; (\textsc{Do})
+
+  \inferrule
+    {(\op : \arity{A_{\op}}{B_{\op}}) \in \Sig
+    \\
+    \vj{\Theta}{\Psi}{\G}{v}{A_{\op}}
+    \\
+    \cj{\Theta}{\Psi}{\G,\, x : B_{\op}}{c}{C}{\Sig}
+    }
+    {\cj{\Theta}{\Psi}{\G}{\op(v;\;x.c)}{C}{\Sig}}
+    \; (\textsc{Op})
+
+  \inferrule
+  {\vj{\Theta}{\Psi}{\G}{v}{\tbool}
+    \\
+    \cj{\Theta}{\Psi}{\G}{c_1}{A}{\Sig}
+    \\
+    \cj{\Theta}{\Psi}{\G}{c_2}{A}{\Sig}
+    }
+    {\cj{\Theta}{\Psi}{\G}{\iif v \then c_1 \eelse c_2}{A}{\Sig}}
+    \; (\textsc{If})
+
+  \inferrule
+  {\vj{\Theta}{\Psi}{\G}{v_1}{\tfun{A}{C}}
+    \\
+    \vj{\Theta}{\Psi}{\G}{v_2}{A}
+    }
+    {\cjp{\Theta}{\Psi}{\G}{v_1\; v_2}{C}}
+    \; (\textsc{App})
+
+  \inferrule{
+    \vj{\Theta}{\Psi}{\G}{v}{\thandler{C[T_i / \psi_i]_{i=1}^n}{D}}
+    \\
+    \cjp{\Theta}{\Psi, \vec{\psi}}{\G}{c}{C}
+    \\
+    \left[\tj \Theta \Psi {T_i}\right]_{i=1}^{n}
+  }{
+    \cjp{\Theta}{\Psi}{\G}{\with v, \{\psi_i \mapsto T_i\}_{i=1}^n \handle c}{D}
+  }
+  \; (\textsc{Handle})
+\end{mathpar}
+The body $c$ is typed in the extended parameter context $\Psi, \vec{\psi}$.
+The handler's input type is the same, but with the parameters instantiated via the parameter substitution.
+The output type $D$ is in the outer context $\Psi$, which does not contain $\vec{\psi}$, preventing the parameters from escaping.
+When $\vec{\psi} = \emptyset$, the rule reduces to standard handler application.
+
+The \textsc{Gen} rule generalises type variables that are not free in $\Gamma$ or $\Sigma$.
+This prevents well-typed terms from getting stuck, even in the presence of polymorphism and effects~\cite{}.
+Critically, parameters are never generalised. 
+They must remain rigid within the body of a handler so that the handler can instantiate them consistently.
+Otherwise the abstraction boundary would break.
+
+\subsection{Operational Semantics}
+
+Evaluation contexts identify where the next reduction step occurs:
+\[
+  E \;::=\; \square
+    \mid \ddo x \leftarrow E \iin c
+    \mid \with v \handle E
+\]
+Let $h = \hhandler\;\{\ret x \mapsto c_r,\;\op_i\;x\;k \mapsto c_i\}_{i=1}^{n}$.
+Single-step reduction $c \leadsto c'$ is defined below, closed under the congruence rule: if $c \leadsto c'$ then $E[c] \leadsto E[c']$.
+\[
+\begin{array}{lcll}
+  (\fun x \mapsto c)\;v
+    & \leadsto & c[v/x]
+    & (\beta\text{-fun}) \\
+  (\rec f\;x \mapsto c)\;v
+    & \leadsto & c\bigl[v/x,\;(\rec f\;x \mapsto c)/f\bigr]
+    & (\beta\text{-rec}) \\
+  \ddo x \leftarrow \ret v \iin c
+    & \leadsto & c[v/x]
+    & (\beta\text{-do-ret}) \\
+  \ddo x \leftarrow \op(v; y.c) \iin c'
+    & \leadsto & \op(v; y.\ddo x \leftarrow c \iin c')
+    & (\beta\text{-do-op}) \\
+  \iif \mathsf{true} \then c_1 \eelse c_2
+    & \leadsto & c_1
+    & (\beta\text{-if}_T) \\
+  \iif \mathsf{false} \then c_1 \eelse c_2
+    & \leadsto & c_2
+    & (\beta\text{-if}_F) \\
+  \with h, \sigma \handle \ret v
+    & \leadsto & c_r[v/x]
+    & (\beta\text{-ret}) \\
+    \with h,\sigma \handle \op_i(v;\;y.c)
+    & \leadsto & c_i\bigl[v/x,\;(\fun y \mapsto \with h \handle c)/k\bigr]
+    & (\beta\text{-op}) \\
+  \with h,\sigma \handle \op(v;\;y.c)
+    & \leadsto & \op(v;\;y.\;\with h \handle c)
+    & (\beta\text{-fwd})
+\end{array}
+\]
+The ($\beta$-fwd) rule applies when $\op \notin \{\op_1, \ldots, \op_n\}$.
+The continuation supplied to the operation clause in ($\beta$-op) reinstates the handler, giving \emph{deep} handling.
+
+The parameter substitution does not appear in any reduction result, thus the reduction sequence is independent of these substitutions.
+This is the formal sense in which parameter variables are erased at runtime. There is no dynamic dispatch, coercions, or type-directed reduction.
+The parameter annotations are only used for type checking.
+
+\begin{proposition}[Parameter Erasure]\label{lem:erasure}
+  Define a parameter erasure map $\lfloor {-} \rfloor$ as
+  \[
+    \lfloor \with h, \sigma \handle c \rfloor = \with \lfloor h \rfloor, \emptyset \handle \lfloor c \rfloor
+  \]
+  and structural identity elsewhere. Then $c \leadsto c' \iff \lfloor c \rfloor \leadsto \lfloor c' \rfloor$.
+\end{proposition}
+
+\subsection{Type Safety}
+
+For the given effect system, we have the following type safety result.
+
+\begin{theorem}[Safety]\label{thm:safety}
+  If $\cj{\emptyset}{\emptyset}{\emptyset}{c}{A}{\Sig}$, then either:
+  \begin{itemize}
+    \item $c = \ret v$ for some $\vj{\emptyset}{\emptyset}{\emptyset}{v}{A}$
+    \item $c = \op(v;\; y.c')$ for some $\op : A_\op \to B_\op \in \Sig$, $\vj{\emptyset}{\emptyset}{\emptyset}{v}{A_\op}$,
+      and $\cj{\emptyset}{\emptyset}{y:B_\op}{c}{A}{\Sig}$.
+    \item $c \leadsto c'$ for some $\cj{\emptyset}{\emptyset}{\emptyset}{c'}{A}{\Sig}$
+  \end{itemize}
+\end{theorem}
+
+\begin{proof}
+  We first prove type substitution, parameter substitution and variable substitution lemmas by structural induction:
+  \begin{itemize}
+    \item If $\cj{\Theta,\alpha}{\Psi}{\Gamma}{c}{A}{\Sig}$ and $\Theta;\Psi \vdash B$, then $\cjp{\Theta}{\Psi}{\Gamma[B / \alpha]}{c[B/ \psi]}{(\comp{A}{\Sig})[B/ \alpha]}$.
+    \item If $\cj{\Theta}{\Psi,\psi}{\Gamma}{c}{A}{\Sig}$ and $\Theta;\Psi \vdash B$, then $\cjp{\Theta}{\Psi}{\Gamma[B / \psi]}{c[B/ \psi]}{(\comp{A}{\Sig})[B/ \psi]}$.
+    \item If $\cj{\Theta}{\Psi}{\Gamma, x:\forall \vec{\alpha}.B}{c}{A}{\Sig}$ and $\vj{\Theta,\vec{\alpha}}{\Psi}{\Gamma}{v}{A}$, then $\cjp{\Theta}{\Psi}{\Gamma}{c[v / x]}{\comp{A}{\Sig}}$.
+  \end{itemize}
+  Progress is then shown by induction over the computation derivations, while preservation is shown by case analysis on the operational steps.
+\end{proof}
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Parametricity}\label{sec:parametricity}
+%% ═══════════════════════════════════════════════════════════════
+
+The type abstraction provided by parameter variables is only meaningful if parametricity holds: code that is polymorphic in $\psi$ truly cannot inspect the concrete representation. We establish this via a step-indexed binary logical relation.
+
+\subsection{Step-Indexed Logical Relation}
+
+\begin{definition}[Admissible Relation]
+  A \emph{step-indexed value relation} is a set $R \subseteq \mathrm{Val}_0 \times \mathrm{Val}_0 \times \mathbb{N}$, whose elements we write as $(v_1, v_2)_n$,
+  that is downward-closed. If $(v_1, v_2)_n \in R$ and $n' \leq n$, then $(v_1, v_2)_{n'} \in R$.
+  We write $\Rel$ for the set of all admissible relations.
+\end{definition}
+
+\begin{definition}
+A \emph{relational interpretation} $\delta : (\Theta \cup \Psi) \to \Rel$ assigns an admissible relation to each type variable and each parameter variable.
+\end{definition}
+
+\paragraph{Value relation.} $\VV\llbracket A \rrbracket_\delta \in \Rel$, is defined by induction on $A$:
+
+\begin{align*}
+  \VV\llbracket \alpha \rrbracket_\delta &= \delta(\alpha) \\
+  \VV\llbracket \psi \rrbracket_\delta &= \delta(\psi) \\
+  \VV\llbracket \tbool \rrbracket_\delta &= \{(b, b)_n \mid b \in \{\ttrue, \ffalse\}, n \in \mathbb{N}\} \\
+  \VV\llbracket \tfun{A}{C} \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall j \leq n.\; \forall (w_1, w_2)_j \in \VV\llbracket A \rrbracket_\delta.\; (v_1\;w_1, v_2\;w_2)_j \in \CC\llbracket C \rrbracket_\delta\} \\
+  \VV\llbracket \thandler{C}{D} \rrbracket_\delta &= \{(h_1, h_2)_n \mid \forall j \leq n.\; \forall (c_1, c_2)_j \in \CC\llbracket C \rrbracket_\delta. \\
+  &\qquad\qquad\qquad (\with h_1 \handle c_1, \with h_2 \handle c_2)_j \in \CC\llbracket D \rrbracket_\delta\} \\
+  \VV\llbracket \forall\vec\alpha.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall \vec{R} \in \Rel^{|\vec\alpha|}.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\vec\alpha \mapsto \vec{R}]}\}
+\end{align*}
+
+\paragraph{Computation relation.} $(c_1, c_2)_n \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ iff for all $j < n$:
+
+\begin{itemize}
+  \item If $c_1 \leadsto^j \ret v_1$, then $\exists v_2.\; c_2 \leadsto^* \ret v_2$ and $(k{-}j, v_1, v_2) \in \VV\llbracket A \rrbracket_\delta$.
+  \item If $c_1 \leadsto^j \op(v_1; y.d_1)$ where $(\op : \arity{A_\op}{B_\op}) \in \Sig$, then $\exists v_2, d_2.\; c_2 \leadsto^* \op(v_2; y.d_2)$ and:
+  \begin{itemize}
+    \item $(v_1, v_2)_{n-j} \in \VV\llbracket A_\op \rrbracket_\delta$
+    \item $\forall k < n{-}j.\; \forall (w_1, w_2)_k \in \VV\llbracket B_\op \rrbracket_\delta.\; (d_1[w_1/y], d_2[w_2/y])_k \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$
+  \end{itemize}
+\end{itemize}
+
+The step index $k$ counts reduction steps on the left; the right side uses $\leadsto^*$ (unbounded). The self-reference in (O) is well-founded: $m < k{-}j$ where $j < k$ ensures $m < k$.
+
+\paragraph{Environment relation.}
+\begin{align*}
+(k, \gamma_1, \gamma_2) \in \GG\llbracket \emptyset \rrbracket_\delta &\quad\text{always} \\
+(k, \gamma_1[x \mapsto v_1], \gamma_2[x \mapsto v_2]) \in \GG\llbracket \G, x : \forall\vec\alpha.A \rrbracket_\delta &\quad\text{iff}\quad (k, \gamma_1, \gamma_2) \in \GG\llbracket \G \rrbracket_\delta \;\land\; (k, v_1, v_2) \in \VV\llbracket \forall\vec\alpha.A \rrbracket_\delta
+\end{align*}
+
+\subsection{Fundamental Theorem}
+
+\begin{theorem}[Parametricity]\label{thm:parametricity}
+\leavevmode
+\begin{enumerate}
+  \item If $\vj{\Theta}{\Psi}{\G}{v}{A}$, then for all $k$, $\delta : (\Theta \cup \Psi) \to \Rel$, and $(k, \gamma_1, \gamma_2) \in \GG\llbracket \G \rrbracket_\delta$:\; $(k, v[\gamma_1], v[\gamma_2]) \in \VV\llbracket A \rrbracket_\delta$.
+  \item If $\cj{\Theta}{\Psi}{\G}{c}{A}{\Sig}$, then for all $k$, $\delta$, and $(k, \gamma_1, \gamma_2) \in \GG\llbracket \G \rrbracket_\delta$:\; $(k, c[\gamma_1], c[\gamma_2]) \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$.
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+By induction on the typing derivation, with each case proving ``for all $k$.'' Key cases:
+
+\emph{Rec:} inner induction on $j$. At $j \geq 1$, the induction hypothesis gives the recursive function at $\VV_{j-1}$, the fundamental theorem (at $j{-}1$) gives the body at $\CC_{j-1}$, and the anti-reduction lemma lifts the application to $\CC_j$.
+
+\emph{Handler literal:} inner induction on $j$. At $j = m{+}1$, the return case applies the fundamental theorem to $c_r$; the operation case constructs the deep continuation $\fun y \mapsto \with h \handle c'$, which is related at $\VV_{m+1}\llbracket \tfun{B_\op}{\comp{B}{\Sig'}} \rrbracket$ by the inner induction hypothesis at $j' \leq m$.
+
+\emph{Handle:} Immediate from the handler relation at $j = k$.
+
+\emph{Do:} Via a separate Bind Lemma, proved by strong induction on $k$: if $(k, c_1, c_2) \in \CC\llbracket \comp{A}{\Sig} \rrbracket$ and for all $j \leq k$ and $(j, v_1, v_2) \in \VV\llbracket A \rrbracket$ we have $(j, d_1[v_1/x], d_2[v_2/x]) \in \CC\llbracket \comp{B}{\Sig} \rrbracket$, then $(k, \ddo x \leftarrow c_1 \iin d_1, \ddo x \leftarrow c_2 \iin d_2) \in \CC\llbracket \comp{B}{\Sig} \rrbracket$. The strengthened hypothesis is necessary because the $\beta$-do-op rule creates new \lstinline{do} expressions not corresponding to any sub-derivation.
+
+\emph{Gen:} Since reduction is independent of the relational interpretation $\delta$, the same witnesses work for all instantiations $\vec{R}$.
+\end{proof}
+
+\subsection{Modularity of the Proof}
+
+The logical relation is structured so that each language feature contributes independently:
+\begin{itemize}[leftmargin=*]
+  \item Each type constructor adds one clause to $\VV$.
+  \item The computation relation $\CC$ is defined uniformly for all computation types.
+  \item Each typing rule adds one case to the fundamental theorem.
+  \item Auxiliary lemmas (monotonicity, identity extension, anti-reduction, bind) are proved once and reused.
+\end{itemize}
+
+This modularity is a consequence of the language design. Because parameter variables interact orthogonally with the handler mechanism, the logical relation does not require heavyweight techniques such as Kripke worlds~\cite{ahmed_semantics_2004} or biorthogonality~\cite{biernacki2018handle}. Adding new type constructors (lists, maps, recursive types) requires only local additions --- a new $\VV$ clause and new fundamental theorem cases --- with no changes to existing proofs.
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Type Inference}\label{sec:inference}
+%% ═══════════════════════════════════════════════════════════════
+
+\cambria{}'s type inference algorithm extends Hindley--Milner~\cite{damas_principal_1982}
+requiring explicit annotations only for operations whose signatures mention instantiated parameters.
+Two completeness results relate the algorithm to the declarative system of \Cref{sec:calculus}.
+
+\begin{lemma}[Ground Completeness] \label{thm:ground-complete}
+  Suppose every handle expression in $t$ has $\sigma = \emptyset$.
+  If $\cjp{\Theta}{\Psi}{\G}{t}{C}$ is derivable declaratively, the algorithm infers
+  a type $C'$ of which $C$ is an instance.
+\end{lemma}
+
+\begin{proof}
+  Any derivation in this fragment is identical to a derivation in the plain algebraic effects system,
+  for which completeness has been established~\cite{damas_principal_1982, kammar_no_2017}.
+\end{proof}
+
+The second result covers the full parameterized system.
+An \emph{annotated term} is one in which every handle expression
+$\with h, \sigma \handle c$ carries an explicit type annotation on the body:
+$\with h, \sigma \handle (c : C)$.
+
+\begin{theorem}[Parameterized Completeness]\label{thm:param-complete}
+  Let $c$ be an annotated term and let $\G$ contain principal types for all variables.
+  If $\cjp{\Theta}{\Psi}{\G}{c}{C}$ is derivable in the declarative system, then the
+  algorithm infers a principal type $C'$ of which $C$ is an instance.
+\end{theorem}
+
+\begin{proof}
+  By structural induction on the typing derivation. The only non-standard cases are:
+  \begin{itemize}
+    \item \emph{\textsc{Do}.}
+          By \emph{gen admissibility}~\cite{damas_principal_1982}, any declarative derivation
+          can be rearranged so that \textsc{Gen} appears only immediately below
+          \textsc{Do}. This extends to our system because effect parameters are never generalized.
+
+    \item \emph{\textsc{Handle}.}
+          The algorithm infers the handler type
+          $C[\sigma] \Rightarrow D$ by the IH. The body is checked against the
+          explicitly annotated type $C$ in context $\Psi, \dom(\sigma)$.
+          A single substitution pass followed by equality checking compares the
+          substituted body type with the handlers inferred input type.
+          The result type $D$ is principal because the handler's type is principal
+          by the IH, and the body's type is fixed by the annotation.
+  \end{itemize}
+\end{proof}
+
+The annotation in \Cref{thm:param-complete} specifies the full type $C$ of the body.
+The following theorem strengthens this to a minimal annotation consisting only of the
+operation arities that mention $\dom(\sigma)$.
+
+\begin{definition} \label{def:relevant}
+  Given a parameter substitution $\sigma$, the
+  \emph{$\sigma$-relevant operations} of the handled signature $\Sig$ is
+  \[
+    \rel_\sigma(\Sig)
+    \;=\;
+    \bigl\{\,\op : A_\op \to B_\op \in \Sig \mid
+      \dom(\sigma) \cap (\fpv(A_\op) \cup \fpv(B_\op)) \neq \emptyset
+    \,\bigr\}.
+  \]
+  A \emph{minimally annotated term} is one in which each handle expression carries an annotation listing only
+  the $\sigma$-relevant operations, $\with h, \sigma \handle (c : \rel_\sigma(\Sig))$.
+  The return type and all other operations are omitted.
+\end{definition}
+
+\begin{corollary}[Minimal Annotation Completeness]\label{thm:minimal-complete}
+  Let $t$ be a minimally annotated term and let $\G$ contain principal types for all
+  variables.
+  If $\cjp{\Theta}{\Psi}{\G}{c}{C}$ is derivable declaratively, then the algorithm
+  infers a principal type $C'$ of which $C$ is an instance.
+\end{corollary}
+
+\begin{proof}
+  We extend the proof of \Cref{thm:param-complete}, strengthening the \textsc{Handle} case.
+  Partition the body's effect signature into three groups:
+
+  \begin{enumerate}
+    \item \emph{$\sigma$-relevant ops.}
+          The annotation seeds each $\psi \in \dom(\sigma)$ as a rigid constant
+          into $\Psi$, and the argument proceeds as in \Cref{thm:param-complete}.
+
+    \item \emph{$\sigma$-free ops.}
+          For any such $\op : A_\op \leadsto B_\op$ we have
+          $\dom(\sigma) \cap (\fpv(A_\op) \cup \fpv(B_\op)) = \emptyset$,
+          so $\sigma(A_\op) = A_\op$ and $\sigma(B_\op) = B_\op$.
+          Typing subterms against the handler's concrete arity already gives the correct
+          abstract type; no annotation is needed.
+          Moreover, since $\psi$ does not appear in $A_\op$ or $B_\op$, every unification
+          constraint arising from $\op$ is $\sigma$-free, so the rigid $\psi$
+          established by group~(1) is not disturbed.
+
+    \item \emph{Forwarded ops.}
+          Forwarded operations flow from the body's signature into $D$ unchanged, so
+          their arities are $\sigma$-free.
+          The argument is then identical to group~(2).
+  \end{enumerate}
+  \emph{Return type.}
+  With each $\psi\in\dom(\sigma)$ rigid in $\Psi$, the unification variable the algorithm introduces
+  for the return type is constrained only by value-level subterms of $c$.
+  Since $\psi\in\dom(\sigma)$ act as a ground constants to the unifier, the resulting value type is
+  principal without any annotation on the return position.
+\end{proof}
+
+The annotation burden is minimal; only operations whose types mention $\psi$ need declaration.
+All other types are inferred.
+Moreover, the annotation $\rel_\sigma(\Sig)$ is a term-independent sufficient condition.
+Further operations in $\rel_\sigma(\Sig)$ may be omitted when $\psi$ propagates to their arity via term-level value flow.
+For example, annotating only $\mathsf{get} : \unit \leadsto \psi$ in the body
+$\ddo x \leftarrow {!}\mathsf{get}\; () \iin {!}\mathsf{set}\;x$
+permits the algorithm to infer $\mathsf{set} : \psi \leadsto \unit$.
+
+For this reason, Cambria allows individual effect operations to be typed with the syntax,
+\begin{lstlisting}
+effect !op : A ~> B. c
+\end{lstlisting}
+but enforces no constraints on which operations need to be annotated, leaving the programmer to manage the interface.
+
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Related Work}\label{sec:related}
+%% ═══════════════════════════════════════════════════════════════
+
+\paragraph{Algebraic effects and handlers.}
+Algebraic effects were introduced by Plotkin and Power~\cite{plotkin_algebraic_2003} and extended with handlers by Plotkin and Pretnar~\cite{plotkin_handling_2009}. Many languages and calculi incorporate handlers, including Eff~\cite{bauer_programming_2015}, Koka~\cite{leijen_koka_2014}, Frank~\cite{lindley_do_2017}, Links~\cite{hillerström_continuation_2017}, and OCaml~5. \cambria{} is closest in spirit to the fine-grained call-by-value calculus of Kammar et al.~\cite{kammar_handlers_2013}, whose type safety results we extend to the parameterized setting.
+
+\paragraph{Parameterized effects and the problem of instances.}
+The need for parameterized effects --- and the inadequacy of simple effect signatures for modelling dynamically created resources --- was identified early in the algebraic effects literature. Biernacki et al.~\cite{biernacki2018handle} address this via existential types in a simply-typed calculus with biorthogonality-based logical relations, but without recursion or universal polymorphism.
+
+\paragraph{Logical relations for effects.}
+Biernacki et al.~\cite{biernacki2018handle} establish a logical relation for handlers using biorthogonality, which defines the computation relation indirectly through evaluation contexts. This gives compositionality properties for free but couples the relation to the full language syntax. Our direct, step-indexed approach is more elementary and modular: each type contributes an independent clause, and adding new features requires only local additions. Step-indexed logical relations originate with Appel and McAllester~\cite{appel_indexed_2001} and were developed for parametric polymorphism by Ahmed~\cite{ahmed_semantics_2006}. To our knowledge, our logical relation is the first to combine step-indexing with algebraic effect handlers.
+
+\paragraph{Step-indexing and recursion.}
+Step-indexed logical relations were introduced precisely to handle general recursion without requiring domain-theoretic machinery. Ahmed~\cite{ahmed_semantics_2006} establishes parametricity for System~F with recursive types. We adapt the step-indexing technique to a setting with effects and handlers, where the computation relation's self-reference through operation continuations requires careful accounting: each operation observation consumes one unit of index, ensuring well-foundedness.
+
+\paragraph{Concurrent effects.}
+Kammar et al.~\cite{kammar2025equational} develop an equational theory for dynamic threads as an algebraic effect. Their formalization uses concrete thread identifiers, without type abstraction. \cambria{}'s parameter variables make thread identifiers abstract, giving parametricity guarantees for concurrent programs that no prior system provides.
+
+%% ═══════════════════════════════════════════════════════════════
+\section{Conclusion}\label{sec:conclusion}
+%% ═══════════════════════════════════════════════════════════════
+
+We have presented \cambria{}, a calculus that extends algebraic effect handlers with parameter variables to provide type abstraction for parameterized effects. Parameter variables are first-class in the type system but erased at runtime, requiring no coercions or type-directed reduction. A step-indexed logical relation establishes parametricity: code polymorphic in a parameter variable cannot inspect its concrete representation.
+
+The design leads to a modular metatheory. The value relation, computation relation, and fundamental theorem decompose into independent pieces, each corresponding to a single type constructor or typing rule. This modularity reflects the orthogonality of parameter variables and effect handling --- and suggests that the abstraction boundary is in the right place.
+
+We have demonstrated \cambria{}'s expressiveness with examples spanning local state, probabilistic programming, and concurrent thread management. The concurrency example is particularly significant: it exercises a parameterized effect that cannot be reduced to effect instances, falling outside the scope of prior work on handler parametricity.
+
+\paragraph{Future work.} Natural extensions include effect polymorphism (abstracting over effect signatures), recursive types, and a denotational semantics establishing the categorical structure of parameterized handlers. We are also interested in mechanizing the parametricity proof and exploring the implications of free theorems for handler-based program transformations.
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}

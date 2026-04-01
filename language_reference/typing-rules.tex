@@ -466,8 +466,8 @@ the ($\beta$-op) case of preservation uses \Cref{lem:param-subst}.
 \section{Type Inference}\label{sec:inference}
 %% ═══════════════════════════════════════════════════════════════
 
-The inference algorithm extends Hindley--Milner~\cite{damas_principal_1982} allowing for explicit effect annotations.
-Otherwise, the algorithm is ordinary HM inference.
+\cambria{}'s type inference algorithm extends Hindley--Milner~\cite{damas_principal_1982}
+requiring explicit annotations only for operations whose signatures mention instantiated parameters.
 Two completeness results relate the algorithm to the declarative system of \Cref{sec:computations}.
 
 \begin{lemma}[Ground Completeness] \label{thm:ground-complete}

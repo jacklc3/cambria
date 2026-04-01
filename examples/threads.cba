@@ -1,0 +1,82 @@
+do for <- return (rec for g xs ->
+  case uncons xs of {
+    inl _        -> return (),
+    inr (x, xs') -> (g x ; for g xs')
+  })
+in
+do concat <- return (rec concat xs ys ->
+  case uncons xs of {
+    inl _        -> return ys,
+    inr (x, xs') -> return (x :: concat xs' ys)
+  })
+in
+
+with handler {
+  $tid -> List(Unique),
+  return x -> return x,
+  addtid (a1,a2) k -> k (concat a1 a2),
+  emptytid _ k -> k [],
+  node (deps, s) k ->
+    do a <- !unique () in (
+      for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps ;
+      !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
+      k (a :: [])
+    )
+} handle (
+  declare !node : $tid * Str ~> $tid.
+
+  with handler {
+    $cell -> Unique,
+    return x  -> return (fun _ -> return x),
+    get a k -> return (fun s -> k (lookup (a, s)) s),
+    set x k -> return (fun s -> k () (insert (x, s))),
+    ref x k -> do a <- !unique () in return (fun s ->
+      k a (insert (((a, x), s)))),
+    finally s -> s empty
+  } handle (
+    declare !get : $cell ~> $tid.
+    declare !set : $cell * $tid ~> Unit.
+    declare !ref : $tid ~> $cell.
+    declare !emptytid : Unit ~> $tid.
+    decalre !addtid : $tid * $tid ~> $tid.
+    decalre !node : $tid ~> $tid.
+
+    do deps <- !ref (!emptytid ()) in
+
+    with handler {
+      return x -> return (inr x),
+      act s k ->
+        do ns <- !get deps in
+        do a <- !node (ns, s) in
+        !set (deps, a) ; k (),
+      wait ps k ->
+        do ns <- !get deps in
+        !set (deps, !addtid (ns, ps)) ; k (),
+      stop _ k ->
+        return (inl ()),
+      fork _ k ->
+        do saved <- !get deps in
+        do _ <- k (inr ()) in
+        do child_deps <- !get deps in (
+          !set (deps, saved) ;
+          k (inl child_deps)
+        )
+    } handle (
+      declare !fork : Unit ~> $tid + Unit.
+      declare !wait : $tid ~> Unit.
+      declare !act  : Str ~> Unit.
+      declare !stop : Unit ~> Unit.
+
+      case !fork () of {
+        inl a1 -> case !fork () of {
+          inl a2 -> case !fork () of {
+            inl a3 -> !wait a2 ; !wait a3 ; !act "action4" ; return (),
+            inr _  -> !wait a1 ; !wait a2 ; !act "action3" ; return ()
+          },
+          inr _  -> !wait a1 ; !act "action2" ; return ()
+        },
+        inr _ -> !act "action1" ; return ()
+      }
+    )
+  )
+)
