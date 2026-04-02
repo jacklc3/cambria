@@ -1,6 +1,7 @@
 \documentclass[acmsmall,screen,review,anonymous]{acmart}
 
 \usepackage{cleveref}
+\usepackage{cancel}
 \usepackage{mathtools}
 \usepackage{mathpartir}
 \usepackage{stmaryrd}
@@ -20,7 +21,16 @@
   sensitive=true,
   morecomment=[l]{--},
   morestring=[b]",
-  literate={->}{$\to$}2 {<-}{$\leftarrow$}2 {~>}{$\leadsto$}2 {=>}{$\Rightarrow$}2 {++}{$\mathbin{+\!\!+}$}2 {\$p}{{\textcolor{paramcolor}{\$p}}}2 {\$cell}{{\textcolor{paramcolor}{\$cell}}}5 {\$urn}{{\textcolor{paramcolor}{\$urn}}}4,
+  literate=
+    {->}{$\to$}2
+    {<-}{$\leftarrow$}2
+    {~>}{$\leadsto$}2
+    {=>}{$\Rightarrow$}2
+    {++}{$\mathbin{+\!\!+}$}2
+    {\$p}{{\textcolor{paramcolor}{\$p}}}2
+    {\$loc}{{\textcolor{paramcolor}{\$loc}}}4
+    {\$tids}{{\textcolor{paramcolor}{\$tids}}}5
+    {\$urn}{{\textcolor{paramcolor}{\$urn}}}4,
 }
 
 \lstset{
@@ -80,6 +90,9 @@
 \newcommand{\dom}{\mathsf{dom}}
 \newcommand{\ttrue}{\mathsf{true}}
 \newcommand{\ffalse}{\mathsf{false}}
+\newcommand{\pack}{\mathsf{pack}}
+\newcommand{\unpack}{\mathsf{unpack}\;}
+\newcommand{\as}{\;\mathsf{as}\;}
 
 \newcommand{\G}{\Gamma}
 \newcommand{\Sig}{\Sigma}
@@ -94,9 +107,10 @@
 
 % Step-indexed LR macros
 \newcommand{\Rel}{\mathbf{Rel}}
-\newcommand{\VV}{\mathcal{V}}
-\newcommand{\CC}{\mathcal{C}}
-\newcommand{\GG}{\mathcal{G}}
+\newcommand{\VV}{}
+\newcommand{\SSS}{}
+\newcommand{\CC}{}
+\newcommand{\GG}{}
 
 \setcopyright{none}
 \acmJournal{PACMPL}
@@ -408,12 +422,12 @@ All metatheoretic results extend straightforwardly.
 The syntax of the language is the following.
 \[
 \begin{array}{lrcl}
-  \text{Value types}                & A, B   & ::= & \alpha \mid \psi \mid \tbool \mid \tfun{A}{C} \mid \thandler{C}{D} \\[4pt]
-  \text{Computation types}          & C, D   & ::= & \comp{A}{\Sig} \\[4pt]
-\text{Effect signatures}            & \Sig   & ::= & \{ \op_i : \arity{A_i}{B_i} \}_{i=1}^{m} \\[4pt]
-  \text{Type variable context}      & \Theta & ::= & \emptyset \mid \Theta, \alpha \\[4pt]
-  \text{Parameter variable context} & \Psi   & ::= & \emptyset \mid \Psi, \psi \\[4pt]
-  \text{Term context}               & \G     & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
+  \text{Value types}           & A, B   & ::= & \alpha \mid \psi \mid \tbool \mid \tfun{A}{C} \mid \thandler{C}{D} \\[4pt]
+  \text{Computation types}     & C, D   & ::= & \comp{A}{\Sig} \\[4pt]
+\text{Effect signatures}       & \Sig   & ::= & \{ \op_i : \arity{A_i}{B_i} \}_{i=1}^{m} \\[4pt]
+  \text{Type variable context} & \Theta & ::= & \emptyset \mid \Theta, \alpha \\[4pt]
+  \text{Parameter context}     & \Psi   & ::= & \emptyset \mid \Psi, \psi \\[4pt]
+  \text{Term context}          & \G     & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
 \end{array}
 \]
 
@@ -424,7 +438,7 @@ These types can be thought of as existential type variables, because they repres
 The syntax of values and computations is the following.
 \[
 \begin{array}{lrcl}
-  \text{Values}       & v, w & ::= & x \mid () \mid \ttrue \mid \ffalse
+  \text{Values}       & v, w & ::= & x \mid \ttrue \mid \ffalse
                                      \mid \fun x \mapsto c \mid \recmark f\;x \mapsto c \mid h \\[4pt]
   \text{Handlers}      & h    & ::= &
     \hhandler\;\{
@@ -432,26 +446,45 @@ The syntax of values and computations is the following.
       \op_i\; x\; k \mapsto c_i
     \}_{i=1}^{m} \\[4pt]
   \text{Computations} & c, d & ::= & \ret v \mid \op(v;\;x.c)\mid \ddo x \leftarrow c \iin d 
-                                     \mid \with \sigma, v \handle c \\[2pt]
-                      &      &     & \mid\; v_1\;v_2 \mid \iif v \then c_1 \eelse c_2 \\[4pt]
+                                     \mid \iif v \then c_1 \eelse c_2 \\[2pt]
+                      &      &     & \mid\; v_1\;v_2 \mid \with \sigma, v \handle c \\[4pt]
   \text{Parameter subst.} & \sigma & ::= & \{\psi_1 \mapsto A_1,\; \ldots,\; \psi_n \mapsto A_n \}
 \end{array}
 \]
-
 The surface syntax $!\op\;v$ desugars to $\op(v;\;x.\ret x)$.
 The key novelty is the \emph{parameter substitution}, often written $\sigma = \{\vec{\psi} \mapsto \vec{A}\}$, in the handle form,
 which bridges the abstract types in the body to their concrete representations in the handler.
 
 \subsection{Typing Rules}\label{sec:typing}
 
-We highlight the rules that are novel or interact with parameter variables; the remaining rules are standard.
+A type judgement $\tj \Theta \Psi A$ states that the type $A$ is well-formed in type varaible context $\Theta$ and parameter context $\Psi$.
+Well-formed value types, computation types, schemes and environments are defined inductively.
+\begin{mathpar}
+  
+  \inferrule{\alpha \in \Theta}{\tj \Theta \Psi \alpha}
 
-\paragraph{Value Judgements.} The rules for value judgements are standard.
+  \inferrule{\psi \in \Psi}{\tj \Theta \Psi \psi}
 
+  \inferrule{ }{\tj \Theta \Psi \tbool}
+
+  \inferrule{ \tj \Theta \Psi A \and \tj \Theta \Psi C }{\tj \Theta \Psi \tfun{A}{C}}
+
+  \inferrule{ \tj \Theta \Psi C \and \tj \Theta \Psi D }{\tj \Theta \Psi \thandler{C}{D}}
+
+  \inferrule{ [\tj \Theta \Psi {A_\op} \quad \tj \Theta \Psi {B_\op} ]_{(\op : A_\op \to B_\op) \in \Sig} }{\tj \Theta \Psi \Sig}
+
+  \inferrule{ \tj \Theta \Psi A \and \tj \Theta \Psi \Sig }{\tj \Theta \Psi {\comp{A}{\Sig}}}
+
+  \inferrule{ \tj {\Theta, \vec{\alpha}} \Psi A }{\tj \Theta \Psi {\forall\vec\alpha.A}}
+
+  \inferrule{ [\tj \Theta \Psi {\forall\vec\alpha.A}]_{(x:\forall \vec\alpha.A) \in \Gamma} }{\tj \Theta \Psi \Gamma}
+\end{mathpar}
+Value judgements are of the form $\vj \Theta \Psi \Gamma v A$ and implicitly enforce that $\tj \Theta \Psi \Gamma$ and $\tj \Theta \Psi A$.
+That are defined inductively over the language syntax.
 \begin{mathpar}
   \inferrule
-  {(x : \forall \vec{\alpha}.B) \in \G \\ [\tj \Theta \Psi {A_i}]_{i=1}^{|\vec{\alpha}|}}
-  {\vj{\Theta}{\Psi}{\G}{x}{B[A_i / \alpha_i]_{i=1}^{|\vec{\alpha}|}}}
+  {(x : \forall \vec{\alpha}.B) \in \G \\ [\tj \Theta \Psi {A_\alpha}]_{\alpha\in\vec\alpha}}
+  {\vj{\Theta}{\Psi}{\G}{x}{B[A_\alpha / \alpha]_{\alpha\in\vec\alpha}}}
   \; (\textsc{Var})
 
   \inferrule
@@ -460,12 +493,12 @@ We highlight the rules that are novel or interact with parameter variables; the 
     \; (\textsc{Bool})
 
   \inferrule
-  {\cjp{\Theta}{\Psi}{\G, x : A}{c}{C}}
+    {\cjp{\Theta}{\Psi}{\G, x : A}{c}{C}}
     {\vj{\Theta}{\Psi}{\G}{\fun x \mapsto c}{\tfun{A}{C}}}
     \; (\textsc{Fun})
 
   \inferrule
-  {\cj{\Theta}{\Psi}{\G, f : \tfun{A}{\comp{B}{\Sig}},\, x : A}{c}{B}{\Sig}}
+    {\cj{\Theta}{\Psi}{\G, f : \tfun{A}{\comp{B}{\Sig}},\, x : A}{c}{B}{\Sig}}
     {\vj{\Theta}{\Psi}{\G}{\rec f\; x \mapsto c}{\tfun{A}{\comp{B}{\Sig}}}}
     \; (\textsc{Rec})
 
@@ -490,7 +523,14 @@ The handled operations do not need to cover the full set of operations in the co
 The remaining operations are forwarded, which is indicated by the $ \Sig \setminus \{ \op_i \}_{i=1}^{m} \subseteq \Sig' $
 premise in the \textsc{Handler} rule.
 
-\paragraph{Computation Judgements.} Computation judgements are also defined inductively.
+Computation judgements are of the form $\cj \Theta \Psi \Gamma c A \Sig$
+and implicitly enforce that $\tj \Theta \Psi \Gamma$ and $\tj \Theta \Psi \comp{A}{\Sig}$.
+In particular, all $\alpha \in \vec\alpha$ do not appear free in $\Gamma$ or $\Sig$ in the \textsc{Gen} rule.
+This permits let-polymorphism without any value restriction~\cite{kammar_no_2017}.
+Also, in the \textsc{HandleParam} rule, while the body $c$ is typed in the extended parameter context $\Psi, \vec{\psi}$,
+the handler'soutput type $D$ is in the outer context $\Psi$, which does not contain $\vec{\psi}$, preventing the parameters from escaping.
+The handler's input type is the same as the body's, but with the parameters instantiated via the parameter substitution.
+When $\vec{\psi} = \emptyset$, the rule reduces to standard handler application.
 \begin{mathpar}
   \inferrule
   {\vj{\Theta}{\Psi}{\G}{v}{A}}
@@ -546,20 +586,12 @@ premise in the \textsc{Handler} rule.
     \cjp{\Theta}{\Psi, \vec{\psi}}{\G}{c}{C}
     \\
     \left[\tj \Theta \Psi {T_i}\right]_{i=1}^{n}
-  }{
-    \cjp{\Theta}{\Psi}{\G}{\with v, \{\psi_i \mapsto T_i\}_{i=1}^n \handle c}{D}
-  }
-  \; (\textsc{Handle})
+    }{
+      \cjp{\Theta}{\Psi}{\G}{\with v, \{\psi_i \mapsto T_i\}_{i=1}^n \handle c}{D}
+    }
+    \; (\textsc{HandleParam})
 \end{mathpar}
-The body $c$ is typed in the extended parameter context $\Psi, \vec{\psi}$.
-The handler's input type is the same, but with the parameters instantiated via the parameter substitution.
-The output type $D$ is in the outer context $\Psi$, which does not contain $\vec{\psi}$, preventing the parameters from escaping.
-When $\vec{\psi} = \emptyset$, the rule reduces to standard handler application.
-
-The \textsc{Gen} rule generalises type variables that are not free in $\Gamma$ or $\Sigma$.
-This prevents well-typed terms from getting stuck, even in the presence of polymorphism and effects~\cite{}.
-Critically, parameters are never generalised. 
-They must remain rigid within the body of a handler so that the handler can instantiate them consistently.
+Parameters are never generalised and must remain rigid within the body of a handler so that the handler can instantiate them consistently.
 Otherwise the abstraction boundary would break.
 
 \subsection{Operational Semantics}
@@ -646,22 +678,111 @@ For the given effect system, we have the following type safety result.
 \section{Parametricity}\label{sec:parametricity}
 %% ═══════════════════════════════════════════════════════════════
 
-The type abstraction provided by parameter variables is only meaningful if parametricity holds: code that is polymorphic in $\psi$ truly cannot inspect the concrete representation. We establish this via a step-indexed binary logical relation.
+In this section we prove parametricity for the parameters and type variables.
+Code in contexts $\Theta$ and $\Psi$ cannot inspect the concrete representation of the variables.
+We prove this result using a step-indexed binary logical relation.
+The key insight with this proof is that parametrized handers can be decomposed into plain handlers and existential types.
+With this decomposition, the logical relation becomes a standard combination of handlers, universal types, existential types and recursion,
+justifying the canonicity of parametrized handlers.
+The parametricity result is shown to carry over to the surface language via an elaboration proof.
+Viewing the parameters as existential types means that we do not need to track the dynamic resources as an effect creates them, we only posit one exists at the end of the computation.
+This means we avoid the complex machinery of Kripke worlds or biorthogonality, making the language more adaptable to further extensions like
+recursive types, linear types and universally quantified effects.
 
-\subsection{Step-Indexed Logical Relation}
+\subsection{The Core Language}
 
-\begin{definition}[Admissible Relation]
-  A \emph{step-indexed value relation} is a set $R \subseteq \mathrm{Val}_0 \times \mathrm{Val}_0 \times \mathbb{N}$, whose elements we write as $(v_1, v_2)_n$,
+Core to the parametricity proof is the insight that parametrized handlers decompose into plain handlers and existential types.
+In particular, for a single parameter substitution, $\sigma = \{\psi \mapsto A\}$,
+\begin{align*}
+  \with v, \{\psi \mapsto A\} \handle c \quad = &\quad \unpack \pack(\psi_n, A_n, x_{n-1}) \as (\psi_n, x_n) \iin (\with x_n \handle c).
+\end{align*}
+This decomposition is formalised in \Cref{sec:elaboration}. Before proceeding to that, we introduce the syntax of the core language.
+We update the handle syntax and extend the value types, values and computations with the following constructs.
+\[
+\begin{array}{lrcl}
+  \text{Value types}  & A, B & ::= & \cdots \mid \exists\psi.A \\[4pt]
+  \text{Values}       & v, w & ::= & \cdots \mid \pack(\psi, A, v) \\[4pt]
+  \text{Computations} & c, d & ::= & \cdots \mid \cancel{\with v, \sigma \handle c} \mid \with v \handle c \mid \unpack v \as (\psi, x) \iin c
+\end{array}
+\]
+Parameter substitutions $\sigma$ are no longer part of the syntax in the core language.
+We have a new typing derivation for existential types, and in place of the single \textsc{HandleParam} rule,
+we have a plain handle rule, as well as existential introduction and elimination rules.
+\begin{mathpar}
+  \inferrule{ \tj \Theta {\Psi, \psi} A }{ \tj \Theta \Psi {\exists\psi.A}}
+
+  \inferrule{
+    \vj{\Theta}{\Psi}{\G}{v}{\exists \psi.A}
+    \\
+    \vj{\Theta}{\Psi,\psi}{\G, x:A}{c}{C}
+  }{
+    \cjp{\Theta}{\Psi}{\G}{\unpack v \as (\psi, x) \iin c}{C}
+  }
+  \; (\textsc{Unpack})
+
+  \inferrule{
+    \vj{\Theta}{\Psi}{\G}{v}{\thandler{C}{D}}
+    \\
+    \cjp{\Theta}{\Psi}{\G}{c}{C}
+  }{
+    \cjp{\Theta}{\Psi}{\G}{\with v \handle c}{D}
+  }
+  \; (\textsc{Handle})
+
+  \inferrule{
+    \tj{\Theta}{\Psi}{A}
+    \\
+    \vj{\Theta}{\Psi}{\G}{v}{B[A / \psi]}
+  }{
+    \vj{\Theta}{\Psi}{\G}{\pack(\psi, A, v)}{\exists \psi.B}
+  }
+  \; (\textsc{Pack})
+\end{mathpar}
+Note that $\psi \notin \fpv(C, \G)$ in the \textsc{Unpack} rule because $\tj{\Theta}{\Psi}{\G}$ and $\tj{\Theta}{\Psi}{C}$ implicitly in the conclusion.
+
+The operational semantics replaces parametrized handler reduction with classic reduction and adds a new reduction for the existential constructs.
+\[
+\begin{array}{lcll}
+  \with h \handle \ret v
+    & \leadsto & c_r[v/x]
+    & (\beta\text{-ret}) \\
+  \with h \handle \op_i(v;\;y.c)
+    & \leadsto & c_i\bigl[v/x,\;(\fun y \mapsto \with h \handle c)/k\bigr]
+    & (\beta\text{-op}) \\
+  \with h \handle \op(v;\;y.c)
+    & \leadsto & \op(v;\;y.\;\with h \handle c)
+    & (\beta\text{-fwd}) \\
+  \unpack \pack(\psi, A, v) \as (\psi, x) \iin c
+    & \leadsto & c[v / x]
+    & (\beta\text{-ext})
+\end{array}
+\]
+As the ($\beta$-ext) rule is purely administritive for existential reduction,
+we define $c_1 \approx_\exists c_2$ iff $c_1$ and $c_2$ are equal up to the congruence closure of:
+\[
+  \unpack \pack(\psi, A, v) \as (\psi, x) \iin c \approx c[v / x]
+\]
+
+\subsection{Step-Indexed Logical Relation and Fundamental Theorem}
+
+In this section, we build the logical relation to prove parametricity of \cambria{}. The definitions of the logical relation are standard.
+The step-indexing integrates nicely with the handler relation by making the self-reference in the typing derivation well-founded,
+rather than having to revert to inducting on the size of the computation tree. While we only indtroduce the relation on the core syntax,
+it extends readily to product types, sum types, list types, map types, and all of the current features in the current version of \cambria{}.
+The ease of integration primarily comes from the decomosition of parametrized handlers into plain handlers and existentials, making each induction case canonical.
+
+\begin{definition}
+  An \emph{admissible relation} is a step-indexed relation on closed value terms
+  $R \subseteq \mathsf{Val}_0 \times \mathsf{Val}_0 \times \mathbb{N}$, an element of which we write $(v_1, v_2)_n$,
   that is downward-closed. If $(v_1, v_2)_n \in R$ and $n' \leq n$, then $(v_1, v_2)_{n'} \in R$.
   We write $\Rel$ for the set of all admissible relations.
 \end{definition}
 
 \begin{definition}
-A \emph{relational interpretation} $\delta : (\Theta \cup \Psi) \to \Rel$ assigns an admissible relation to each type variable and each parameter variable.
+  A \emph{relational interpretation} $\delta : (\Theta \cup \Psi) \to \Rel$ assigns an admissible relation to each type variable and parameter.
 \end{definition}
 
-\paragraph{Value relation.} $\VV\llbracket A \rrbracket_\delta \in \Rel$, is defined by induction on $A$:
-
+The logical relation $\llbracket {-} \rrbracket$ on values, schemes, computations, and environments is given by induction.
 \begin{align*}
   \VV\llbracket \alpha \rrbracket_\delta &= \delta(\alpha) \\
   \VV\llbracket \psi \rrbracket_\delta &= \delta(\psi) \\
@@ -669,44 +790,38 @@ A \emph{relational interpretation} $\delta : (\Theta \cup \Psi) \to \Rel$ assign
   \VV\llbracket \tfun{A}{C} \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall j \leq n.\; \forall (w_1, w_2)_j \in \VV\llbracket A \rrbracket_\delta.\; (v_1\;w_1, v_2\;w_2)_j \in \CC\llbracket C \rrbracket_\delta\} \\
   \VV\llbracket \thandler{C}{D} \rrbracket_\delta &= \{(h_1, h_2)_n \mid \forall j \leq n.\; \forall (c_1, c_2)_j \in \CC\llbracket C \rrbracket_\delta. \\
   &\qquad\qquad\qquad (\with h_1 \handle c_1, \with h_2 \handle c_2)_j \in \CC\llbracket D \rrbracket_\delta\} \\
-  \VV\llbracket \forall\vec\alpha.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall \vec{R} \in \Rel^{|\vec\alpha|}.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\vec\alpha \mapsto \vec{R}]}\}
+  \VV\llbracket \forall\vec\alpha.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \exists R \in \Rel.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\psi \mapsto R]}\} \\
+  \SSS\llbracket \exists\psi.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall \vec{R} \in \Rel^{|\vec\alpha|}.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\vec\alpha \mapsto \vec{R}]}\} \\
+  \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta &= \{(c_1, c_2)_n \mid c_1 \text{ and } c_2 \text{ are terminally related at } n\} \\
+  \GG\llbracket \G \rrbracket_\delta &= \{(\gamma_1, \gamma_2)_n \mid \forall(x:\forall\vec\alpha.A)\in\Gamma. \; (\gamma_1(x), \gamma_2(x))_n \in\SSS\llbracket \forall\vec\alpha.A \rrbracket_\delta \}
 \end{align*}
 
-\paragraph{Computation relation.} $(c_1, c_2)_n \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ iff for all $j < n$:
-
-\begin{itemize}
-  \item If $c_1 \leadsto^j \ret v_1$, then $\exists v_2.\; c_2 \leadsto^* \ret v_2$ and $(k{-}j, v_1, v_2) \in \VV\llbracket A \rrbracket_\delta$.
-  \item If $c_1 \leadsto^j \op(v_1; y.d_1)$ where $(\op : \arity{A_\op}{B_\op}) \in \Sig$, then $\exists v_2, d_2.\; c_2 \leadsto^* \op(v_2; y.d_2)$ and:
+\begin{definition}
+  Two computations $c_1$ and $c_2$ are \emph{terminally related} at $n$ if for all $j < n$:
   \begin{itemize}
-    \item $(v_1, v_2)_{n-j} \in \VV\llbracket A_\op \rrbracket_\delta$
-    \item $\forall k < n{-}j.\; \forall (w_1, w_2)_k \in \VV\llbracket B_\op \rrbracket_\delta.\; (d_1[w_1/y], d_2[w_2/y])_k \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$
+    \item If $c_1 \leadsto^j \ret v_1$, then there is $v_2$ such that $c_2 \leadsto^* \ret v_2$ and $(v_1, v_2)_{n-j} \in \VV\llbracket A \rrbracket_\delta$
+    \item If $c_1 \leadsto^j \op(v_1; y.d_1)$ for $(\op : \arity{A_\op}{B_\op}) \in \Sig$, then there is $v_2$ and $d_2$ such that $c_2 \leadsto^* \op(v_2; y.d_2)$ and:
+    \begin{itemize}
+      \item $(v_1, v_2)_{n-j} \in \VV\llbracket A_\op \rrbracket_\delta$
+      \item $\forall k < n{-}j.\; \forall (w_1, w_2)_k \in \VV\llbracket B_\op \rrbracket_\delta.\; (d_1[w_1/y], d_2[w_2/y])_k \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$
+    \end{itemize}
   \end{itemize}
-\end{itemize}
-
-The step index $k$ counts reduction steps on the left; the right side uses $\leadsto^*$ (unbounded). The self-reference in (O) is well-founded: $m < k{-}j$ where $j < k$ ensures $m < k$.
-
-\paragraph{Environment relation.}
-\begin{align*}
-(k, \gamma_1, \gamma_2) \in \GG\llbracket \emptyset \rrbracket_\delta &\quad\text{always} \\
-(k, \gamma_1[x \mapsto v_1], \gamma_2[x \mapsto v_2]) \in \GG\llbracket \G, x : \forall\vec\alpha.A \rrbracket_\delta &\quad\text{iff}\quad (k, \gamma_1, \gamma_2) \in \GG\llbracket \G \rrbracket_\delta \;\land\; (k, v_1, v_2) \in \VV\llbracket \forall\vec\alpha.A \rrbracket_\delta
-\end{align*}
-
-\subsection{Fundamental Theorem}
+\end{definition}
+The step index $j$ counts reduction steps on the left.
+The self-reference of $\CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ is well-founded because $k < n{-}j$ ensures $k < n$.
 
 \begin{theorem}[Parametricity]\label{thm:parametricity}
-\leavevmode
-\begin{enumerate}
-  \item If $\vj{\Theta}{\Psi}{\G}{v}{A}$, then for all $k$, $\delta : (\Theta \cup \Psi) \to \Rel$, and $(k, \gamma_1, \gamma_2) \in \GG\llbracket \G \rrbracket_\delta$:\; $(k, v[\gamma_1], v[\gamma_2]) \in \VV\llbracket A \rrbracket_\delta$.
-  \item If $\cj{\Theta}{\Psi}{\G}{c}{A}{\Sig}$, then for all $k$, $\delta$, and $(k, \gamma_1, \gamma_2) \in \GG\llbracket \G \rrbracket_\delta$:\; $(k, c[\gamma_1], c[\gamma_2]) \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$.
-\end{enumerate}
+  If $\cjp{\Theta}{\Psi}{\G}{c}{C}$, then for all $\delta : (\Theta \cup \Psi) \to \Rel$, $n\in\mathbb{N}$,
+  and $(\gamma_1, \gamma_2)_n \in \GG\llbracket \G \rrbracket_\delta$,
+  then $(c[\gamma_1], c[\gamma_2])_n \in \CC\llbracket C \rrbracket_\delta$.
 \end{theorem}
 
-\begin{proof}[Proof sketch]
-By induction on the typing derivation, with each case proving ``for all $k$.'' Key cases:
+\begin{proof}
+By induction on the typing derivation. 
 
 \emph{Rec:} inner induction on $j$. At $j \geq 1$, the induction hypothesis gives the recursive function at $\VV_{j-1}$, the fundamental theorem (at $j{-}1$) gives the body at $\CC_{j-1}$, and the anti-reduction lemma lifts the application to $\CC_j$.
 
-\emph{Handler literal:} inner induction on $j$. At $j = m{+}1$, the return case applies the fundamental theorem to $c_r$; the operation case constructs the deep continuation $\fun y \mapsto \with h \handle c'$, which is related at $\VV_{m+1}\llbracket \tfun{B_\op}{\comp{B}{\Sig'}} \rrbracket$ by the inner induction hypothesis at $j' \leq m$.
+\emph{Handler:} inner induction on $j$. At $j = m{+}1$, the return case applies the fundamental theorem to $c_r$; the operation case constructs the deep continuation $\fun y \mapsto \with h \handle c'$, which is related at $\VV_{m+1}\llbracket \tfun{B_\op}{\comp{B}{\Sig'}} \rrbracket$ by the inner induction hypothesis at $j' \leq m$.
 
 \emph{Handle:} Immediate from the handler relation at $j = k$.
 
@@ -715,10 +830,8 @@ By induction on the typing derivation, with each case proving ``for all $k$.'' K
 \emph{Gen:} Since reduction is independent of the relational interpretation $\delta$, the same witnesses work for all instantiations $\vec{R}$.
 \end{proof}
 
-\subsection{Modularity of the Proof}
-
 The logical relation is structured so that each language feature contributes independently:
-\begin{itemize}[leftmargin=*]
+\begin{itemize}
   \item Each type constructor adds one clause to $\VV$.
   \item The computation relation $\CC$ is defined uniformly for all computation types.
   \item Each typing rule adds one case to the fundamental theorem.
@@ -726,6 +839,75 @@ The logical relation is structured so that each language feature contributes ind
 \end{itemize}
 
 This modularity is a consequence of the language design. Because parameter variables interact orthogonally with the handler mechanism, the logical relation does not require heavyweight techniques such as Kripke worlds~\cite{ahmed_semantics_2004} or biorthogonality~\cite{biernacki2018handle}. Adding new type constructors (lists, maps, recursive types) requires only local additions --- a new $\VV$ clause and new fundamental theorem cases --- with no changes to existing proofs.
+
+\subsection{Elaboration} \label{sec:elaboration}
+
+\newcommand{\elab}[1]{{(#1)^\dagger}}
+
+This section demonstrated that \cambria{} elaborates faithfully into the core language.
+This means that the parametricity result from \Cref{thm:parametricity} carries into \cambria{}, and the pbstract interfaces of the parametrized handlers are formally guaranteed.
+
+\begin{definition}
+  The \emph{elaboration translation} $\elab{{-}}$ from \cambria{}'s syntax to the core syntax is given the identity on types,
+  and structural identity on terms, apart from the following clause, which is defined inductively over the size of the parameter substitution.
+  \begin{align*}
+    \elab{\with v, \emptyset \handle c}              &= \with v \handle c \\[-2pt]
+    \elab{\with v, \sigma[\psi \mapsto A] \handle c} &= \unpack \pack(\psi, A, v) \as (\psi, x) \iin \elab{\with x, \sigma \handle c}
+  \end{align*}
+\end{definition}
+
+The following results confirm that this elaboration is sound.
+
+\begin{proposition}[Type Preservation]
+  If $\cjp \Theta \Psi \Gamma c C$ in \cambria{}, then $\cjp \Theta \Psi \Gamma {\elab{c}} C$ in the core syntax.
+\end{proposition}
+
+\begin{proof}
+  The only non-trivial case is the $\handle$ elaboration. This is proved by induction on the size of the parameter substitution.
+  When $\sigma=\emptyset$, this reduces to the classic handler case:
+  \[
+  \inferrule{
+    \vj{\Theta}{\Psi}{\G}{v}{\thandler{C}{D}}
+    \\
+    \cjp{\Theta}{\Psi}{\G}{c}{C}
+    }{
+      \cjp{\Theta}{\Psi}{\G}{\with v, \emptyset \handle c}{D}
+    }
+  \]
+  When $\sigma=\sigma'[\psi \mapsto A]$, working back from the typing derivation gives:
+  \[
+    \inferrule{
+      \vj{\Theta}{\Psi}{\G}{v}{\thandler{C[\sigma'[\psi\mapsto A]]}{D}}
+      \\
+      \cjp{\Theta}{\Psi,\dom(\sigma'), \psi}{\G}{c}{C}
+      \\
+      \tj \Theta \Psi A \quad \cdots
+    }{
+      \cjp{\Theta}{\Psi}{\G}{\with v, \sigma'[\psi \mapsto A] \handle c}{D}
+    }
+  \]
+  As $\psi \notin \fpv(D)$, we can derive
+  \[
+    \inferrule{
+      \vj{\Theta}{\Psi}{\G}{v}{(\thandler{C[\sigma']}{D})[A / \psi]}
+    }{
+      \vj{\Theta}{\Psi}{\G}{\pack(\psi, A, v)}{\exists\psi.\thandler{C[\sigma']}{D}}
+    }
+  \]
+  And weakening $\cjp{\Theta}{\Psi,\dom(\sigma'), \psi}{\G}{c}{C}$ gives
+  \[
+    \cjp \Theta {\Psi, \psi} {\Gamma, x : \thandler{C[\sigma']}{D}} {\with x, \sigma' \handle c} D
+  \]
+  By the IH, $\cjp \Theta {\Psi, \psi} {\Gamma, x : \thandler{C[\sigma']}{D}} {\elab{\with x, \sigma' \handle c}} D$, resulting in
+  \[
+    \cjp{\Theta}{\Psi}{\G}{\unpack \pack(\psi, A, v) \as (\psi, x) \iin \elab{\with x, \sigma \handle c}}{D}.
+  \]
+  as required.
+\end{proof}
+
+\begin{proposition}[Operational Correspondence]
+  $c \leadsto c'$ in \cambria{} if and only if $\elab{c} \leadsto^* \elab{c'}$ in the core language.
+\end{proposition}
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Type Inference}\label{sec:inference}
