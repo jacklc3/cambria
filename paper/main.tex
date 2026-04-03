@@ -29,7 +29,8 @@
     {++}{$\mathbin{+\!\!+}$}2
     {\$p}{{\textcolor{paramcolor}{\$p}}}2
     {\$loc}{{\textcolor{paramcolor}{\$loc}}}4
-    {\$tids}{{\textcolor{paramcolor}{\$tids}}}5
+    {\$tid}{{\textcolor{paramcolor}{\$tid}}}4
+    {\$node}{{\textcolor{paramcolor}{\$node}}}5
     {\$urn}{{\textcolor{paramcolor}{\$urn}}}4,
 }
 
@@ -333,72 +334,63 @@ The thread identifiers \lstinline|$tids| are abstract and so cannot be forged, c
 The following program constructs an N-shaped dependency between four actions.
 
 \begin{lstlisting}
-nshape = (
-  effect !fork : Unit ~> Unit + $tids.
-  effect !wait : $tids ~> Unit.
-  effect !act  : Str ~> Unit.
-  effect !stop : Unit ~> Unit.
-
-  case !fork () of {
-    inl _ -> !act "action1" ; return (),
-    inr a1 -> case !fork () of {
-      inl _  -> !wait a1 ; !act "action2" ; !stop () ; return (),
-      inr a2 -> !wait a2; case !fork () of {
-        inl _  -> !wait a1 ; !act "action3" ; !stop () ; return (),
-        inr a3 -> !wait a3 ; !act "action4" ; !stop () ; return ()
-      }
-    }
-  } 
-)
+declare !fork : Unit ~> $tid + Unit.
+declare !wait : $tid ~> Unit.
+declare !act  : Str ~> Unit.
+declare !stop : Unit ~> Unit.
+case !fork () of {
+  inl a1 -> case !fork () of {
+    inl a2 -> case !fork () of {
+      inl a3 -> !wait a2 ; !wait a3 ; !act "action4" ; return (),
+      inr _  -> !wait a1 ; !wait a2 ; !act "action3" ; return ()
+    },
+    inr _  -> !wait a1 ; !act "action2" ; return ()
+  },
+  inr _ -> !act "action1" ; return ()
+}
 \end{lstlisting}
+
 This program could be handled by a handler that spawns new threads for each fork instance, and then copying hte continuation to be run on each thread.
 However, we may want to better understand the dependencies between the observable actions.
 For concurrent program of this scale, this can be parsed from the program, but at larger scales with interleaving parts this is near impossible.
 Instead, we can build a handler that converts the program into a DAG in graphviz format.
 We first handle the threads effect into a simpler labelled poset algebra~\cite{kammar_handlers_2013} that is parametrized by a type of nodes.
 \begin{lstlisting}
-effect !get : $loc ~> $tids.
-effect !set : $loc * $tids ~> Unit.
-effect !ref : $tids ~> $loc.
-effect !emptytids : Unit ~> $tids.
-effect !addtids : $tids * $tids ~> $tids.
-effect !node : $tids ~> $tids.
-do loc <- !ref (!emptytids ()) in
-with handler {
+declare !get  : $loc ~> List($node).
+declare !set  : $loc * List($node) ~> Unit.
+declare !ref  : List($node) ~> $loc.
+declare !node : List($node) * Str ~> List($node).
+do loc <- !ref [] in
+return handler {
+  $tid -> List($node),
   return x -> return (inr x),
   act s k ->
     do deps <- !get loc in
     do a <- !node (deps, s) in
     !set (loc, a) ; k (),
-  wait deps k ->
-    do deps' <- !get loc in
-    !set (loc, !addtids (deps, deps')) ; k (),
+  wait deps' k ->
+    do deps <- !get loc in
+    !set (loc, concat deps deps') ; k (),
   stop _ k ->
     return (inl ()),
   fork _ k ->
-    do deps <- !get loc in
+    do saved <- !get loc in
     do _ <- k (inr ()) in
     do child_deps <- !get loc in (
-      !set (loc, deps) ;
+      !set (loc, saved) ;
       k (inl child_deps)
     )
-} handle nshape
+}
 \end{lstlisting}
 This handling scheme also shows that we may interleave handlers with multiple parameters without worry.
-The local state effect is storing the abstract thread identifiers in its memory locations.
-The labelled poset algebra in this implementation has the effect operations \lstinline|node|, \lstinline|addtids|, and \lstinline|emptytids|,
-rather than the single one established in~\cite{kammar2025equational}. This is because we have encoded the parameter operations
-of merging two compound thread ids and producing the empty compound id as effect operations to keep the parameters completely abstract.
-This can be done mechanically for any operations on the parameters.
+The local state effect is storing the sets of abstract nodes in its memory locations.
 We can finally implement the node effect interface by printing the nodes and dependencies in graphviz format, using the fresh name handler from \Cref{sec:local-state}.
 \begin{lstlisting}
 handler {
-  $tids -> List(Int),
+  $node -> Unique,
   return x -> return x,
-  addtid (a1,a2) k -> k (concat a1 a2),
-  emptytid _ k -> k [],
   node (deps, s) k ->
-    do a <- !fresh () in (
+    do a <- !unique () in (
       for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps ;
       !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
       k (a :: [])
@@ -628,15 +620,17 @@ Single-step reduction $c \leadsto c'$ is defined below, closed under the congrue
     & \leadsto & c_r[v/x]
     & (\beta\text{-ret}) \\
     \with h,\sigma \handle \op_i(v;\;y.c)
-    & \leadsto & c_i\bigl[v/x,\;(\fun y \mapsto \with h \handle c)/k\bigr]
+    & \leadsto & c_i\bigl[v/x,\;(\fun y \mapsto \with h, \emptyset \handle c)/k\bigr]
     & (\beta\text{-op}) \\
   \with h,\sigma \handle \op(v;\;y.c)
-    & \leadsto & \op(v;\;y.\;\with h \handle c)
+    & \leadsto & \op(v;\;y.\;\with h, \emptyset \handle c)
     & (\beta\text{-fwd})
 \end{array}
 \]
 The ($\beta$-fwd) rule applies when $\op \notin \{\op_1, \ldots, \op_n\}$.
 The continuation supplied to the operation clause in ($\beta$-op) reinstates the handler, giving \emph{deep} handling.
+In the reinstated continuations, we replace the parameter substitution $\sigma$ with $\emptyset$ because the parameters are only needed for
+type checking and do not have an effect on the reductions, as formalised in \Cref{lem:erasure}.
 
 The parameter substitution does not appear in any reduction result, thus the reduction sequence is independent of these substitutions.
 This is the formal sense in which parameter variables are erased at runtime. There is no dynamic dispatch, coercions, or type-directed reduction.
@@ -756,11 +750,6 @@ The operational semantics replaces parametrized handler reduction with classic r
     & \leadsto & c[v / x]
     & (\beta\text{-ext})
 \end{array}
-\]
-As the ($\beta$-ext) rule is purely administritive for existential reduction,
-we define $c_1 \approx_\exists c_2$ iff $c_1$ and $c_2$ are equal up to the congruence closure of:
-\[
-  \unpack \pack(\psi, A, v) \as (\psi, x) \iin c \approx c[v / x]
 \]
 
 \subsection{Step-Indexed Logical Relation and Fundamental Theorem}
