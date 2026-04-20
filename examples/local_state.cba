@@ -1,4 +1,5 @@
 with handler {
+  $loc -> Unique,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
@@ -6,6 +7,8 @@ with handler {
     k a (insert (((a, x), s)))),
   finally s -> s empty
 } handle (
+  declare !ref : Int ~> $loc.
+
   do a <- !ref 2 in
   do b <- !ref 3 in
   (!set (a, !get b + !get a); !get a)

@@ -13,13 +13,17 @@ in
 
 with handler {
   $node -> Unique,
-  return x -> return x,
-  node (deps, s) k ->
-    do a <- !unique () in (
-      for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps ;
-      !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
-      k (a :: [])
-    )
+  return x -> return (fun _ -> return x),
+  node (deps, s) k -> return (fun _ ->
+    do a <- !unique () in
+    do _ <- !print (hash a ++ " [label=\"" ++ s ++ "\"]") in
+    do _ <- for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps in
+    k (a :: []) ()),
+  finally f ->
+    !print "" ;
+    !print "digraph { graph [label=\"Dependency graph\"]; ";
+    f ();
+    !print "}\n"
 } handle (
   with handler {
     $loc -> Unique,
@@ -65,12 +69,12 @@ with handler {
       case !fork () of {
         inl a1 -> case !fork () of {
           inl a2 -> case !fork () of {
-            inl a3 -> !wait a2 ; !wait a3 ; !act "action4" ; return (),
-            inr _  -> !wait a1 ; !wait a2 ; !act "action3" ; return ()
+            inl a3 -> !wait a2 ; !act "Action 4" ; return (),
+            inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; return ()
           },
-          inr _  -> !wait a1 ; !act "action2" ; return ()
+          inr _  -> !act "Action 2" ; return ()
         },
-        inr _ -> !act "action1" ; return ()
+        inr _ -> !act "Action 1" ; return ()
       }
     )
   )

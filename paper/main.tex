@@ -9,6 +9,7 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \usepackage{booktabs}
+\usepackage{todonotes}
 
 % ── Cambria listing style ──────────────────────────────────────
 \definecolor{kwcolor}{RGB}{0,0,160}
@@ -72,6 +73,7 @@
 \newcommand{\arity}[2]{#1 \to #2}
 
 \newcommand{\op}{\mathsf{op}}
+\newcommand{\ops}{\mathsf{ops}}
 \newcommand{\ret}{\mathsf{return}\;}
 \newcommand{\ddo}{\mathsf{do}\;}
 \newcommand{\iin}{\;\mathsf{in}\;}
@@ -89,6 +91,7 @@
 \newcommand{\handle}{\;\mathsf{handle}\;}
 \newcommand{\effect}{\mathsf{effect}\;}
 \newcommand{\dom}{\mathsf{dom}}
+\newcommand{\cod}{\mathsf{cod}}
 \newcommand{\ttrue}{\mathsf{true}}
 \newcommand{\ffalse}{\mathsf{false}}
 \newcommand{\pack}{\mathsf{pack}}
@@ -105,13 +108,16 @@
 \newcommand{\vj}[5]{#1; #2; #3 \vdash #4 : #5}
 \newcommand{\cj}[6]{#1; #2; #3 \vdash #4 : \comp{#5}{#6}}
 \newcommand{\cjp}[5]{#1; #2; #3 \vdash #4 : #5}
+\newcommand{\eenv}{\bullet}
 
 % Step-indexed LR macros
 \newcommand{\Rel}{\mathbf{Rel}}
-\newcommand{\VV}{}
-\newcommand{\SSS}{}
-\newcommand{\CC}{}
-\newcommand{\GG}{}
+\newcommand{\VV}{\mathcal{V}}
+\newcommand{\SSS}{\mathcal{S}}
+\newcommand{\CC}{\mathcal{C}}
+\newcommand{\GG}{\mathcal{E}}
+
+\newcommand{\ctx}{\mathcal{C}}
 
 \setcopyright{none}
 \acmJournal{PACMPL}
@@ -169,9 +175,9 @@ Prior work addresses this ``problem of instances'' through existential types~\ci
 \begin{lstlisting}
 with handler { $cell -> Unique, get a k -> ..., set x k -> ..., ref x k -> ... }
 handle (
-  effect !get : $cell ~> Int.
-  effect !set : $cell * Int ~> Unit.
-  effect !ref : Int ~> $cell.
+  effect get : $cell ~> Int.
+  effect set : $cell * Int ~> Unit.
+  effect ref : Int ~> $cell.
   -- here $cell is abstract: the program cannot inspect it
   do a <- !ref 42 in !get a
 )
@@ -201,9 +207,9 @@ We introduce \cambria{} through a series of examples that exercise its key featu
 The following program declares the three operations involved in the local state effect and runs a program allocating and updating two memory cells:
 
 \begin{lstlisting}
-effect !get : $loc ~> Int.
-effect !set : $loc * Int ~> Unit.
-effect !ref : Int ~> $loc.
+effect get : $loc ~> Int.
+effect set : $loc * Int ~> Unit.
+effect ref : Int ~> $loc.
 do a <- !ref 2 in
 do b <- !ref 3 in (
   !set (a, !get b); !get a
@@ -229,6 +235,7 @@ This shows that the parametrized handlers in \cambria{} integrate seamlessly wit
 
 \begin{lstlisting}
 fresh_handler = handler {
+  $name -> Int,
   return x -> return (fun _ -> x),
   fresh _ k -> return (fun n -> k n (n+1)),
   finally f -> f 0
@@ -242,9 +249,9 @@ Even if the parameter \lstinline|$loc| is handled to in integer type,
 the following code will not type-check because \lstinline|a| remains abstract until handled.
 
 \begin{lstlisting}
-effect !get : $loc ~> Int.
-effect !set : $loc * Int ~> Unit.
-effect !ref : Int ~> $loc.
+effect get : $loc ~> Int.
+effect set : $loc * Int ~> Unit.
+effect ref : Int ~> $loc.
 do a <- !ref 2 in !set (a+1, 3)
 \end{lstlisting}
 
@@ -261,9 +268,9 @@ do map <- return (rec map (f, xs) ->
     inr (x, xs') -> f x :: map f xs'
   }) in
 with local_state_handler handle (
-  effect !get : $p ~> Int.
-  effect !ref : Int ~> $p.
-  do refs  <- map ((fun n -> !ref n), (10 :: 20 :: 30 :: [])) in
+  effect get : $p ~> Int.
+  effect ref : Int ~> $p.
+  do refs <- map ((fun n -> !ref n), (10 :: 20 :: 30 :: [])) in
   do bools <- map ((fun r -> !get r == 20), refs) in
   return bools
 )
@@ -286,31 +293,32 @@ Polya's urn is a probabilistic process where an urn contains a red ball and a bl
 After each sample from the urn, an additional ball of the sampled colour is places back in the urn.
 That is, the urn gets biased towards the previous samples.
 
-Consider a probabilistic program that samples from a Polya urn ten times and accumulates the result.
+Consider a probabilistic program that samples from a Polya urn ten times and accumulates the number of draws of red balls.
 \begin{lstlisting}
-effect !newurn : Unit ~> $urn.
-effect !sample : $urn ~> Bool.
-do x <- !newurn () in
-countSuccesses 10 (fun _ -> !sample x) 
+effect newurn : Unit ~> $urn.
+effect sample : $urn ~> Bool.
+do urn <- !newurn () in
+countRedDraws 10 (fun _ -> !sample urn) 
 \end{lstlisting}
-This effect can be handled via the local state effect, where the memory locations track the number of balls in each urn.
+This effect can be handled via the local state effect, where the references track the number of balls in the urns.
 \begin{lstlisting}
 handler {
   $urn -> $loc,
   newurn _ k -> k (!ref (1, 1)),
   sample urn k ->
     do (red, blue) <- !get urn in
-    do ball <- !bernoulli (red / (red + blue)) in
-    do _ <- !set (a, (i + boolToInt ball, j + (1 - boolToInt ball))) in
-    k ball
+    do isRedBall <- !bernoulli (red / (red + blue)) in
+    do incRed <- boolToInt isRedBall in
+    do _ <- !set (a, (red + incRed, blue + (1 - incRed))) in
+    k isRedBall
 }
 \end{lstlisting}
 Here, the parameter parameter instantiation is to another parameter \lstinline|$urn -> $loc|, rather than a comcrete type,
-composing the urn abstraction with the state abstraction.
+composing the urn abstraction with the local state abstraction.
 The effect operation \lstinline|!bernoulli : Double ~> Bool| is an inbuilt \cambria{} command that samples from a Bernoulli distribution.
 Polya famously showed that the distribution of the urn is equivalent to a distribution given by first uniformly sampling from the interval
 between 0 and 1, and then constantly sampling from a Bernoulli distribution with the resulting random variable instead.
-Hence, we can bypass local state to produce a more efficient implementation of the Polya urn effect by instantiating \lstinline|$urn| as a double instead.
+Hence, we can bypass local state to produce a more efficient implementation of the Polya urn effect by instantiating \lstinline|$urn| as a double.
 \begin{lstlisting}
 handler {
   $urn -> Double,
@@ -327,7 +335,7 @@ All of the previous examples can be expressed as individual instances of the sam
 The following example of concurrent thread management~\cite{kammar2025equational} is not such a case.
 Instances interact non-trivially with one another and so cannot be expressed via multiple copies of handlers.
 
-A concurrent program performs four operations: \lstinline{!act} performs a labelled observable action, \lstinline{!fork} spawns a child thread,
+A concurrent program has four operations: \lstinline{!act} performs an observable action, \lstinline{!fork} spawns a child thread,
 \lstinline{!wait} stalls the thread unill other threads have finished, and \lstinline{!stop} terminates the current thread.
 The thread identifiers \lstinline|$tids| are abstract and so cannot be forged, compared, or inspected.
 
@@ -340,47 +348,60 @@ declare !act  : Str ~> Unit.
 declare !stop : Unit ~> Unit.
 case !fork () of {
   inl a1 -> case !fork () of {
-    inl a2 -> case !fork () of {
-      inl a3 -> !wait a2 ; !wait a3 ; !act "action4" ; return (),
-      inr _  -> !wait a1 ; !wait a2 ; !act "action3" ; return ()
+    inl a2 -> !wait a2 ; case !fork () of {
+      inl a3 -> !act "Action 4" ; !stop (),
+      inr _  -> !wait a1 ; !act "Action 3" ; !stop ()
     },
-    inr _  -> !wait a1 ; !act "action2" ; return ()
+    inr _  -> !act "Action 2" ; !stop ()
   },
-  inr _ -> !act "action1" ; return ()
+  inr _ -> !act "Action 1" ; !stop ()
 }
 \end{lstlisting}
 
-This program could be handled by a handler that spawns new threads for each fork instance, and then copying hte continuation to be run on each thread.
-However, we may want to better understand the dependencies between the observable actions.
-For concurrent program of this scale, this can be parsed from the program, but at larger scales with interleaving parts this is near impossible.
-Instead, we can build a handler that converts the program into a DAG in graphviz format.
-We first handle the threads effect into a simpler labelled poset algebra~\cite{kammar_handlers_2013} that is parametrized by a type of nodes.
+Only parent have access to the thread IDs of the children, and thus a child may only be waited on by its ancestors.
+So a simple valid implementation of this concurrency effect would be to first run the continuation for the child thread, and then run the continuation of the parent thread.
+Waiting becomes a no-op, so we can instantiate the thread IDs to the unit type because there is no need to track them.
+The type \lstinline|A| is handled into \lstinline|Unit + A| to indicate if the thread returned a value or terminated.
+\begin{lstlisting}
+handler {
+  $tid -> Unit,
+  return x -> return (inr x),
+  act  s k -> !print s ; k (),
+  wait _ k -> k (),
+  stop _ k -> return (inl ()),
+  fork _ k -> k (inr ()) ; k (inl ())
+}
+\end{lstlisting}
+Alternatively, we may want to visualise understand the dependencies between the observable actions for diagnostics.
+We can implement a handler that converts the program into a DAG in graphviz format.
+This is achieved by handling the concurrency effect into a simpler labelled poset algebra~\cite{kammar_handlers_2013} that is parametrized by a type of nodes.
 \begin{lstlisting}
 declare !get  : $loc ~> List($node).
 declare !set  : $loc * List($node) ~> Unit.
 declare !ref  : List($node) ~> $loc.
 declare !node : List($node) * Str ~> List($node).
-do loc <- !ref [] in
-return handler {
-  $tid -> List($node),
-  return x -> return (inr x),
-  act s k ->
-    do deps <- !get loc in
-    do a <- !node (deps, s) in
-    !set (loc, a) ; k (),
-  wait deps' k ->
-    do deps <- !get loc in
-    !set (loc, concat deps deps') ; k (),
-  stop _ k ->
-    return (inl ()),
-  fork _ k ->
-    do saved <- !get loc in
-    do _ <- k (inr ()) in
-    do child_deps <- !get loc in (
-      !set (loc, saved) ;
-      k (inl child_deps)
-    )
-}
+let node_handler = 
+  do loc <- !ref [] in
+  return handler {
+    $tid -> List($node),
+    return x -> return (inr x),
+    act s k ->
+      do deps <- !get loc in
+      do a <- !node (deps, s) in
+      !set (loc, a) ; k (),
+    wait deps' k ->
+      do deps <- !get loc in
+      !set (loc, concat deps deps') ; k (),
+    stop _ k ->
+      return (inl ()),
+    fork _ k ->
+      do saved <- !get loc in
+      do _ <- k (inr ()) in
+      do child_deps <- !get loc in (
+        !set (loc, saved) ;
+        k (inl child_deps)
+      )
+  }
 \end{lstlisting}
 This handling scheme also shows that we may interleave handlers with multiple parameters without worry.
 The local state effect is storing the sets of abstract nodes in its memory locations.
@@ -402,11 +423,13 @@ uses multi-shot continuations to run both child and parent threads. The thread i
 The parameter must genuinely \emph{vary}, rather than being a fixed existential witness.
 
 %% ═══════════════════════════════════════════════════════════════
-\section{Core Calculus}\label{sec:calculus}
+\section{The Calculus}\label{sec:calculus}
 %% ═══════════════════════════════════════════════════════════════
 
-In this section, we introduce the core calculus for \cambria{}. We introduce only the constructs which are directly involved with parametrized handlers.
-The full language includes integers, strings, product types and sum types with pattern matching. These are standard extensions.
+We now introduce the calculus underpinning \cambria{}.
+For clarity, we chose to present only a minimal set of language constructs that highlight the interactions of parametrized handlers.
+The full language includes integers, strings, product types, sum types and more.
+All of these are standard extensions orthogonal to the theory of parametrized handlers.
 All metatheoretic results extend straightforwardly.
 
 \subsection{Types and Syntax}
@@ -416,13 +439,12 @@ The syntax of the language is the following.
 \begin{array}{lrcl}
   \text{Value types}           & A, B   & ::= & \alpha \mid \psi \mid \tbool \mid \tfun{A}{C} \mid \thandler{C}{D} \\[4pt]
   \text{Computation types}     & C, D   & ::= & \comp{A}{\Sig} \\[4pt]
-\text{Effect signatures}       & \Sig   & ::= & \{ \op_i : \arity{A_i}{B_i} \}_{i=1}^{m} \\[4pt]
-  \text{Type variable context} & \Theta & ::= & \emptyset \mid \Theta, \alpha \\[4pt]
-  \text{Parameter context}     & \Psi   & ::= & \emptyset \mid \Psi, \psi \\[4pt]
-  \text{Term context}          & \G     & ::= & \emptyset \mid \G,\; x : \forall \vec{\alpha} . A
+  \text{Effect signatures}     & \Sig   & ::= & \emptyset \mid \Sig, \op : A \to B \\[4pt]
+  \text{Type variable context} & \Theta & ::= & \eenv \mid \Theta, \alpha \\[4pt]
+  \text{Parameter context}     & \Psi   & ::= & \eenv \mid \Psi, \psi \\[4pt]
+  \text{Term context}          & \G     & ::= & \eenv \mid \G,\; x : \forall \vec{\alpha} . A
 \end{array}
 \]
-
 There are three contexts: $\Theta$ for type variables, $\Psi$ for parameter variables, and $\Gamma$ for term variables.
 Notably, the only extension to the type system beyond a standard handler calculus is the parameter variables $\psi$.
 These types can be thought of as existential type variables, because they represent an implementation detail in the effect interface.
@@ -435,16 +457,19 @@ The syntax of values and computations is the following.
   \text{Handlers}      & h    & ::= &
     \hhandler\;\{
       \ret x \mapsto c_r,\;
-      \op_i\; x\; k \mapsto c_i
-    \}_{i=1}^{m} \\[4pt]
+      \op_1\; x\; k \mapsto c_1,\; \cdots,\;
+      \op_m\; x\; k \mapsto c_m
+  \} \\[4pt]
   \text{Computations} & c, d & ::= & \ret v \mid \op(v;\;x.c)\mid \ddo x \leftarrow c \iin d 
                                      \mid \iif v \then c_1 \eelse c_2 \\[2pt]
                       &      &     & \mid\; v_1\;v_2 \mid \with \sigma, v \handle c \\[4pt]
-  \text{Parameter subst.} & \sigma & ::= & \{\psi_1 \mapsto A_1,\; \ldots,\; \psi_n \mapsto A_n \}
+  \text{Parameter subst.} & \sigma & ::= & \emptyset \mid \sigma[\psi \mapsto A]
 \end{array}
 \]
+We write $\hhandler\;\{ \ret x \mapsto c_r,\; \op\; x\; k \mapsto c_\op \}_{\op\in\Sig}$ as shorthand for the handler syntax where
+$\Sig = \{\op_1 : A_1 \to B_1, \; \cdots\;, \op_m : A_m \to B_m \}$.
 The surface syntax $!\op\;v$ desugars to $\op(v;\;x.\ret x)$.
-The key novelty is the \emph{parameter substitution}, often written $\sigma = \{\vec{\psi} \mapsto \vec{A}\}$, in the handle form,
+The key novelty is the \emph{parameter substitution}, often written $\sigma = \{\vec{\psi} \mapsto \vec{A}\}$, in the handle term,
 which bridges the abstract types in the body to their concrete representations in the handler.
 
 \subsection{Typing Rules}\label{sec:typing}
@@ -472,7 +497,7 @@ Well-formed value types, computation types, schemes and environments are defined
   \inferrule{ [\tj \Theta \Psi {\forall\vec\alpha.A}]_{(x:\forall \vec\alpha.A) \in \Gamma} }{\tj \Theta \Psi \Gamma}
 \end{mathpar}
 Value judgements are of the form $\vj \Theta \Psi \Gamma v A$ and implicitly enforce that $\tj \Theta \Psi \Gamma$ and $\tj \Theta \Psi A$.
-That are defined inductively over the language syntax.
+They are defined inductively over the language syntax.
 \begin{mathpar}
   \inferrule
   {(x : \forall \vec{\alpha}.B) \in \G \\ [\tj \Theta \Psi {A_\alpha}]_{\alpha\in\vec\alpha}}
@@ -495,24 +520,23 @@ That are defined inductively over the language syntax.
     \; (\textsc{Rec})
 
   \inferrule{
-    \cj{\Theta}{\Psi}{\G, x_r : A}{c_r}{B}{\Sig'}
+    \cj{\Theta}{\Psi}{\G, x : A}{c_r}{B}{\Sig'}
     \\
-    \Sig \setminus \{ \op_i : \arity{A_i}{B_i} \}_{i=1}^{m} \subseteq \Sig'
+    \Sig \setminus \Sig'' \subseteq \Sig'
     \\\\
     \left[
-      (\op_i : A_i \to B_i) \in \Sig \quad
-      \cj{\Theta}{\Psi}{\G,\, x_i : A_i,\, k_i : \tfun{B_i}{\comp{B}{\Sig'}}}{c_i}{B}{\Sig'}
-    \right]_{i = 1}^{m}
+      \cj{\Theta}{\Psi}{\G,\, x : A_\op,\, k : \tfun{B_\op}{\comp{B}{\Sig'}}}{c_\op}{B}{\Sig'}
+    \right]_{(\op:A_\op \to B_\op) \in \Sig''}
     }
     {\vj{\Theta}{\Psi}{\G}{
       \hhandler\;\{\ret x_r \mapsto c_r,\;
-        \op_i\; x\; k \mapsto c_i
-      \}_{i = 1}^{m}
+        \op\; x\; k \mapsto c_\op
+      \}_{\op \in\Sig''}
     }{\thandler{\comp{A}{\Sig}}{\comp{B}{\Sig'}}}}
     \; (\textsc{Handler})
 \end{mathpar}
 The handled operations do not need to cover the full set of operations in the computation effect signature.
-The remaining operations are forwarded, which is indicated by the $ \Sig \setminus \{ \op_i \}_{i=1}^{m} \subseteq \Sig' $
+The remaining operations are forwarded, which is indicated by the $ \Sig \setminus \Sig'' \subseteq \Sig' $
 premise in the \textsc{Handler} rule.
 
 Computation judgements are of the form $\cj \Theta \Psi \Gamma c A \Sig$
@@ -573,13 +597,13 @@ When $\vec{\psi} = \emptyset$, the rule reduces to standard handler application.
     \; (\textsc{App})
 
   \inferrule{
-    \vj{\Theta}{\Psi}{\G}{v}{\thandler{C[T_i / \psi_i]_{i=1}^n}{D}}
+    \vj{\Theta}{\Psi}{\G}{v}{\thandler{C[\sigma]}{D}}
     \\
-    \cjp{\Theta}{\Psi, \vec{\psi}}{\G}{c}{C}
+    \cjp{\Theta}{\Psi, \dom(\sigma)}{\G}{c}{C}
     \\
-    \left[\tj \Theta \Psi {T_i}\right]_{i=1}^{n}
+    \left[\tj \Theta \Psi A\right]_{A\in\cod(\sigma)}
     }{
-      \cjp{\Theta}{\Psi}{\G}{\with v, \{\psi_i \mapsto T_i\}_{i=1}^n \handle c}{D}
+      \cjp{\Theta}{\Psi}{\G}{\with v, \sigma \handle c}{D}
     }
     \; (\textsc{HandleParam})
 \end{mathpar}
@@ -594,7 +618,7 @@ Evaluation contexts identify where the next reduction step occurs:
     \mid \ddo x \leftarrow E \iin c
     \mid \with v \handle E
 \]
-Let $h = \hhandler\;\{\ret x \mapsto c_r,\;\op_i\;x\;k \mapsto c_i\}_{i=1}^{n}$.
+Let $h = \hhandler\;\{\ret x \mapsto c_r,\;\op\;x\;k \mapsto c_\op\}_{\op\in\Sig}$.
 Single-step reduction $c \leadsto c'$ is defined below, closed under the congruence rule: if $c \leadsto c'$ then $E[c] \leadsto E[c']$.
 \[
 \begin{array}{lcll}
@@ -619,15 +643,15 @@ Single-step reduction $c \leadsto c'$ is defined below, closed under the congrue
   \with h, \sigma \handle \ret v
     & \leadsto & c_r[v/x]
     & (\beta\text{-ret}) \\
-    \with h,\sigma \handle \op_i(v;\;y.c)
-    & \leadsto & c_i\bigl[v/x,\;(\fun y \mapsto \with h, \emptyset \handle c)/k\bigr]
+    \with h,\sigma \handle \op(v;\;y.c)
+    & \leadsto & c_\op\bigl[v/x,\;(\fun y \mapsto \with h, \emptyset \handle c)/k\bigr]
     & (\beta\text{-op}) \\
   \with h,\sigma \handle \op(v;\;y.c)
     & \leadsto & \op(v;\;y.\;\with h, \emptyset \handle c)
     & (\beta\text{-fwd})
 \end{array}
 \]
-The ($\beta$-fwd) rule applies when $\op \notin \{\op_1, \ldots, \op_n\}$.
+The ($\beta$-op) rule applies when $\op\in\ops(h)$, while the ($\beta$-fwd) rule applies when $\op \notin\ops(h)$.
 The continuation supplied to the operation clause in ($\beta$-op) reinstates the handler, giving \emph{deep} handling.
 In the reinstated continuations, we replace the parameter substitution $\sigma$ with $\emptyset$ because the parameters are only needed for
 type checking and do not have an effect on the reductions, as formalised in \Cref{lem:erasure}.
@@ -649,12 +673,12 @@ The parameter annotations are only used for type checking.
 For the given effect system, we have the following type safety result.
 
 \begin{theorem}[Safety]\label{thm:safety}
-  If $\cj{\emptyset}{\emptyset}{\emptyset}{c}{A}{\Sig}$, then either:
+  If $\cj{\eenv}{\eenv}{\eenv}{c}{A}{\Sig}$, then either:
   \begin{itemize}
-    \item $c = \ret v$ for some $\vj{\emptyset}{\emptyset}{\emptyset}{v}{A}$
-    \item $c = \op(v;\; y.c')$ for some $\op : A_\op \to B_\op \in \Sig$, $\vj{\emptyset}{\emptyset}{\emptyset}{v}{A_\op}$,
-      and $\cj{\emptyset}{\emptyset}{y:B_\op}{c}{A}{\Sig}$.
-    \item $c \leadsto c'$ for some $\cj{\emptyset}{\emptyset}{\emptyset}{c'}{A}{\Sig}$
+    \item $c = \ret v$ for some $\vj{\eenv}{\eenv}{\eenv}{v}{A}$
+    \item $c = \op(v;\; y.c')$ for some $\op : A_\op \to B_\op \in \Sig$, $\vj{\eenv}{\eenv}{\eenv}{v}{A_\op}$,
+      and $\cj{\eenv}{\eenv}{y:B_\op}{c}{A}{\Sig}$.
+    \item $c \leadsto c'$ for some $\cj{\eenv}{\eenv}{\eenv}{c'}{A}{\Sig}$
   \end{itemize}
 \end{theorem}
 
@@ -667,6 +691,31 @@ For the given effect system, we have the following type safety result.
   \end{itemize}
   Progress is then shown by induction over the computation derivations, while preservation is shown by case analysis on the operational steps.
 \end{proof}
+
+\subsection{Contextual Equivalence}
+
+Two programs in \cambria{} are contextually equivalent when there are no contexts that they can be place in that distinguishes their behaviour.
+
+\begin{definition}
+  A \emph{computation context} is a computation with a hole in it.
+  \[
+  \begin{array}{lrcl}
+    \text{Computation contexts} & \ctx & ::= & \square \mid \op(v;\;x.\ctx) \mid \ddo x \leftarrow \ctx \iin c
+                                       \mid \ddo x \leftarrow c \iin \ctx
+                                       \\[2pt]
+                        &      &     & \mid \iif v \then \ctx \eelse c \mid \iif v \then c \eelse \ctx \mid\; \with \sigma, v \handle \ctx
+  \end{array}
+  \]
+  Given a well-typed computation $\cj \Theta \Psi \Gamma c A \Sig$,
+  a \emph{closing context} for $c$ is a computation context $\ctx$ such that $\cj \eenv \eenv \eenv {\ctx[c]} \tbool \emptyset$.
+  Given two well-typed computations $\cj \Theta \Psi \Gamma {c_1, c_2} A \Sig$, they are \emph{contextually equivalent}, written $c_1 \approx c_2$,
+  if for all closing contexts $\ctx$,
+  \[
+    \ctx[c_1] \leadsto^* \ret b \iff \ctx[c_2] \leadsto^* \ret b
+  \]
+  where $b \in \{\ttrue, \ffalse\}$.
+
+\end{definition}
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Parametricity}\label{sec:parametricity}
@@ -688,10 +737,10 @@ recursive types, linear types and universally quantified effects.
 Core to the parametricity proof is the insight that parametrized handlers decompose into plain handlers and existential types.
 In particular, for a single parameter substitution, $\sigma = \{\psi \mapsto A\}$,
 \begin{align*}
-  \with v, \{\psi \mapsto A\} \handle c \quad = &\quad \unpack \pack(\psi_n, A_n, x_{n-1}) \as (\psi_n, x_n) \iin (\with x_n \handle c).
+  \with v, \{\psi \mapsto A\} \handle c \quad = &\quad \unpack \pack(\psi, A, v) \as (\psi, x) \iin (\with x \handle c).
 \end{align*}
 This decomposition is formalised in \Cref{sec:elaboration}. Before proceeding to that, we introduce the syntax of the core language.
-We update the handle syntax and extend the value types, values and computations with the following constructs.
+We update the handle syntax and extend the value types, values and computations with the following constructs in replace of the parametrized handle term.
 \[
 \begin{array}{lrcl}
   \text{Value types}  & A, B & ::= & \cdots \mid \exists\psi.A \\[4pt]
@@ -734,31 +783,41 @@ we have a plain handle rule, as well as existential introduction and elimination
 \end{mathpar}
 Note that $\psi \notin \fpv(C, \G)$ in the \textsc{Unpack} rule because $\tj{\Theta}{\Psi}{\G}$ and $\tj{\Theta}{\Psi}{C}$ implicitly in the conclusion.
 
-The operational semantics replaces parametrized handler reduction with classic reduction and adds a new reduction for the existential constructs.
+The operational semantics replaces parametrized handler reduction with classic reduction and adds a new reduction rule for existential terms.
 \[
 \begin{array}{lcll}
   \with h \handle \ret v
-    & \leadsto & c_r[v/x]
+    & \leadsto_c & c_r[v/x]
     & (\beta\text{-ret}) \\
   \with h \handle \op_i(v;\;y.c)
-    & \leadsto & c_i\bigl[v/x,\;(\fun y \mapsto \with h \handle c)/k\bigr]
+    & \leadsto_c & c_i\bigl[v/x,\;(\fun y \mapsto \with h \handle c)/k\bigr]
     & (\beta\text{-op}) \\
   \with h \handle \op(v;\;y.c)
-    & \leadsto & \op(v;\;y.\;\with h \handle c)
+    & \leadsto_c & \op(v;\;y.\;\with h \handle c)
     & (\beta\text{-fwd}) \\
   \unpack \pack(\psi, A, v) \as (\psi, x) \iin c
-    & \leadsto & c[v / x]
+    & \leadsto_a & c[v / x]
     & (\beta\text{-ext})
 \end{array}
 \]
+To make it clear which operational semantics we are using, we denote reduction steps in the core language
+by $\leadsto_c$ if it is a core reduction step, and by $\leadsto_a$ if it is an administrative reduction step.
+The only administrative reduction step is ($\beta$-ext), which of no computational consequence because it
+instantiates existential types, which have no runtime impact.
+In \cambria{}, this is captured by the single parametrized handle reduction, as we formalise in \Cref{prop:op-corresp}.
 
 \subsection{Step-Indexed Logical Relation and Fundamental Theorem}
 
 In this section, we build the logical relation to prove parametricity of \cambria{}. The definitions of the logical relation are standard.
 The step-indexing integrates nicely with the handler relation by making the self-reference in the typing derivation well-founded,
-rather than having to revert to inducting on the size of the computation tree. While we only indtroduce the relation on the core syntax,
+rather than having to revert to inducting on the size of the computation tree. While we only introduce the relation on the core syntax,
 it extends readily to product types, sum types, list types, map types, and all of the current features in the current version of \cambria{}.
-The ease of integration primarily comes from the decomosition of parametrized handlers into plain handlers and existentials, making each induction case canonical.
+The ease of integration primarily comes from the decomposition of parametrized handlers into plain handlers and existentials, making each induction case canonical.
+
+We build up a relational model of contextual equivalence via a step-indexed logical relation.
+The relation is defined mutually inductively over values, computation, schemes and environments.
+The step-index tracks whether two terms cannot be discerned within that number of steps.
+Thus, the relation should only grow with the size of the index.
 
 \begin{definition}
   An \emph{admissible relation} is a step-indexed relation on closed value terms
@@ -767,37 +826,35 @@ The ease of integration primarily comes from the decomosition of parametrized ha
   We write $\Rel$ for the set of all admissible relations.
 \end{definition}
 
-\begin{definition}
-  A \emph{relational interpretation} $\delta : (\Theta \cup \Psi) \to \Rel$ assigns an admissible relation to each type variable and parameter.
-\end{definition}
-
-The logical relation $\llbracket {-} \rrbracket$ on values, schemes, computations, and environments is given by induction.
+Given a type context $\Theta$ and parameter context $\Psi$,
+a \emph{relational interpretation} $\delta : (\Theta \cup \Psi) \to \Rel$ assigns an admissible relation to each type variable and parameter.
+The logical relation assigns to each typing judgement $\tj \Theta \Psi X$, a mapping from relational interpretations to an admissible relation.
+On value types, this is written as $\VV\llbracket X \rrbracket_\delta$.
+We also qualify with $\CC$, $\SSS$, and $\GG$ to make it clear whether we are interpreting values, computations, schemes or environments.
+It is defined inductively over the typing judgements, and a step index $n\in\mathbb{N}$.
 \begin{align*}
   \VV\llbracket \alpha \rrbracket_\delta &= \delta(\alpha) \\
   \VV\llbracket \psi \rrbracket_\delta &= \delta(\psi) \\
   \VV\llbracket \tbool \rrbracket_\delta &= \{(b, b)_n \mid b \in \{\ttrue, \ffalse\}, n \in \mathbb{N}\} \\
   \VV\llbracket \tfun{A}{C} \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall j \leq n.\; \forall (w_1, w_2)_j \in \VV\llbracket A \rrbracket_\delta.\; (v_1\;w_1, v_2\;w_2)_j \in \CC\llbracket C \rrbracket_\delta\} \\
-  \VV\llbracket \thandler{C}{D} \rrbracket_\delta &= \{(h_1, h_2)_n \mid \forall j \leq n.\; \forall (c_1, c_2)_j \in \CC\llbracket C \rrbracket_\delta. \\
-  &\qquad\qquad\qquad (\with h_1 \handle c_1, \with h_2 \handle c_2)_j \in \CC\llbracket D \rrbracket_\delta\} \\
-  \VV\llbracket \forall\vec\alpha.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \exists R \in \Rel.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\psi \mapsto R]}\} \\
-  \SSS\llbracket \exists\psi.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall \vec{R} \in \Rel^{|\vec\alpha|}.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\vec\alpha \mapsto \vec{R}]}\} \\
-  \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta &= \{(c_1, c_2)_n \mid c_1 \text{ and } c_2 \text{ are terminally related at } n\} \\
+  \VV\llbracket \thandler{C}{D} \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall j \leq n.\; \forall (c_1, c_2)_j \in \CC\llbracket C \rrbracket_\delta. \\
+  &\qquad\qquad\qquad (\with v_1 \handle c_1, \with v_2 \handle c_2)_j \in \CC\llbracket D \rrbracket_\delta\} \\
+  \VV\llbracket \exists\psi.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \exists R \in \Rel.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\psi \mapsto R]}\} \\
+  \SSS\llbracket \forall\vec\alpha.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall \vec{R} \in \Rel^{|\vec\alpha|}.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\vec\alpha \mapsto \vec{R}]}\} \\
   \GG\llbracket \G \rrbracket_\delta &= \{(\gamma_1, \gamma_2)_n \mid \forall(x:\forall\vec\alpha.A)\in\Gamma. \; (\gamma_1(x), \gamma_2(x))_n \in\SSS\llbracket \forall\vec\alpha.A \rrbracket_\delta \}
 \end{align*}
-
-\begin{definition}
-  Two computations $c_1$ and $c_2$ are \emph{terminally related} at $n$ if for all $j < n$:
+For two closed computations, they are related at step index $n$ if they remain observationally equivalent after $n$ reduction steps.
+That is, $(c_1,c_2)_n \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ if for all $j < n$:
+\begin{itemize}
+  \item If $c_1 \leadsto^j \ret v_1$, then there is $v_2$ such that $c_2 \leadsto^* \ret v_2$ and $(v_1, v_2)_{n-j} \in \VV\llbracket A \rrbracket_\delta$
+  \item If $c_1 \leadsto^j \op(v_1; y.d_1)$ for $(\op : \arity{A_\op}{B_\op}) \in \Sig$, then there is $v_2$ and $d_2$ such that $c_2 \leadsto^* \op(v_2; y.d_2)$ and:
   \begin{itemize}
-    \item If $c_1 \leadsto^j \ret v_1$, then there is $v_2$ such that $c_2 \leadsto^* \ret v_2$ and $(v_1, v_2)_{n-j} \in \VV\llbracket A \rrbracket_\delta$
-    \item If $c_1 \leadsto^j \op(v_1; y.d_1)$ for $(\op : \arity{A_\op}{B_\op}) \in \Sig$, then there is $v_2$ and $d_2$ such that $c_2 \leadsto^* \op(v_2; y.d_2)$ and:
-    \begin{itemize}
-      \item $(v_1, v_2)_{n-j} \in \VV\llbracket A_\op \rrbracket_\delta$
-      \item $\forall k < n{-}j.\; \forall (w_1, w_2)_k \in \VV\llbracket B_\op \rrbracket_\delta.\; (d_1[w_1/y], d_2[w_2/y])_k \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$
-    \end{itemize}
+    \item $(v_1, v_2)_{n-j} \in \VV\llbracket A_\op \rrbracket_\delta$
+    \item $\forall k < n{-}j.\; \forall (w_1, w_2)_k \in \VV\llbracket B_\op \rrbracket_\delta.\; (d_1[w_1/y], d_2[w_2/y])_k \in \CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$
   \end{itemize}
-\end{definition}
-The step index $j$ counts reduction steps on the left.
-The self-reference of $\CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ is well-founded because $k < n{-}j$ ensures $k < n$.
+\end{itemize}
+The step index tracks reduction steps on the left.
+The self-reference of $\CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ is well-founded because the index strictly reduces.
 
 \begin{theorem}[Parametricity]\label{thm:parametricity}
   If $\cjp{\Theta}{\Psi}{\G}{c}{C}$, then for all $\delta : (\Theta \cup \Psi) \to \Rel$, $n\in\mathbb{N}$,
@@ -807,52 +864,35 @@ The self-reference of $\CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ is well-f
 
 \begin{proof}
 By induction on the typing derivation. 
-
-\emph{Rec:} inner induction on $j$. At $j \geq 1$, the induction hypothesis gives the recursive function at $\VV_{j-1}$, the fundamental theorem (at $j{-}1$) gives the body at $\CC_{j-1}$, and the anti-reduction lemma lifts the application to $\CC_j$.
-
-\emph{Handler:} inner induction on $j$. At $j = m{+}1$, the return case applies the fundamental theorem to $c_r$; the operation case constructs the deep continuation $\fun y \mapsto \with h \handle c'$, which is related at $\VV_{m+1}\llbracket \tfun{B_\op}{\comp{B}{\Sig'}} \rrbracket$ by the inner induction hypothesis at $j' \leq m$.
-
-\emph{Handle:} Immediate from the handler relation at $j = k$.
-
-\emph{Do:} Via a separate Bind Lemma, proved by strong induction on $k$: if $(k, c_1, c_2) \in \CC\llbracket \comp{A}{\Sig} \rrbracket$ and for all $j \leq k$ and $(j, v_1, v_2) \in \VV\llbracket A \rrbracket$ we have $(j, d_1[v_1/x], d_2[v_2/x]) \in \CC\llbracket \comp{B}{\Sig} \rrbracket$, then $(k, \ddo x \leftarrow c_1 \iin d_1, \ddo x \leftarrow c_2 \iin d_2) \in \CC\llbracket \comp{B}{\Sig} \rrbracket$. The strengthened hypothesis is necessary because the $\beta$-do-op rule creates new \lstinline{do} expressions not corresponding to any sub-derivation.
-
-\emph{Gen:} Since reduction is independent of the relational interpretation $\delta$, the same witnesses work for all instantiations $\vec{R}$.
 \end{proof}
 
-The logical relation is structured so that each language feature contributes independently:
-\begin{itemize}
-  \item Each type constructor adds one clause to $\VV$.
-  \item The computation relation $\CC$ is defined uniformly for all computation types.
-  \item Each typing rule adds one case to the fundamental theorem.
-  \item Auxiliary lemmas (monotonicity, identity extension, anti-reduction, bind) are proved once and reused.
-\end{itemize}
+\todo[inline]{Expand this proof}
 
-This modularity is a consequence of the language design. Because parameter variables interact orthogonally with the handler mechanism, the logical relation does not require heavyweight techniques such as Kripke worlds~\cite{ahmed_semantics_2004} or biorthogonality~\cite{biernacki2018handle}. Adding new type constructors (lists, maps, recursive types) requires only local additions --- a new $\VV$ clause and new fundamental theorem cases --- with no changes to existing proofs.
-
-\subsection{Elaboration} \label{sec:elaboration}
+\subsection{Elaboration and Adequacy} \label{sec:elaboration}
 
 \newcommand{\elab}[1]{{(#1)^\dagger}}
 
-This section demonstrated that \cambria{} elaborates faithfully into the core language.
-This means that the parametricity result from \Cref{thm:parametricity} carries into \cambria{}, and the pbstract interfaces of the parametrized handlers are formally guaranteed.
+This section demonstrates that \cambria{} elaborates faithfully into the core language.
+Hence, the fundamental theorem, \Cref{thm:parametricity}, is reflected by \cambria{},
+and the abstract interfaces of the parametrized handlers are formally guaranteed.
 
 \begin{definition}
-  The \emph{elaboration translation} $\elab{{-}}$ from \cambria{}'s syntax to the core syntax is given the identity on types,
-  and structural identity on terms, apart from the following clause, which is defined inductively over the size of the parameter substitution.
+  The \emph{elaboration translation} $\elab{{-}}$ from \cambria{}'s syntax to the core syntax is given by
+  structural identity on terms, apart from the parametrized handle clause, where it is defined inductively over the size of the parameter substitution.
   \begin{align*}
-    \elab{\with v, \emptyset \handle c}              &= \with v \handle c \\[-2pt]
-    \elab{\with v, \sigma[\psi \mapsto A] \handle c} &= \unpack \pack(\psi, A, v) \as (\psi, x) \iin \elab{\with x, \sigma \handle c}
+    \elab{\with v, \emptyset \handle c}              &= \with v^\dagger \handle c^\dagger \\[-2pt]
+    \elab{\with v, \sigma[\psi \mapsto A] \handle c} &= \unpack \pack(\psi, A, v^\dagger) \as (\psi, x) \iin \elab{\with x, \sigma \handle c}
   \end{align*}
 \end{definition}
 
-The following results confirm that this elaboration is sound.
+This elaboration preserves typing judgements, and is thus well-defined.
 
 \begin{proposition}[Type Preservation]
-  If $\cjp \Theta \Psi \Gamma c C$ in \cambria{}, then $\cjp \Theta \Psi \Gamma {\elab{c}} C$ in the core syntax.
+  If $\cjp \Theta \Psi \Gamma c C$ in \cambria{}, then $\cjp \Theta \Psi \Gamma {c^\dagger} C$ in the core syntax.
 \end{proposition}
 
 \begin{proof}
-  The only non-trivial case is the $\handle$ elaboration. This is proved by induction on the size of the parameter substitution.
+  The only non-trivial case is the \textsc{Handle} elaboration. This is proved by induction on the size of the parameter substitution.
   When $\sigma=\emptyset$, this reduces to the classic handler case:
   \[
   \inferrule{
@@ -863,7 +903,7 @@ The following results confirm that this elaboration is sound.
       \cjp{\Theta}{\Psi}{\G}{\with v, \emptyset \handle c}{D}
     }
   \]
-  When $\sigma=\sigma'[\psi \mapsto A]$, working back from the typing derivation gives:
+  When $\sigma=\sigma'[\psi \mapsto A]$, unwinding the typing derivation gives:
   \[
     \inferrule{
       \vj{\Theta}{\Psi}{\G}{v}{\thandler{C[\sigma'[\psi\mapsto A]]}{D}}
@@ -876,27 +916,90 @@ The following results confirm that this elaboration is sound.
     }
   \]
   As $\psi \notin \fpv(D)$, we can derive
-  \[
+  \begin{equation}
     \inferrule{
       \vj{\Theta}{\Psi}{\G}{v}{(\thandler{C[\sigma']}{D})[A / \psi]}
     }{
-      \vj{\Theta}{\Psi}{\G}{\pack(\psi, A, v)}{\exists\psi.\thandler{C[\sigma']}{D}}
-    }
-  \]
-  And weakening $\cjp{\Theta}{\Psi,\dom(\sigma'), \psi}{\G}{c}{C}$ gives
+      \vj{\Theta}{\Psi}{\G}{\pack(\psi, A, v)}{\exists\psi.(\thandler{C[\sigma']}{D})}
+    }\text, \label{eq:pack}
+  \end{equation}
+  and weakening $\cjp{\Theta}{\Psi,\dom(\sigma'), \psi}{\G}{c}{C}$ gives,
+  \begin{equation}
+    \cjp \Theta {\Psi, \psi} {\Gamma, x : \thandler{C[\sigma']}{D}} {\with x, \sigma' \handle c} D . \label{eq:freepsi}
+  \end{equation}
+  Then, combining \eqref{eq:pack} and \eqref{eq:freepsi} we can derive
   \[
-    \cjp \Theta {\Psi, \psi} {\Gamma, x : \thandler{C[\sigma']}{D}} {\with x, \sigma' \handle c} D
+    \cjp{\Theta}{\Psi}{\G}{\unpack \pack(\psi, A, v) \as (\psi, x) \iin \elab{\with x, \sigma' \handle c}}{D}
   \]
-  By the IH, $\cjp \Theta {\Psi, \psi} {\Gamma, x : \thandler{C[\sigma']}{D}} {\elab{\with x, \sigma' \handle c}} D$, resulting in
-  \[
-    \cjp{\Theta}{\Psi}{\G}{\unpack \pack(\psi, A, v) \as (\psi, x) \iin \elab{\with x, \sigma \handle c}}{D}.
-  \]
-  as required.
+  where we invoked the IH on $\elab{\with x, \sigma' \handle c}$.
 \end{proof}
 
-\begin{proposition}[Operational Correspondence]
-  $c \leadsto c'$ in \cambria{} if and only if $\elab{c} \leadsto^* \elab{c'}$ in the core language.
+This elaboration is sound in the following sense.
+A term in \cambria{} reduces if and only if its elaboration reduces in the core language.
+And this reduction in the core language must be of the form of any number of administrative reductions followed by a single core reduction.
+That is, reduction steps in \cambria{} are one-to-one with core reductions,
+along with some plumbing to handle the existential elaborations, which are handled in a single reduction step in \cambria{}.
+
+\begin{proposition}[Operational Correspondence] \label{prop:op-corresp}
+  For a closed term $\cj \eenv \eenv \eenv c A \Sig$, $c \leadsto c'$ if and only if $c^\dagger \leadsto_a^* \ \leadsto_c {c'}^\dagger$.
 \end{proposition}
+
+\begin{proof}
+  The proof is given by case analysis on the reductions in \cambria{}.
+  The only non-trivial cases are the parametrized handler reductions,
+  because the elaboration is structural identity on all other terms.
+  When the parameter substitution is empty,
+  \begin{equation}
+    \with h, \emptyset \handle d \leadsto c' \iff (\with h, \emptyset \handle d)^\dagger \leadsto_c c'^\dagger \label{eq:emptystep}
+  \end{equation}
+  because $(\with h, \emptyset \handle d)^\dagger = (\with h^\dagger \handle d^\dagger)$ and the elaboration is stable under substitution.
+  If the parameter substitution is not empty, we show by induction that
+  \[
+    (\with h, \sigma \handle c)^\dagger \leadsto^*_a (\with h, \emptyset \handle c)^\dagger.
+  \]
+  For $\sigma = \emptyset$, this is immediate after zero reductions.
+  For $\sigma = \sigma'[\psi \mapsto A]$,
+  \begin{align*}
+    (\with h, \sigma'[\psi \mapsto A] \handle d)^\dagger
+    &= \unpack \pack(\psi, A, h) \as (\psi, x) \iin (\with x, \sigma' \handle d)^\dagger \\
+    &\leadsto_a (\with h, \sigma' \handle d)^\dagger \\
+    &\leadsto_a^* (\with h, \emptyset \handle d)^\dagger \tag{IH}
+  \end{align*}
+  As $(\with h, \sigma \handle d)$ reduces identically to $(\with h, \emptyset \handle d)$, the result follows from \eqref{eq:emptystep}.
+\end{proof}
+
+Finally, we may lift the parametricity result (\Cref{thm:parametricity}) from the core language to \cambria{}.
+
+\begin{theorem}[Adequacy]
+  Let $\cjp \Theta \Psi \Gamma {c_1, c_2} C$. If for all relational interpretations $\delta: (\Theta \cup \Psi) \to \Rel$,
+  step-indexes $n\in\mathbb{N}$, and related substitutions $(\gamma_1, \gamma_2)_n \in \GG\llbracket \Gamma \rrbracket_\delta$,
+  \[
+    (c_1[\gamma_1]^\dagger, c_2[\gamma_2]^\dagger)_n \in \CC\llbracket C \rrbracket_\delta,
+  \]
+  then $c_1 \approx c_2$.
+\end{theorem}
+
+\subsection{Applications of Parametricity}
+
+Parametricity is a powerful result with many consequences.
+It can be used to derive many properties of the language including
+representation independence, prevention of effect encapsulation, commutativity, and garbage collection results.
+This section outlines the key corollaries of \Cref{thm:parametricity}.
+
+\subsubsection{Representation Independence for Parameterized Handlers}
+
+\begin{theorem}[Representation Independence]
+  Let $\tj \Theta \Psi \sigma_1, \sigma_2$ be two well-typed assignment of types to parameters $\vec\psi$.
+  Let $\{\vec\psi \mapsto \vec R\}$ be an assignment of each $\psi$ to an admissible relation.
+  Then, if $(h_1, h_2)_n \in \VV\llbracket \thandler{C}{D} \rrbracket_{\delta[\vec\psi \mapsto \vec R]}$ for all $n \in \mathbb{N}$,
+  then $(\with h_1, \sigma_1 \handle c) \approx (\with h_2, \sigma_2 \handle c)$.
+\end{theorem}
+
+\subsubsection{Garbage Collection for Parameterized Effects}
+
+\subsubsection{Scope Safety of Parameters}
+
+\subsubsection{Handler Commutativity for Independent Parameters}
 
 %% ═══════════════════════════════════════════════════════════════
 \section{Type Inference}\label{sec:inference}
@@ -913,7 +1016,7 @@ Two completeness results relate the algorithm to the declarative system of \Cref
 \end{lemma}
 
 \begin{proof}
-  Any derivation in this fragment is identical to a derivation in the plain algebraic effects system,
+  Any derivation in this fragment is identical to a derivation in a plain algebraic effects system,
   for which completeness has been established~\cite{damas_principal_1982, kammar_no_2017}.
 \end{proof}
 
@@ -929,7 +1032,7 @@ $\with h, \sigma \handle (c : C)$.
 \end{theorem}
 
 \begin{proof}
-  By structural induction on the typing derivation. The only non-standard cases are:
+  By structural induction on the typing derivation. The main cases are:
   \begin{itemize}
     \item \emph{\textsc{Do}.}
           By \emph{gen admissibility}~\cite{damas_principal_1982}, any declarative derivation
@@ -945,6 +1048,7 @@ $\with h, \sigma \handle (c : C)$.
           The result type $D$ is principal because the handler's type is principal
           by the IH, and the body's type is fixed by the annotation.
   \end{itemize}
+  The remaining cases are standard.
 \end{proof}
 
 The annotation in \Cref{thm:param-complete} specifies the full type $C$ of the body.
@@ -1014,7 +1118,7 @@ permits the algorithm to infer $\mathsf{set} : \psi \leadsto \unit$.
 
 For this reason, Cambria allows individual effect operations to be typed with the syntax,
 \begin{lstlisting}
-effect !op : A ~> B. c
+effect op : A ~> B. c
 \end{lstlisting}
 but enforces no constraints on which operations need to be annotated, leaving the programmer to manage the interface.
 
