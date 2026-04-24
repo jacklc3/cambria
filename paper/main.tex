@@ -839,7 +839,7 @@ It is defined inductively over the typing judgements, and a step index $n\in\mat
   \VV\llbracket \tfun{A}{C} \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall j \leq n.\; \forall (w_1, w_2)_j \in \VV\llbracket A \rrbracket_\delta.\; (v_1\;w_1, v_2\;w_2)_j \in \CC\llbracket C \rrbracket_\delta\} \\
   \VV\llbracket \thandler{C}{D} \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall j \leq n.\; \forall (c_1, c_2)_j \in \CC\llbracket C \rrbracket_\delta. \\
   &\qquad\qquad\qquad (\with v_1 \handle c_1, \with v_2 \handle c_2)_j \in \CC\llbracket D \rrbracket_\delta\} \\
-  \VV\llbracket \exists\psi.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \exists R \in \Rel.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\psi \mapsto R]}\} \\
+  \VV\llbracket \exists\psi.A \rrbracket_\delta &= \{(\pack(\psi, B_1, v_1), \pack(\psi, B_2, v_2))_n \mid \exists R \in \Rel.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\psi \mapsto R]}\} \\
   \SSS\llbracket \forall\vec\alpha.A \rrbracket_\delta &= \{(v_1, v_2)_n \mid \forall \vec{R} \in \Rel^{|\vec\alpha|}.\; (v_1, v_2)_n \in \VV\llbracket A \rrbracket_{\delta[\vec\alpha \mapsto \vec{R}]}\} \\
   \GG\llbracket \G \rrbracket_\delta &= \{(\gamma_1, \gamma_2)_n \mid \forall(x:\forall\vec\alpha.A)\in\Gamma. \; (\gamma_1(x), \gamma_2(x))_n \in\SSS\llbracket \forall\vec\alpha.A \rrbracket_\delta \}
 \end{align*}
