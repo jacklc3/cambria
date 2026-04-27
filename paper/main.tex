@@ -529,7 +529,7 @@ They are defined inductively over the language syntax.
     \right]_{(\op:A_\op \to B_\op) \in \Sig''}
     }
     {\vj{\Theta}{\Psi}{\G}{
-      \hhandler\;\{\ret x_r \mapsto c_r,\;
+      \hhandler\;\{\ret x \mapsto c_r,\;
         \op\; x\; k \mapsto c_\op
       \}_{\op \in\Sig''}
     }{\thandler{\comp{A}{\Sig}}{\comp{B}{\Sig'}}}}
@@ -864,6 +864,25 @@ The self-reference of $\CC\llbracket \comp{A}{\Sig} \rrbracket_\delta$ is well-f
 
 \begin{proof}
 By induction on the typing derivation. 
+
+\emph{Rec:} By inner induction on $n$.
+For $n \geq 1$, the inner induction hypothesis gives the recursive function related at $n{-}1$.
+The fundamental theorem (at $n{-}1$) then gives the function bodies related at $n{-}1$,
+and the anti-reduction lemma lifts this relation to $n$.
+
+\emph{Handler:} By inner induction on $n$.
+Two related computations will the return case applies the fundamental theorem to $c_r$;
+the operation case constructs the deep continuation $\fun y \mapsto \with h \handle c'$,
+which is related at $\VV_{m+1}\llbracket \tfun{B_\op}{\comp{B}{\Sig'}} \rrbracket$ by the inner induction hypothesis at $j' \leq m$.
+
+\emph{Handle:} Immediate from the handler relation at $i = n$.
+
+\emph{Do:} Via a separate Bind Lemma, proved by strong induction on $n$:
+if $(c_1, c_2)_n \in \CC\llbracket \comp{A}{\Sig} \rrbracket$ and for all $i \leq n$ and $(v_1, v_2)_n \in \VV\llbracket A \rrbracket$
+we have $(d_1[v_1/x], d_2[v_2/x])_i \in \CC\llbracket \comp{B}{\Sig} \rrbracket$,
+then $(\ddo x \leftarrow c_1 \iin d_1, \ddo x \leftarrow c_2 \iin d_2)_n \in \CC\llbracket \comp{B}{\Sig} \rrbracket$.
+
+\emph{Gen:} Since reduction is independent of the relational interpretation $\delta$, the same witnesses work for all instantiations $\vec{R}$.
 \end{proof}
 
 \todo[inline]{Expand this proof}
