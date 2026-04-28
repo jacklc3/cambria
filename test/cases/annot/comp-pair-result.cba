@@ -1,0 +1,4 @@
+-- Annotation on a non-trivial value type.
+-- @expect-type: (Int * Bool)!{}
+-- @expect-value: Pure: (1, True)
+(return (1, true) : Int * Bool!{})

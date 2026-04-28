@@ -1,6 +1,6 @@
 module Parsing.SugaredSyntax where
 
-import Types (Ident, Op, Arity, ValueType(..))
+import Types (Ident, Op, Arity, ValueType, CompType)
 import Syntax (Side(..))
 
 data Pattern
@@ -20,6 +20,7 @@ data SugaredExpr
   | SEFun [Pattern] SugaredComp
   | SERec Ident [Pattern] SugaredComp
   | SEComp SugaredComp
+  | SEAnnot SugaredExpr ValueType
 
 data SugaredComp
   = SCReturn SugaredExpr
@@ -30,6 +31,7 @@ data SugaredComp
   | SCApp SugaredExpr SugaredExpr
   | SCWith SugaredExpr SugaredComp
   | SCEffect Op Arity SugaredComp
+  | SCAnnot SugaredComp CompType
 
 data HandlerClause
   = RC Pattern SugaredComp

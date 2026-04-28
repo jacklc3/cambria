@@ -21,15 +21,16 @@ instance Unifiable ValueType where
     unify' t1' t2'
     where
       unify' TUnit TUnit     = return ()
+      unify' TVoid TVoid     = return ()
       unify' TInt TInt       = return ()
       unify' TBool TBool     = return ()
       unify' TDouble TDouble = return ()
       unify' TString TString = return ()
-      unify' TUnique TUnique = return ()
+      unify' TName TName     = return ()
       unify' (TParam p) (TParam q)
-        | p == q = return ()
-      unify' (TVar u) t = bind u t
-      unify' t (TVar u) = bind u t
+        | p == q             = return ()
+      unify' (TVar u) t      = bind u t
+      unify' t (TVar u)      = bind u t
       unify' (TPair a b) (TPair a' b')     = unify a a' >> unify b b'
       unify' (TEither a b) (TEither a' b') = unify a a' >> unify b b'
       unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'

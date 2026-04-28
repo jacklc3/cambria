@@ -10,11 +10,12 @@ data ValueType
   = TVar Ident
   | TParam Ident
   | TUnit
+  | TVoid
   | TInt
   | TBool
   | TDouble
   | TString
-  | TUnique
+  | TName
   | TPair ValueType ValueType
   | TEither ValueType ValueType
   | TFun ValueType CompType
@@ -45,11 +46,12 @@ showType :: Int -> ValueType -> String
 showType _ (TVar a) = a
 showType _ (TParam p) = "$" ++ p
 showType _ TUnit = "Unit"
+showType _ TVoid = "Void"
 showType _ TInt = "Int"
 showType _ TBool = "Bool"
 showType _ TDouble = "Double"
 showType _ TString = "Str"
-showType _ TUnique = "Unique"
+showType _ TName = "Name"
 showType p (TPair t1 t2) = parensIf (p > 3) $ showType 4 t1 ++ " * " ++ showType 4 t2
 showType p (TEither t1 t2) = parensIf (p > 2) $ showType 3 t1 ++ " + " ++ showType 3 t2
 showType p (TFun t1 t2) = parensIf (p > 1) $ showType 2 t1 ++ " -> " ++ show t2

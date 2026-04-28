@@ -1,0 +1,3 @@
+-- Closed annotation that omits an effect the body actually uses.
+-- @expect-error: Effect mismatch
+(!print "boom" : Unit!{})

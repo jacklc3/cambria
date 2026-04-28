@@ -1,0 +1,11 @@
+-- A handler that discharges an effect: takes Int!{flip : Unit ~> Bool}
+-- and produces Int!{}.
+-- @expect-type: Int!{}
+do h <- return ((handler {
+  return x -> return x,
+  flip _ k -> k true
+}) : Int!{flip : Unit ~> Bool} => Int!{}) in
+with h handle (
+  do b <- !flip () in
+  if b then return 1 else return 2
+)

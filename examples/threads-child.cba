@@ -9,7 +9,7 @@ with handler {
   effect !fork : Unit ~> $tid + Unit.
   effect !wait : $tid ~> Unit.
   effect !act  : Str ~> Unit.
-  effect !stop : Unit ~> Unit.
+  effect !stop : Unit ~> Void.
 
   case !fork () of {
     inl a1 -> case !fork () of {

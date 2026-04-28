@@ -1,0 +1,4 @@
+-- The body returns its argument, so the result type must match the
+-- argument type; annotating Int -> Bool!{} forces a contradiction.
+-- @expect-error: Type mismatch
+do f <- return ((fun x -> return x) : Int -> Bool!{}) in f 4

@@ -1,7 +1,7 @@
 -- Test existential type parameters
 -- Declares get/set/ref with abstract parameter type $p inside handle body
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),

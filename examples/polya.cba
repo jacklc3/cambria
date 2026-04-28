@@ -5,7 +5,7 @@ do countSuccesses <- return rec countSuccesses n f ->
    if n == 0 then return 0 else do i <- countSuccesses (n - 1) f in i + boolToInt (f ())
 in
 with handler {
-  $cell -> Unique,
+  $cell -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),

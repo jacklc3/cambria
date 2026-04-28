@@ -1,0 +1,5 @@
+-- A value annotation can pin down a polymorphic literal so the
+-- surrounding context picks the right instance.
+-- @expect-type: (Int + Bool)!{}
+-- @expect-value: Pure: inl 5
+return ((inl 5) : Int + Bool)

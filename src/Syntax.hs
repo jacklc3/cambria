@@ -16,6 +16,7 @@ data Value
   | VBool Bool
   | VString String
   | VUnit
+  | VName Name
   | VPair Value Value
   | VEither Side Value
   | VHandler Handler
@@ -25,8 +26,8 @@ data Value
   | VVar Ident
   | VFun Ident Computation
   | VRec Ident Ident Computation
+  | VAnnot Value ValueType
     -- Runtime-only values
-  | VUnique Name
   | VPrimitive (Value -> Computation)
   | VClosure Ident Computation Env
 
@@ -36,7 +37,7 @@ instance Show Value where
   show (VBool b)        = show b
   show (VString s)      = show s
   show VUnit            = "()"
-  show (VUnique a)      = "<a" ++ show (hashUnique a) ++ ">"
+  show (VName a)        = "<a" ++ show (hashUnique a) ++ ">"
   show (VPair v1 v2)    = "(" ++ show v1 ++ ", " ++ show v2 ++ ")"
   show (VEither L v)    = "inl " ++ show v
   show (VEither R v)    = "inr " ++ show v
@@ -48,6 +49,7 @@ instance Show Value where
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VPrimitive _)   = "<primitive>"
   show (VClosure _ _ _) = "<closure>"
+  show (VAnnot v t)     = "(" ++ show v ++ " : " ++ show t ++ ")"
 
 instance Eq Value where
   (VInt i1) == (VInt i2)           = i1 == i2
@@ -55,7 +57,7 @@ instance Eq Value where
   (VBool b1) == (VBool b2)         = b1 == b2
   (VString s1) == (VString s2)     = s1 == s2
   VUnit == VUnit                   = True
-  (VUnique a1) == (VUnique a2)     = a1 == a2
+  (VName a1) == (VName a2)     = a1 == a2
   (VPair v1 v2) == (VPair v3 v4)   = v1 == v3 && v2 == v4
   (VEither L v1) == (VEither L v2) = v1 == v2
   (VEither R v1) == (VEither R v2) = v1 == v2
@@ -73,6 +75,7 @@ data Computation
   | CApp Value Value
   | CHandle Value Computation
   | CEffect Op Arity Computation
+  | CAnnot Computation CompType
 
 instance Show Computation where
   show (CReturn v)    = "return " ++ show v
@@ -85,6 +88,7 @@ instance Show Computation where
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
   show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
   show (CEffect op ar c) = "effect !" ++ op ++ " : " ++ show ar ++ ". " ++ show c
+  show (CAnnot c t)   = "(" ++ show c ++ " : " ++ show t ++ ")"
 
 data RetClause = RetClause Ident Computation
 data OpClause = OpClause Ident Ident Computation

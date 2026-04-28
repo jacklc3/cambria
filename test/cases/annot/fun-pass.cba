@@ -1,0 +1,4 @@
+-- Function arrow in a value annotation.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 4
+do f <- return ((fun x -> return x) : Int -> Int!{}) in f 4

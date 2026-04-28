@@ -1,6 +1,6 @@
--- @expect-type: (List Int * List Bool)!{ fresh : Unit ~> Unique }
+-- @expect-type: (List Int * List Bool)!{ fresh : Unit ~> Name }
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),

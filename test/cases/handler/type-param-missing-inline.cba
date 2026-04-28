@@ -1,6 +1,6 @@
 -- @expect-error: does not handle operation
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x -> return x,
   get a k -> k 42,
   ref x k -> k ()

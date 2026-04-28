@@ -1,0 +1,2 @@
+-- @expect-error: Type mismatch
+return (5 : Bool)

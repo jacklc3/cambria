@@ -118,6 +118,10 @@ inferComp = \case
     tIn' <- applySubst tIn
     unify (apply (Parameter ps) tc) tIn'
     applySubst tOut
+  CAnnot c t -> do
+    t' <- inferComp c
+    unify t' t
+    applySubst t'
 
 inferValue :: Value -> Infer ValueType
 inferValue = \case
@@ -127,7 +131,7 @@ inferValue = \case
   VString _ -> return TString
   VDouble _ -> return TDouble
   VUnit     -> return TUnit
-  VUnique _ -> return TUnique
+  VName _ -> return TName
   VPair v1 v2 -> do
     t1 <- inferValue v1
     t2 <- inferValue v2
@@ -178,6 +182,10 @@ inferValue = \case
     applySubst (THandler (TComp hInVal eIn) (Map.fromList pSubst) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
+  VAnnot v t -> do
+    t' <- inferValue v
+    unify t' t
+    applySubst t
 
 checkValue :: Value -> ValueType -> Infer ()
 checkValue v t = do

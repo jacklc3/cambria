@@ -1,4 +1,4 @@
--- @expect-type: ((Unique * Unique) * Unique)!{ fresh : Unit ~> Unique }
+-- @expect-type: ((Name * Name) * Name)!{ fresh : Unit ~> Name }
 do x <- !fresh () in
 do y <- !fresh () in
 do z <- !fresh () in

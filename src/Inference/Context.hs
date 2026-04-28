@@ -22,7 +22,7 @@ primitives =
   , ("max",    mkPrimScheme [] (TPair TInt TInt) TInt)
   , ("/",      mkPrimScheme [] (TPair TInt TInt) TDouble)
   , ("++",     mkPrimScheme [] (TPair TString TString) TString)
-  , ("hash",   mkPrimScheme [] TUnique TString)
+  , ("hash",   mkPrimScheme [] TName TString)
   , ("==",     mkPrimScheme ["a"] (TPair (TVar "a") (TVar "a")) TBool)
   , ("fst",    mkPrimScheme ["a","b"] (TPair (TVar "a") (TVar "b")) (TVar "a"))
   , ("snd",    mkPrimScheme ["a","b"] (TPair (TVar "a") (TVar "b")) (TVar "b"))
@@ -33,6 +33,7 @@ primitives =
   , ("::",     mkPrimScheme ["a"] (TPair (TVar "a") (TList (TVar "a"))) (TList (TVar "a")))
   , ("null",   mkPrimScheme ["a"] (TList (TVar "a")) TBool)
   , ("uncons", mkPrimScheme ["a"] (TList (TVar "a")) (TEither TUnit (TPair (TVar "a") (TList (TVar "a")))))
+  , ("absurd", mkPrimScheme ["a"] TVoid (TVar "a"))
   ]
 
 constants :: [(String, Scheme)]
@@ -43,7 +44,7 @@ constants =
 
 primitiveOps :: [(String, Arity)]
 primitiveOps =
-  [ ("fresh",     Arity TUnit TUnique)
+  [ ("fresh",     Arity TUnit TName)
   , ("print",     Arity TString TUnit)
   , ("read",      Arity TUnit TString)
   , ("flip",      Arity TUnit TBool)

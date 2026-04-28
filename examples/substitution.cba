@@ -1,5 +1,5 @@
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x  -> return (inl x),
   var a _ -> return (inr a),
   sub _ k -> do c <- !fresh () in
@@ -9,11 +9,11 @@ with handler {
     }
 } handle (
   effect !sub : Unit ~> $p + Unit.
-  effect !var : $p   ~> Int.
+  effect !var : $p   ~> Void.
 
   case !sub () of {
     inl a -> case !sub () of {
-      inl b -> !var a,
+      inl b -> !var a; return 1,
       inr _ -> return 2
     },
     inr _ -> return 3

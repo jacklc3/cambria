@@ -12,7 +12,7 @@ do concat <- return (rec concat xs ys ->
 in
 
 with handler {
-  $node -> Unique,
+  $node -> Name,
   return x -> return (fun _ -> return x),
   node (deps, s) k -> return (fun _ ->
     do a <- !fresh () in
@@ -26,7 +26,7 @@ with handler {
     !print "}\n"
 } handle (
   with handler {
-    $loc -> Unique,
+    $loc -> Name,
     return x  -> return (fun _ -> return x),
     get a k -> return (fun s -> k (lookup (a, s)) s),
     set x k -> return (fun s -> k () (insert (x, s))),
@@ -64,7 +64,7 @@ with handler {
       effect !fork : Unit ~> $tid + Unit.
       effect !wait : $tid ~> Unit.
       effect !act  : Str ~> Unit.
-      effect !stop : Unit ~> Unit.
+      effect !stop : Unit ~> Void.
 
       case !fork () of {
         inl a1 -> case !fork () of {

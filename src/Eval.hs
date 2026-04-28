@@ -42,6 +42,7 @@ eval env = \case
       newCont f@(VClosure y _ _) = VClosure y (CDo x (CApp f (VVar y)) c2) env
       newCont v                  = error $ "Non-closure in impure continuation: " ++ show v
   CEffect _ _ c -> eval env c
+  CAnnot c _ -> eval env c
   COp op v ->
     Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
   CHandle hv c ->
@@ -73,4 +74,5 @@ evalValue env = \case
   VEither s v -> VEither s (evalValue env v)
   VFun x c    -> VClosure x c env
   VRec f x c  -> let env' = def f (VClosure x c env') env in VClosure x c env'
+  VAnnot v _  -> evalValue env v
   v           -> v

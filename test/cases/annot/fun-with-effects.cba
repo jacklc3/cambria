@@ -1,0 +1,6 @@
+-- Function value annotated with an effect row in its return. The test
+-- runner doesn't dispatch primitive ops, so the result surfaces as
+-- Impure rather than Pure.
+-- @expect-type: Unit!{ print : Str ~> Unit }
+-- @expect-value: Impure: !print "hi"
+do f <- return ((fun s -> !print s) : Str -> Unit!{print : Str ~> Unit, ...}) in f "hi"

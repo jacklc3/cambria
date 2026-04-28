@@ -1,0 +1,7 @@
+-- Identity handler annotated with =>.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 7
+do h <- return ((handler {
+  return x -> return x
+}) : Int!{} => Int!{}) in
+with h handle (return 7)

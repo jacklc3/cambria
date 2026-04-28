@@ -1,6 +1,6 @@
 -- @expect-error: does not handle operation
 do h <- return handler {
-  $p -> Unique,
+  $p -> Name,
   return x -> return x,
   get a k -> k 42,
   ref x k -> k ()

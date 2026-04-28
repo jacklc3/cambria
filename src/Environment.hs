@@ -26,7 +26,7 @@ primitives =
   , ("fst",    \(VPair x _) -> x)
   , ("snd",    \(VPair _ x) -> x)
   , ("==",     \(VPair x y) -> VBool (x == y))
-  , ("hash",   \(VUnique a) -> VString $ show $ hashUnique a)
+  , ("hash",   \(VName a) -> VString $ show $ hashUnique a)
   , ("insert", \(VPair (VPair k v) (VMap m)) -> VMap ((k, v) : filter (\(k', _) -> k' /= k) m))
   , ("remove", \(VPair k (VMap m)) -> VMap (filter (\(k', _) -> k' /= k) m))
   , ("lookup", \(VPair k (VMap m)) -> case Prelude.lookup k m of
@@ -38,6 +38,7 @@ primitives =
   , ("uncons", \(VList xs') -> case xs' of
       []     -> VEither L VUnit
       (x:xs) -> VEither R (VPair x (VList xs)))
+  , ("absurd", \_ -> error "absurd: applied to a value of type Void")
   ]
 
 constants :: [(Ident, Value)]
@@ -48,7 +49,7 @@ constants =
 
 primitiveOps :: [(Op, Value -> Value -> IO Computation)]
 primitiveOps =
-  [ ("fresh",     \_           k -> CApp k . VUnique       <$> newUnique)
+  [ ("fresh",     \_           k -> CApp k . VName         <$> newUnique)
   , ("print",     \(VString s) k -> CApp k . const VUnit   <$> putStrLn s)
   , ("read",      \_           k -> CApp k . VString       <$> getLine)
   , ("flip",      \_           k -> CApp k . VBool         <$> randomIO)

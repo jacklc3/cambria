@@ -25,11 +25,12 @@ data TokenKind
   | TokOf
   -- Type names
   | TokTUnit
+  | TokTVoid
   | TokTInt
   | TokTBool
   | TokTDouble
   | TokTString
-  | TokTUnique
+  | TokTName
   | TokTMap
   | TokTList
   -- Symbols
@@ -65,3 +66,5 @@ data TokenKind
   | TokCons
   | TokNil
   | TokTypeParam String
+  | TokEllipsis
+  | TokFatArrow

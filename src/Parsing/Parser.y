@@ -3,10 +3,12 @@ module Parsing.Parser (
   parse,
 ) where
 
+import qualified Data.Map as Map
+
 import Parsing.Token
 import Parsing.Lexer
 import Parsing.SugaredSyntax
-import Types (Ident, Op, Arity(Arity), ValueType(..))
+import Types (Ident, Op, Arity(Arity), ValueType(..), CompType(..), EffectsType(..))
 import Syntax (Side(..))
 
 import Control.Monad.Except
@@ -17,7 +19,7 @@ import Control.Monad.Except
 %monad { Except String } { (>>=) } { return }
 %error { parseError }
 %error.expected
-%expect 1
+%expect 2
 
 %token
   fun                        { Token _ _ TokFun }
@@ -38,11 +40,12 @@ import Control.Monad.Except
   of                         { Token _ _ TokOf }
   effect                     { Token _ _ TokEffect }
   Unit                       { Token _ _ TokTUnit }
+  Void                       { Token _ _ TokTVoid }
   Int                        { Token _ _ TokTInt }
   Bool                       { Token _ _ TokTBool }
   Double                     { Token _ _ TokTDouble }
   Str                        { Token _ _ TokTString }
-  Unique                     { Token _ _ TokTUnique }
+  Name                       { Token _ _ TokTName }
   Map                        { Token _ _ TokTMap }
   List                       { Token _ _ TokTList }
 
@@ -67,7 +70,10 @@ import Control.Monad.Except
   '::'                       { Token _ _ TokCons }
   '[]'                       { Token _ _ TokNil }
   '.'                        { Token _ _ TokDot }
+  '...'                      { Token _ _ TokEllipsis }
   '='                        { Token _ _ TokEquals }
+  '!'                        { Token _ _ TokExclam }
+  '=>'                       { Token _ _ TokFatArrow }
 
   integer                    { Token _ _ (TokInt $$) }
   boolean                    { Token _ _ (TokBool $$) }
@@ -90,20 +96,24 @@ expr :: { SugaredExpr }
   : value                                 { $1 }
   | comp                                  { SEComp $1 }
   | '(' expr ')'                          { $2 }
+  | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
 exprInfix :: { SugaredExpr }
   : atom                                  { $1 }
   | compInfix                             { SEComp $1 }
   | '(' expr ')'                          { $2 }
+  | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
 exprApp :: { SugaredExpr }
   : var                                   { SEVar $1 }
   | compApp                               { SEComp $1 }
   | '(' expr ')'                          { $2 }
+  | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
 exprAtom :: { SugaredExpr }
   : atom                                  { $1 }
   | '(' expr ')'                          { $2 }
+  | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
 wildvar :: { Ident }
   : var                                   { $1 }
@@ -173,6 +183,7 @@ compApp :: { SugaredComp }
   : exprApp exprAtom %prec APP            { SCApp $1 $2 }
   | op exprAtom %prec APP                 { SCOp $1 $2 }
   | '(' comp ')'                          { $2 }
+  | '(' comp ':' compType ')'             { SCAnnot $2 $4 }
 
 eitherMatch :: { ((Pattern, SugaredComp), (Pattern, SugaredComp)) }
   : inlMatch ',' inrMatch                 { ($1, $3) }
@@ -185,6 +196,11 @@ inrMatch :: { (Pattern, SugaredComp) }
   : inr pattern '->' comp                 { ($2, $4) }
 
 type :: { ValueType }
+  : typeSum                               { $1 }
+  | typeSum '->' compType                 { TFun $1 $3 }
+  | compType '=>' compType                { THandler $1 mempty $3 }
+
+typeSum :: { ValueType }
   : typeProd                              { $1 }
   | typeProd '+' typeProd                 { TEither $1 $3 }
 
@@ -194,17 +210,35 @@ typeProd :: { ValueType }
 
 typeAtom :: { ValueType }
   : Unit                                  { TUnit }
+  | Void                                  { TVoid }
   | Int                                   { TInt }
   | Bool                                  { TBool }
   | Double                                { TDouble }
   | Str                                   { TString }
-  | Unique                                { TUnique }
+  | Name                                  { TName }
   | Map typeAtom typeAtom                 { TMap $2 $3 }
   | List typeAtom                         { TList $2 }
   | typeparam                             { TParam $1 }
   | '(' type ')'                          { $2 }
 
+compType :: { CompType }
+  : type '!' '{' effList '}'              { TComp $1 (mkEffects $4) }
+
+effList :: { ([(Op, Arity)], Bool) }
+  : {- empty -}                           { ([], False) }
+  | '...'                                 { ([], True) }
+  | opSig                                 { ([$1], False) }
+  | opSig ',' effList                     { ($1 : fst $3, snd $3) }
+
+opSig :: { (Op, Arity) }
+  : var ':' type '~>' type                { ($1, Arity $3 $5) }
+
 {
+
+mkEffects :: ([(Op, Arity)], Bool) -> EffectsType
+mkEffects (ops, isOpen)
+  | isOpen    = Open (Map.fromList ops) ""
+  | otherwise = Closed (Map.fromList ops)
 
 parseError :: [Token] -> [String] -> Except String a
 parseError (Token (AlexPn _ line col) s _:_) expected =

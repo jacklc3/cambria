@@ -12,10 +12,10 @@
 -- The key: in (1) the output list has element type $p, the abstract
 -- parameter. In (2) the *input* list has element type $p. The same
 -- polymorphic map works uniformly — it never inspects what $p is.
--- The handler reveals $p = Unique, but map doesn't know or care.
+-- The handler reveals $p = Name, but map doesn't know or care.
 
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),

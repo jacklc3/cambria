@@ -1,0 +1,3 @@
+-- Bare ellipsis: no specific effects required, accept anything.
+-- @expect-type: Name!{ fresh : Unit ~> Name }
+(!fresh () : Name!{...})

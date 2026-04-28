@@ -4,12 +4,12 @@
 -- We use it at both (Int, Int) and ($p, $p).
 --
 -- When instantiated at $p, swap operates on abstract reference
--- identifiers — values whose concrete type (Unique) is hidden
+-- identifiers — values whose concrete type (Name) is hidden
 -- by the handler. The polymorphic function treats them as opaque
 -- values it can shuffle around without inspecting.
 
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),

@@ -1,4 +1,4 @@
--- @expect-type: Int!{ fresh : Unit ~> Unique }
+-- @expect-type: Int!{ fresh : Unit ~> Name }
 with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (s a) s),

@@ -1,0 +1,6 @@
+-- Value annotation lives at the expression level. Inside the body of
+-- a do-binding we use `return (x : Int)` — the annotation sits on the
+-- extracted value, not on the surrounding computation.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 7
+do x <- return 7 in return (x : Int)

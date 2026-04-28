@@ -58,6 +58,10 @@ desugarComp = \case
   SCEffect op ar s -> do
     c <- desugarComp s
     return (CEffect op ar c)
+  SCAnnot s ct -> do
+    c <- desugarComp s
+    ct' <- desugarCompType ct
+    return $ CAnnot c ct'
 
 desugarExpr :: SugaredExpr -> Fresh (Computation -> Computation, Value)
 desugarExpr = \case
@@ -90,6 +94,10 @@ desugarExpr = \case
     tmp  <- fresh
     c <- desugarComp s
     return (CDo tmp c, VVar tmp)
+  SEAnnot e t -> do
+    (k, v) <- desugarExpr e
+    t' <- desugarValueType t
+    return (k, VAnnot v t')
 
 desugarHandler :: [HandlerClause] -> Fresh Handler
 desugarHandler cs = do
@@ -132,3 +140,52 @@ desugarArguments (p:ps) c = do
   c1 <- desugarArguments ps c
   (x, c2) <- desugarPattern p c1
   return (CReturn (VFun x c2))
+
+desugarValueType :: ValueType -> Fresh ValueType
+desugarValueType = \case
+  TPair t1 t2 -> do
+    t1' <- desugarValueType t1
+    t2' <- desugarValueType t2
+    return (TPair t1' t2')
+  TEither t1 t2 -> do
+    t1' <- desugarValueType t1
+    t2' <- desugarValueType t2
+    return (TEither t1' t2')
+  TFun t1 t2 -> do
+    t1' <- desugarValueType t1
+    t2' <- desugarCompType t2
+    return (TFun t1' t2')
+  TList t -> do
+    t' <- desugarValueType t
+    return (TList t')
+  TMap k v -> do
+    k' <- desugarValueType k
+    v' <- desugarValueType v
+    return (TMap k' v')
+  THandler i ps o -> do
+    i'  <- desugarCompType i
+    ps' <- traverse desugarValueType ps
+    o'  <- desugarCompType o
+    return (THandler i' ps' o')
+  t -> return t
+
+desugarCompType :: CompType -> Fresh CompType
+desugarCompType (TComp v effs) = do
+  v'    <- desugarValueType v
+  effs' <- desugarEffects effs
+  return (TComp v' effs')
+
+desugarEffects :: EffectsType -> Fresh EffectsType
+desugarEffects (Closed m) = do
+  m' <- traverse desugarArity m
+  return (Closed m')
+desugarEffects (Open m _) = do
+  m' <- traverse desugarArity m
+  r  <- fresh
+  return (Open m' r)
+
+desugarArity :: Arity -> Fresh Arity
+desugarArity (Arity a r) = do
+  a' <- desugarValueType a
+  r' <- desugarValueType r
+  return (Arity a' r')

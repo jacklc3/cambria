@@ -33,11 +33,12 @@ tokens :-
   of                         { \p s -> Token p s TokOf }
   effect                     { \p s -> Token p s TokEffect }
   Unit                       { \p s -> Token p s TokTUnit }
+  Void                       { \p s -> Token p s TokTVoid }
   Int                        { \p s -> Token p s TokTInt }
   Bool                       { \p s -> Token p s TokTBool }
   Double                     { \p s -> Token p s TokTDouble }
   Str                        { \p s -> Token p s TokTString }
-  Unique                     { \p s -> Token p s TokTUnique }
+  Name                       { \p s -> Token p s TokTName }
   Map                        { \p s -> Token p s TokTMap }
   List                       { \p s -> Token p s TokTList }
 
@@ -52,6 +53,7 @@ tokens :-
   ">"                        { \p s -> Token p (quotes s) TokGT }
   "->"                       { \p s -> Token p (quotes s) TokArrow }
   "<-"                       { \p s -> Token p (quotes s) TokLeftArrow }
+  "=>"                       { \p s -> Token p (quotes s) TokFatArrow }
   "="                        { \p s -> Token p (quotes s) TokEquals }
   "+"                        { \p s -> Token p (quotes s) TokPlus }
   "-"                        { \p s -> Token p (quotes s) TokMinus }
@@ -70,6 +72,7 @@ tokens :-
   "::"                       { \p s -> Token p (quotes s) TokCons }
   "[]"                       { \p s -> Token p (quotes s) TokNil }
   ":"                        { \p s -> Token p (quotes s) TokColon }
+  "..."                      { \p s -> Token p (quotes s) TokEllipsis }
   "."                        { \p s -> Token p (quotes s) TokDot }
 
   \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (drop 1 s)) }

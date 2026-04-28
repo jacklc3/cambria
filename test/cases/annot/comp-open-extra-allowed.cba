@@ -1,0 +1,4 @@
+-- Open annotation: lists print, but the body uses fresh too. The
+-- trailing ellipsis lets the row carry the additional effect.
+-- @expect-type: Name!{ fresh : Unit ~> Name , print : Str ~> Unit }
+(do _ <- !print "hi" in !fresh () : Name!{print : Str ~> Unit, ...})

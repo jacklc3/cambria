@@ -1,4 +1,4 @@
--- @expect-type: (Int + Unique)!{ fresh : Unit ~> Unique }
+-- @expect-type: (Int + Name)!{ fresh : Unit ~> Name }
 with handler {
   return x  -> return (inl x),
   var a k -> return (inr a),

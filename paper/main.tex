@@ -60,7 +60,7 @@
 \newcommand{\tbool}{\mathsf{Bool}}
 \newcommand{\tdouble}{\mathsf{Double}}
 \newcommand{\tstring}{\mathsf{Str}}
-\newcommand{\tunique}{\mathsf{Unique}}
+\newcommand{\tname}{\mathsf{Name}}
 \newcommand{\tlist}[1]{\mathsf{List}(#1)}
 
 \newcommand{\tfun}[2]{#1 \to #2}
@@ -173,7 +173,7 @@ Prior work addresses this ``problem of instances'' through existential types~\ci
 \cambria{} takes a different approach. We extend the type system with \emph{parameter variables} $\psi$, written \lstinline{$p} in concrete syntax. A parameter variable is introduced in the body of a handled computation (via \lstinline{effect}) and instantiated by the handler:
 
 \begin{lstlisting}
-with handler { $cell -> Unique, get a k -> ..., set x k -> ..., ref x k -> ... }
+with handler { $cell -> Name, get a k -> ..., set x k -> ..., ref x k -> ... }
 handle (
   effect get : $cell ~> Int.
   effect set : $cell * Int ~> Unit.
@@ -183,7 +183,7 @@ handle (
 )
 \end{lstlisting}
 
-Inside the body, \lstinline{$cell} is an abstract type. The program cannot inspect values of type \lstinline{$cell} --- it can only manipulate them through the declared operations. The handler instantiates \lstinline{$cell -> Unique}, revealing the representation to its own implementation but not to the client. This achieves the same data abstraction as existential types, but through a purely static mechanism: parameter variables are erased at runtime, requiring no coercions or type-directed reduction.
+Inside the body, \lstinline{$cell} is an abstract type. The program cannot inspect values of type \lstinline{$cell} --- it can only manipulate them through the declared operations. The handler instantiates \lstinline{$cell -> Name}, revealing the representation to its own implementation but not to the client. This achieves the same data abstraction as existential types, but through a purely static mechanism: parameter variables are erased at runtime, requiring no coercions or type-directed reduction.
 
 \paragraph{Contributions.} We make the following contributions:
 \begin{enumerate}[leftmargin=*]
@@ -408,7 +408,7 @@ The local state effect is storing the sets of abstract nodes in its memory locat
 We can finally implement the node effect interface by printing the nodes and dependencies in graphviz format, using the fresh name handler from \Cref{sec:local-state}.
 \begin{lstlisting}
 handler {
-  $node -> Unique,
+  $node -> Name,
   return x -> return x,
   node (deps, s) k ->
     do a <- !fresh () in (

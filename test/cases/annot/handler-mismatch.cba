@@ -1,0 +1,6 @@
+-- Handler annotation with the wrong input value type.
+-- @expect-error: Type mismatch
+do h <- return ((handler {
+  return x -> return x
+}) : Bool!{} => Int!{}) in
+with h handle (return 7)

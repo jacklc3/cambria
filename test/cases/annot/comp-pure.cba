@@ -1,0 +1,3 @@
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 3
+(return 3 : Int!{})

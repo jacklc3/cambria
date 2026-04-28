@@ -1,0 +1,3 @@
+-- Closed annotation that exactly matches the inferred row.
+-- @expect-type: Unit!{ print : Str ~> Unit }
+(!print "hello" : Unit!{print : Str ~> Unit})
