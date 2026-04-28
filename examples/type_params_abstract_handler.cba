@@ -4,8 +4,8 @@ with handler {
   return x -> return x,
   get a k -> k 42
 } handle (
-  declare !get : $p ~> Int.
-  declare !ref : Int ~> $p.
+  effect !get : $p ~> Int.
+  effect !ref : Int ~> $p.
   do a <- !ref 10 in
   !get a
 )

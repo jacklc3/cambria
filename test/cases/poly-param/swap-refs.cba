@@ -1,0 +1,22 @@
+-- @expect-type: ((Int * Int) * (Int * Int))!{ fresh : Unit ~> Unique }
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !fresh () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s empty
+} handle (
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
+  do swap <- return (fun pair -> return (snd pair, fst pair)) in
+  do swapped_ints <- swap (10, 20) in
+  do a <- !ref 100 in
+  do b <- !ref 200 in
+  do swapped_refs <- swap (a, b) in
+  do v1 <- !get (fst swapped_refs) in
+  do v2 <- !get (snd swapped_refs) in
+  return (swapped_ints, (v1, v2))
+)

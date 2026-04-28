@@ -5,8 +5,8 @@ with handler {
   return x -> return x,
   ref x k -> k (inr x)
 } handle (
-  declare !get : $p2 ~> Int.
-  declare !ref : Int ~> $p1.
+  effect !get : $p2 ~> Int.
+  effect !ref : Int ~> $p1.
   do a <- !ref 42 in
   return a
 )

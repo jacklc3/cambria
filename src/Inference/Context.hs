@@ -43,7 +43,7 @@ constants =
 
 primitiveOps :: [(String, Arity)]
 primitiveOps =
-  [ ("unique",    Arity TUnit TUnique)
+  [ ("fresh",     Arity TUnit TUnique)
   , ("print",     Arity TString TUnit)
   , ("read",      Arity TUnit TString)
   , ("flip",      Arity TUnit TBool)

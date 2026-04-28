@@ -1,0 +1,13 @@
+-- @expect-error: does not handle operation
+with handler {
+  $p -> Unique,
+  return x -> return x,
+  get a k -> k 42,
+  ref x k -> k ()
+} handle (
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
+  do a <- !ref 0 in
+  !set (a, !get a)
+)

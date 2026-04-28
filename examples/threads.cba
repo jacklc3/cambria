@@ -15,7 +15,7 @@ with handler {
   $node -> Unique,
   return x -> return (fun _ -> return x),
   node (deps, s) k -> return (fun _ ->
-    do a <- !unique () in
+    do a <- !fresh () in
     do _ <- !print (hash a ++ " [label=\"" ++ s ++ "\"]") in
     do _ <- for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps in
     k (a :: []) ()),
@@ -30,14 +30,14 @@ with handler {
     return x  -> return (fun _ -> return x),
     get a k -> return (fun s -> k (lookup (a, s)) s),
     set x k -> return (fun s -> k () (insert (x, s))),
-    ref x k -> do a <- !unique () in return (fun s ->
+    ref x k -> do a <- !fresh () in return (fun s ->
       k a (insert (((a, x), s)))),
     finally s -> s empty
   } handle (
-    declare !get  : $loc ~> List($node).
-    declare !set  : $loc * List($node) ~> Unit.
-    declare !ref  : List($node) ~> $loc.
-    declare !node : List($node) * Str ~> List($node).
+    effect !get  : $loc ~> List($node).
+    effect !set  : $loc * List($node) ~> Unit.
+    effect !ref  : List($node) ~> $loc.
+    effect !node : List($node) * Str ~> List($node).
 
     do loc <- !ref [] in
 
@@ -61,10 +61,10 @@ with handler {
           k (inl child_deps)
         )
     } handle (
-      declare !fork : Unit ~> $tid + Unit.
-      declare !wait : $tid ~> Unit.
-      declare !act  : Str ~> Unit.
-      declare !stop : Unit ~> Unit.
+      effect !fork : Unit ~> $tid + Unit.
+      effect !wait : $tid ~> Unit.
+      effect !act  : Str ~> Unit.
+      effect !stop : Unit ~> Unit.
 
       case !fork () of {
         inl a1 -> case !fork () of {

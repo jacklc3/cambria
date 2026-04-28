@@ -1,0 +1,4 @@
+-- @expect-type: Bool!{ flip : Unit ~> Bool , print : Str ~> Unit }
+do x <- !flip () in
+do _ <- !print "hello" in
+return x

@@ -94,7 +94,7 @@ inferComp = \case
     t2 <- extendVariable x2 (Forall mempty mempty tr') (inferComp c2)
     unify t1 t2
     applySubst t1
-  CDeclare op ar c -> do
+  CEffect op ar c -> do
     tc <- inferComp c
     case Map.lookup op (effectOps (effects tc)) of
       Just ar' -> unify ar ar' >> applySubst tc

@@ -1,0 +1,8 @@
+-- @expect-type: Int!{ print : Str ~> Unit }
+with handler {
+  decide v k -> (do _ <- !print "deciding" in max (k true, k false))
+} handle (
+  do x <- if !decide () then return 10 else return 20 in
+  do _ <- !print "done" in
+  return x
+)

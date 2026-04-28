@@ -48,7 +48,7 @@ constants =
 
 primitiveOps :: [(Op, Value -> Value -> IO Computation)]
 primitiveOps =
-  [ ("unique",    \_           k -> CApp k . VUnique       <$> newUnique)
+  [ ("fresh",     \_           k -> CApp k . VUnique       <$> newUnique)
   , ("print",     \(VString s) k -> CApp k . const VUnit   <$> putStrLn s)
   , ("read",      \_           k -> CApp k . VString       <$> getLine)
   , ("flip",      \_           k -> CApp k . VBool         <$> randomIO)

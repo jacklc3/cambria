@@ -1,3 +1,4 @@
+-- @expect-type: Unit!{}
 with handler {
   return x -> return x,
   print s k -> k ()

@@ -1,3 +1,0 @@
-do x <- return 1 in
-do y <- return 2 in
-return (x + y, ())

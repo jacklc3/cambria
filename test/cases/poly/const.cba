@@ -1,0 +1,5 @@
+-- @expect-type: (Int * Str)!{}
+do const <- return (fun x -> return (fun y -> return x)) in
+do a <- const 42 true in
+do b <- const "hello" 99 in
+return (a, b)

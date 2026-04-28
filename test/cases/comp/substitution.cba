@@ -1,0 +1,18 @@
+-- @expect-type: (Int + Unique)!{ fresh : Unit ~> Unique }
+with handler {
+  return x  -> return (inl x),
+  var a k -> return (inr a),
+  sub _ k -> do c <- !fresh () in
+    case k (inl c) of {
+      inl x -> return (inl x),
+      inr d -> if d == c then k (inr ()) else return (inr d)
+    }
+} handle (
+  case !sub () of {
+    inl a -> case !sub () of {
+      inl b -> !var a,
+      inr _ -> return 2
+    },
+    inr _ -> return 3
+  }
+)

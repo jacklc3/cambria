@@ -1,0 +1,2 @@
+-- @expect-error: Unbound variable: x
+return x

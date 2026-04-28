@@ -36,7 +36,7 @@ import Control.Monad.Except
   inr                        { Token _ _ TokInr }
   case                       { Token _ _ TokCase }
   of                         { Token _ _ TokOf }
-  declare                    { Token _ _ TokDeclare }
+  effect                     { Token _ _ TokEffect }
   Unit                       { Token _ _ TokTUnit }
   Int                        { Token _ _ TokTInt }
   Bool                       { Token _ _ TokTBool }
@@ -156,7 +156,7 @@ compTerm :: { SugaredComp }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
   | with expr handle compTerm             { SCWith $2 $4 }
-  | declare op ':' type '~>' type '.' compTerm  { SCDeclare $2 (Arity $4 $6) $8 }
+  | effect op ':' type '~>' type '.' compTerm  { SCEffect $2 (Arity $4 $6) $8 }
   | compInfix                             { $1 }
 
 compInfix :: { SugaredComp }

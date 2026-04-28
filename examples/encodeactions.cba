@@ -13,7 +13,7 @@ do concat <- return rec concat v1 v2 ->
 in
 with handler {
   act (a, s) k ->
-    do b <- !unique () in (
+    do b <- !fresh () in (
       !print ("n" ++ hash b ++ " [label=\"" ++ s ++ "\"]; ") ;
       for (fun a -> !print ("n" ++ hash a ++ " -> n" ++ hash b ++ "; ")) a ;
       k (b :: [])

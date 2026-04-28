@@ -58,7 +58,7 @@ data TokenKind
   | TokUnderscore
   | TokSemiColon
   | TokConcat
-  | TokDeclare
+  | TokEffect
   | TokSquigglyArrow
   | TokColon
   | TokDot

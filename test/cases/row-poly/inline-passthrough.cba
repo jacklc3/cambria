@@ -1,0 +1,16 @@
+-- @expect-type: ((Int * List Int) * (Bool * List Int))!{ flip : Unit ~> Bool , print : Str ~> Unit }
+do r1 <- with handler {
+  return x -> return (x, []),
+  emit v k -> do (r, acc) <- k () in
+    return (r, v :: acc)
+} handle (
+  !emit 1; !emit 2; !print "hello"; return 42
+) in
+do r2 <- with handler {
+  return x -> return (x, []),
+  emit v k -> do (r, acc) <- k () in
+    return (r, v :: acc)
+} handle (
+  !emit 3; !flip (); return true
+) in
+return (r1, r2)

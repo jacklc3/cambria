@@ -1,3 +1,4 @@
+-- @expect-type: Int!{ print : Str ~> Unit }
 with handler {
   return x -> return x,
   decide v k -> do _ <- !print "deciding" in k true

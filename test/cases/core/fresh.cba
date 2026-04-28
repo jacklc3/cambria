@@ -1,0 +1,5 @@
+-- @expect-type: ((Unique * Unique) * Unique)!{ fresh : Unit ~> Unique }
+do x <- !fresh () in
+do y <- !fresh () in
+do z <- !fresh () in
+return ((x,y),z)

@@ -1,0 +1,29 @@
+-- @expect-type: (Int * (Bool * (Int * Int)))!{ fresh : Unit ~> Unique }
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !fresh () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s empty
+} handle (
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
+  do with_ref <- return (fun init -> return (fun body ->
+    do r <- !ref init in body r
+  )) in
+  do mk1 <- with_ref 42 in
+  do r1 <- mk1 (fun r -> do v <- !get r in return v) in
+  do mk2 <- with_ref 0 in
+  do r2 <- mk2 (fun r -> do v <- !get r in return (v == 0)) in
+  do mk3 <- with_ref 5 in
+  do r3 <- mk3 (fun r ->
+    do before <- !get r in
+    do _ <- !set (r, before * 2) in
+    do after <- !get r in
+    return (before, after)
+  ) in
+  return (r1, (r2, r3))
+)

@@ -1,0 +1,5 @@
+-- @expect-type: (t0 * t0)!{ myeffect : Unit ~> t0 }
+do r <- !myeffect () in
+do a <- return r in
+do b <- return r in
+return (a, b)

@@ -1,0 +1,6 @@
+-- @expect-type: (Int * Bool)!{ flip : Unit ~> Bool }
+do _ <- !flip () in
+do id <- return (fun x -> return x) in
+do a <- id 42 in
+do b <- id true in
+return (a, b)

@@ -1,0 +1,27 @@
+-- @expect-type: (List Int * List Bool)!{ fresh : Unit ~> Unique }
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !fresh () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s empty
+} handle (
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
+  do map <- return (rec map f xs ->
+    case uncons xs of {
+      inl _       -> return [],
+      inr (x,xs') -> f x :: map f xs'
+    })
+  in
+  do allocator <- map (fun n -> !ref n) in
+  do refs <- allocator (10 :: 20 :: 30 :: []) in
+  do reader <- map (fun r -> !get r) in
+  do vals <- reader refs in
+  do tester <- map (fun n -> return (n == 20)) in
+  do checks <- tester vals in
+  return (vals, checks)
+)

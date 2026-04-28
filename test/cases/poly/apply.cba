@@ -1,0 +1,5 @@
+-- @expect-type: (Int * Bool)!{}
+do apply <- return (fun f -> f ()) in
+do a <- apply (fun x -> return 42) in
+do b <- apply (fun x -> return true) in
+return (a, b)

@@ -18,13 +18,13 @@ with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !unique () in return (fun s ->
+  ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
 } handle (
-  declare !get : $p ~> Int.
-  declare !set : $p * Int ~> Unit.
-  declare !ref : Int ~> $p.
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
 
   -- Define the polymorphic combinator once
   do with_ref <- return (fun init body -> do r <- !ref init in body r) in

@@ -3,13 +3,13 @@ with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !unique () in return (fun s ->
+  ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
 } handle (
   with handler {
     newgraph z k -> k (!ref empty),
-    newnode z k -> k (!unique ()),
+    newnode z k -> k (!fresh ()),
     isedge (g, (a, b)) k ->
       do m <- !get g in
       if member ((a,b), m) then

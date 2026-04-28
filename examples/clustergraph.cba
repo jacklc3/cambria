@@ -1,7 +1,7 @@
 -- Two cluster graph
 -- See also erdosrenyi.cba
 with handler {
-  newgraph _ k -> k (!unique ()),
+  newgraph _ k -> k (!fresh ()),
   newnode g k -> k (!flip ()),
   isedge (_, (a, b)) k ->
     if a == b then return false else return true

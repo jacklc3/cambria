@@ -55,9 +55,9 @@ desugarComp = \case
     (k, v) <- desugarExpr e
     c <- desugarComp s
     return $ k (CHandle v c)
-  SCDeclare op ar s -> do
+  SCEffect op ar s -> do
     c <- desugarComp s
-    return (CDeclare op ar c)
+    return (CEffect op ar c)
 
 desugarExpr :: SugaredExpr -> Fresh (Computation -> Computation, Value)
 desugarExpr = \case

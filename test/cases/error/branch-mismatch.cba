@@ -1,0 +1,2 @@
+-- @expect-error: Type mismatch
+if true then return 1 else return "hello"

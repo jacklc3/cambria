@@ -1,0 +1,8 @@
+-- @expect-type: (Unit * Str)!{}
+with handler {
+  return x -> return (x, ""),
+  print s k -> do x <- k () in
+    return (fst x, s ++ (snd x))
+} handle (
+  !print "A"; !print "B"; !print "C"
+)

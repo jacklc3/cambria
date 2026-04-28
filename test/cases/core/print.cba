@@ -1,0 +1,3 @@
+-- @expect-type: Unit!{ print : Str ~> Unit }
+-- @expect-value: Impure: !print "test"
+!print "test"

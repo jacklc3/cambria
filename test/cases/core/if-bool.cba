@@ -1,1 +1,2 @@
+-- @expect-type: Int!{}
 if true then return 1 else return 2

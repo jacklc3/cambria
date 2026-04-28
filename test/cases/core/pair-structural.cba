@@ -1,0 +1,3 @@
+-- @expect-type: ((Int * Bool) * Str)!{}
+-- @expect-value: Pure: ((1, True), "hello")
+return ((1, true), "hello")

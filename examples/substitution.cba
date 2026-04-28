@@ -2,14 +2,14 @@ with handler {
   $p -> Unique,
   return x  -> return (inl x),
   var a _ -> return (inr a),
-  sub _ k -> do c <- !unique () in
+  sub _ k -> do c <- !fresh () in
     case k (inl c) of {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
     }
 } handle (
-  declare !sub : Unit ~> $p + Unit.
-  declare !var : $p   ~> Int.
+  effect !sub : Unit ~> $p + Unit.
+  effect !var : $p   ~> Int.
 
   case !sub () of {
     inl a -> case !sub () of {

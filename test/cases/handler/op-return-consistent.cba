@@ -1,0 +1,8 @@
+-- @expect-type: Int!{}
+with handler {
+  return x -> return x,
+  choose v k -> k true
+} handle (
+  do b <- !choose () in
+  if b then return 1 else return 2
+)

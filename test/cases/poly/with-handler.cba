@@ -1,0 +1,9 @@
+-- @expect-type: Int!{}
+do id <- return (fun x -> return x) in
+with handler {
+  return x -> return x,
+  ask v k -> k 42
+} handle (
+  do a <- id (!ask ()) in
+  return a
+)

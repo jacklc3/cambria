@@ -1,0 +1,2 @@
+-- @expect-error: Type mismatch
+(fun x -> return (x + 1)) true

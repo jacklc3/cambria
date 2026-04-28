@@ -6,10 +6,10 @@ with handler {
   stop _ k -> return (inl ()),
   fork _ k -> k (inr ()) ; k (inl ())
 } handle (
-  declare !fork : Unit ~> $tid + Unit.
-  declare !wait : $tid ~> Unit.
-  declare !act  : Str ~> Unit.
-  declare !stop : Unit ~> Unit.
+  effect !fork : Unit ~> $tid + Unit.
+  effect !wait : $tid ~> Unit.
+  effect !act  : Str ~> Unit.
+  effect !stop : Unit ~> Unit.
 
   case !fork () of {
     inl a1 -> case !fork () of {

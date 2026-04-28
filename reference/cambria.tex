@@ -35,7 +35,7 @@
 % ── Listings: Cambria language ───────────────────────────────────────────────
 \lstdefinelanguage{cambria}{
   morekeywords={fun,rec,handler,return,finally,do,in,if,then,else,with,handle,
-                inl,inr,case,of,declare,Unit,Int,Bool,Double,Str,Unique,Map,List,
+                inl,inr,case,of,effect,Unit,Int,Bool,Double,Str,Unique,Map,List,
                 true,false},
   sensitive=true,
   morecomment=[l]{--},
@@ -177,7 +177,7 @@ fine-grained call-by-value discipline.
 \texttt{Bool}   & \cba{true}, \cba{false}     & Booleans \\
 \texttt{Double} & (produced by \texttt{/} and \cba{!uniform}) & Floating-point numbers \\
 \texttt{Str}    & \texttt{"hello"}, \texttt{"a\textbackslash nb"} & Strings (with escapes) \\
-\texttt{Unique} & (produced by \cba{!unique}) & Opaque unique identifiers \\
+\texttt{Unique} & (produced by \cba{!fresh}) & Opaque unique identifiers \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -220,7 +220,7 @@ insert ((key, val), m)      -- insert into map
 % ── Type syntax ──────────────────────────────────────────────────────────────
 \subsection{Type Syntax in Declarations}
 
-Types are written in \cba{declare} statements using this syntax:
+Types are written in \cba{effect} statements using this syntax:
 
 \begin{center}
 \begin{tabular}{ll}
@@ -553,7 +553,7 @@ Some operations are built-in and handled by the runtime (see
 Section~\ref{sec:builtinio}).  Operations can be:
 
 \begin{enumerate}
-  \item \textbf{Declared} with \cba{declare} to enforce a type signature, and
+  \item \textbf{Declared} with \cba{effect} to enforce a type signature, and
   \item \textbf{Handled} by an enclosing \cba{with ... handle ...} block
 \end{enumerate}
 
@@ -699,9 +699,9 @@ to the handler that provides them.
 \subsection{Declaring Operations with Type Parameters}
 
 \begin{lstlisting}
-declare !ref : Int ~> $p.
-declare !get : $p ~> Int.
-declare !set : $p & Int ~> Unit.
+effect !ref : Int ~> $p.
+effect !get : $p ~> Int.
+effect !set : $p & Int ~> Unit.
 \end{lstlisting}
 
 Here \texttt{\$p} is an abstract type.  Code that uses these operations knows
@@ -719,13 +719,13 @@ A handler can instantiate a type parameter by including a
 with handler {
   $p -> Unique,
   return x -> ...,
-  ref x k -> do a <- !unique () in k a,
+  ref x k -> do a <- !fresh () in k a,
   get a k -> ...,
   set x k -> ...
 } handle (
-  declare !ref : Int ~> $p.
-  declare !get : $p ~> Int.
-  declare !set : $p & Int ~> Unit.
+  effect !ref : Int ~> $p.
+  effect !get : $p ~> Int.
+  effect !set : $p & Int ~> Unit.
   ...
 )
 \end{lstlisting}
@@ -768,23 +768,23 @@ with handler {
   get a k -> k 42,
   ref x k -> k ()
 } handle (
-  declare !get : $p ~> Int.
-  declare !set : $p & Int ~> Unit.   -- not handled!
-  declare !ref : Int ~> $p.
+  effect !get : $p ~> Int.
+  effect !set : $p & Int ~> Unit.   -- not handled!
+  effect !ref : Int ~> $p.
   ...
 )
 \end{lstlisting}
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Effect Declarations}
-\label{sec:declare}
+\label{sec:effect}
 
-\subsection{\texttt{declare}}
+\subsection{\texttt{effect}}
 
 Declares the type signature of an effect operation for use in subsequent code:
 
 \begin{lstlisting}
-declare !opName : ArgType ~> RetType.
+effect !opName : ArgType ~> RetType.
 \end{lstlisting}
 
 The declaration must end with a \texttt{.} (dot) and is followed by the
@@ -793,12 +793,12 @@ computation that uses the operation.
 Examples:
 
 \begin{lstlisting}
-declare !get : $p ~> Int.
-declare !set : $p & Int ~> Unit.
-declare !ref : Int ~> $p.
-declare !ask : Unit ~> Int.
-declare !urn : Unit ~> $p.
-declare !sample : $p ~> Bool.
+effect !get : $p ~> Int.
+effect !set : $p & Int ~> Unit.
+effect !ref : Int ~> $p.
+effect !ask : Unit ~> Int.
+effect !urn : Unit ~> $p.
+effect !sample : $p ~> Bool.
 \end{lstlisting}
 
 Declarations serve two purposes:
@@ -903,7 +903,7 @@ I/O:
 \toprule
 \textbf{Operation} & \textbf{Signature} & \textbf{Description} \\
 \midrule
-\texttt{!unique ()}    & \texttt{Unit $\leadsto$ Unique}    & Fresh unique identifier \\
+\texttt{!fresh ()}    & \texttt{Unit $\leadsto$ Unique}    & Fresh unique identifier \\
 \texttt{!print s}      & \texttt{Str $\leadsto$ Unit}       & Print string to stdout \\
 \texttt{!read ()}      & \texttt{Unit $\leadsto$ Str}       & Read line from stdin \\
 \texttt{!flip ()}      & \texttt{Unit $\leadsto$ Bool}      & Random boolean (fair coin) \\
@@ -939,7 +939,7 @@ For example:
   \item \texttt{Int!\{\}}: a pure computation producing an \texttt{Int}
   \item \texttt{Bool!\{ flip : Unit \(\leadsto\) Bool \}}: a computation
         that may invoke \texttt{!flip} and produces a \texttt{Bool}
-  \item \texttt{Unit!\{ print : Str \(\leadsto\) Unit, unique : Unit
+  \item \texttt{Unit!\{ print : Str \(\leadsto\) Unit, fresh : Unit
         \(\leadsto\) Unique \}}: may print and generate uniques
 \end{itemize}
 
@@ -1211,7 +1211,7 @@ with handler {
   return x  -> return (fun _ -> return x),
   get a k   -> return (fun s -> k (lookup (a, s)) s),
   set x k   -> return (fun s -> k () (insert (x, s))),
-  ref x k   -> do a <- !unique () in
+  ref x k   -> do a <- !fresh () in
                 return (fun s ->
                   k a (insert (((a, x), s)))),
   finally s -> s empty
@@ -1253,7 +1253,7 @@ with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !unique () in return (fun s ->
+  ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
 } handle (
@@ -1307,13 +1307,13 @@ with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !unique () in return (fun s ->
+  ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
 } handle (
-  declare !get : $p ~> Int.
-  declare !set : $p & Int ~> Unit.
-  declare !ref : Int ~> $p.
+  effect !get : $p ~> Int.
+  effect !set : $p & Int ~> Unit.
+  effect !ref : Int ~> $p.
 
   do map <- return (rec map f xs ->
     case uncons xs of {
@@ -1340,8 +1340,8 @@ following two programs both implement a Beta--Bernoulli model with the same
 body code and the same effect interface:
 
 \begin{lstlisting}
-declare !urn : Unit ~> $p.
-declare !sample : $p ~> Bool.
+effect !urn : Unit ~> $p.
+effect !sample : $p ~> Bool.
 \end{lstlisting}
 
 \texttt{!urn} creates a new random process and \texttt{!sample} draws a
@@ -1366,8 +1366,8 @@ with handler {
   urn _ k -> k (!uniform ()),
   sample a k -> k (!bernoulli a)
 } handle (
-  declare !urn : Unit ~> $p.
-  declare !sample : $p ~> Bool.
+  effect !urn : Unit ~> $p.
+  effect !sample : $p ~> Bool.
 
   do a <- !urn () in
   countSuccesses 10 (fun _ -> !sample a)
@@ -1399,7 +1399,7 @@ with handler {
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !unique () in return (fun s ->
+  ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
 } handle (
@@ -1413,8 +1413,8 @@ with handler {
                         j + (1 - boolToInt b))) in
       k b
   } handle (
-    declare !urn : Unit ~> $p.
-    declare !sample : $p ~> Bool.
+    effect !urn : Unit ~> $p.
+    effect !sample : $p ~> Bool.
 
     do a <- !urn () in
     countSuccesses 10 (fun _ -> !sample a)
@@ -1466,7 +1466,7 @@ comp    := comp ; comp
          | case expr of { inl p -> comp,
                           inr p -> comp }
          | with expr handle comp
-         | declare !op : type ~> type . comp
+         | effect !op : type ~> type . comp
          | expr expr
          | !op expr
          | expr BINOP expr

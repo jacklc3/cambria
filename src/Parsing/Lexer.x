@@ -31,7 +31,7 @@ tokens :-
   inr                        { \p s -> Token p s TokInr }
   case                       { \p s -> Token p s TokCase }
   of                         { \p s -> Token p s TokOf }
-  declare                    { \p s -> Token p s TokDeclare }
+  effect                     { \p s -> Token p s TokEffect }
   Unit                       { \p s -> Token p s TokTUnit }
   Int                        { \p s -> Token p s TokTInt }
   Bool                       { \p s -> Token p s TokTBool }

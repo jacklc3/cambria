@@ -1,0 +1,6 @@
+-- @expect-type: ((Int * Int) * (Bool * Bool))!{}
+do id <- return (fun x -> return x) in
+do f <- id (fun y -> return (y, y)) in
+do a <- f 1 in
+do b <- f true in
+return (a, b)

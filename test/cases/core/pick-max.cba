@@ -1,0 +1,9 @@
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 25
+with handler {
+  decide v k -> max (k true, k false)
+} handle (
+  do x1 <- if !decide () then return 15 else return 30 in
+  do x2 <- if !decide () then return 5  else return 10 in
+  return (x1 - x2)
+)

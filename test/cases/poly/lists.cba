@@ -1,0 +1,4 @@
+-- @expect-type: (Bool * Bool)!{}
+do ints <- 1 :: 2 :: 3 :: [] in
+do bools <- true :: false :: [] in
+return (null ints, null bools)

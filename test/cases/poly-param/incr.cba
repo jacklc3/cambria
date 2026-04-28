@@ -1,0 +1,24 @@
+-- @expect-type: Int!{ fresh : Unit ~> Unique }
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !fresh () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s empty
+} handle (
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
+  do incr <- return (fun r ->
+    do v <- !get r in
+    !set (r, v + 1)
+  ) in
+  do a <- !ref 10 in
+  do b <- !ref 20 in
+  do _ <- incr a in
+  do _ <- incr b in
+  do _ <- incr a in
+  return (!get a + !get b)
+)

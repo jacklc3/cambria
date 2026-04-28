@@ -1,0 +1,29 @@
+-- @expect-type: ((Int * Int) * (Int * (Int * Int)))!{ fresh : Unit ~> Unique }
+with handler {
+  $p -> Unique,
+  return x  -> return (fun _ -> return x),
+  get a k -> return (fun s -> k (lookup (a, s)) s),
+  set x k -> return (fun s -> k () (insert (x, s))),
+  ref x k -> do a <- !fresh () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s empty
+} handle (
+  effect !get : $p ~> Int.
+  effect !set : $p * Int ~> Unit.
+  effect !ref : Int ~> $p.
+  do map_pair <- return (fun f -> return (fun pair ->
+    do x <- f (fst pair) in
+    do y <- f (snd pair) in
+    return (x, y)
+  )) in
+  do double_both <- map_pair (fun n -> return (n * 2)) in
+  do doubled <- double_both (3, 7) in
+  do a <- !ref 100 in
+  do b <- !ref 200 in
+  do read_both <- map_pair (fun r -> !get r) in
+  do vals <- read_both (a, b) in
+  do sum <- return (fst vals + snd vals) in
+  do alloc_both <- map_pair (fun n -> !ref n) in
+  do new_refs <- alloc_both (sum, fst doubled + snd doubled) in
+  return (doubled, (sum, (!get (fst new_refs), !get (snd new_refs))))
+)

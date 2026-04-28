@@ -1,0 +1,6 @@
+-- @expect-error: Type mismatch: Int vs Bool
+effect !ask : Unit ~> Int.
+do x <- !ask () in
+effect !ask : Unit ~> Bool.
+do y <- !ask () in
+return (x, y)

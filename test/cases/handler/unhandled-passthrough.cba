@@ -1,0 +1,8 @@
+-- @expect-type: Unit!{ print : Str ~> Unit }
+with handler {
+  return x -> return x,
+  decide v k -> k true
+} handle (
+  do b <- !decide () in
+  if b then !print "yes" else !print "no"
+)

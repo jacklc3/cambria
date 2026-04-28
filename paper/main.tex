@@ -342,10 +342,10 @@ The thread identifiers \lstinline|$tids| are abstract and so cannot be forged, c
 The following program constructs an N-shaped dependency between four actions.
 
 \begin{lstlisting}
-declare !fork : Unit ~> $tid + Unit.
-declare !wait : $tid ~> Unit.
-declare !act  : Str ~> Unit.
-declare !stop : Unit ~> Unit.
+effect !fork : Unit ~> $tid + Unit.
+effect !wait : $tid ~> Unit.
+effect !act  : Str ~> Unit.
+effect !stop : Unit ~> Unit.
 case !fork () of {
   inl a1 -> case !fork () of {
     inl a2 -> !wait a2 ; case !fork () of {
@@ -376,10 +376,10 @@ Alternatively, we may want to visualise understand the dependencies between the 
 We can implement a handler that converts the program into a DAG in graphviz format.
 This is achieved by handling the concurrency effect into a simpler labelled poset algebra~\cite{kammar_handlers_2013} that is parametrized by a type of nodes.
 \begin{lstlisting}
-declare !get  : $loc ~> List($node).
-declare !set  : $loc * List($node) ~> Unit.
-declare !ref  : List($node) ~> $loc.
-declare !node : List($node) * Str ~> List($node).
+effect !get  : $loc ~> List($node).
+effect !set  : $loc * List($node) ~> Unit.
+effect !ref  : List($node) ~> $loc.
+effect !node : List($node) * Str ~> List($node).
 let node_handler = 
   do loc <- !ref [] in
   return handler {
@@ -411,7 +411,7 @@ handler {
   $node -> Unique,
   return x -> return x,
   node (deps, s) k ->
-    do a <- !unique () in (
+    do a <- !fresh () in (
       for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps ;
       !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
       k (a :: [])
