@@ -1,0 +1,44 @@
+with handler {
+  $loc -> Name,
+  return x -> return (fun _ -> return x),
+  get a k  -> return (fun s -> k (lookup (a, s)) s),
+  set x k  -> return (fun s -> k () (insert (x, s))),
+  ref x k  -> do a <- !fresh () in return (fun s ->
+    k a (insert (((a, x), s)))),
+  finally s -> s empty
+} handle (
+  effect !get : $loc ~> Bool.
+  effect !set : $loc * Bool ~> Unit.
+  effect !ref : Bool ~> $loc.
+
+  with handler {
+    $tid -> Unit -> Unit!{...},
+    return _ -> return (),
+    act  s k -> !print s ; k (),
+    wait t k -> t () ; k (),
+    stop _ k -> return (),
+    fork _ k ->
+      do done <- !ref false in
+      do tid  <- return (fun _ ->
+        if !get done then return ()
+        else (!set (done, true) ; k (inr ()))) in
+      do _ <- k (inl tid) in
+      tid ()
+  } handle (
+    effect !fork : Unit ~> $tid + Unit.
+    effect !wait : $tid ~> Unit.
+    effect !act  : Str ~> Unit.
+    effect !stop : Unit ~> Void.
+
+    case !fork () of {
+      inl a1 -> case !fork () of {
+        inl a2 -> !wait a2; case !fork () of {
+          inl a3 -> !act "Action 4" ; !stop (),
+          inr _  -> !wait a1 ; !act "Action 3" ; !stop ()
+        },
+        inr _  -> !act "Action 2" ; !stop ()
+      },
+      inr _  -> !act "Action 1" ; !stop ()
+    }
+  )
+)

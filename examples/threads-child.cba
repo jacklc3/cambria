@@ -1,21 +1,21 @@
 with handler {
   $tid -> Unit,
-  return x -> return (inr x),
+  return _ -> return (),
   act  s k -> !print s ; k (),
   wait _ k -> k (),
-  stop _ k -> return (inl ()),
+  stop _ k -> return (),
   fork _ k -> k (inr ()) ; k (inl ())
 } handle (
   effect !fork : Unit ~> $tid + Unit.
   effect !wait : $tid ~> Unit.
-  effect !act  : Str ~> Unit.
+  effect !act  : Str  ~> Unit.
   effect !stop : Unit ~> Void.
 
   case !fork () of {
     inl a1 -> case !fork () of {
-      inl a2 -> case !fork () of {
-        inl a3 -> !wait a2 ; !act "Action 4" ; !stop (),
-        inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; !stop ()
+      inl a2 -> !wait a2 ; case !fork () of {
+        inl a3 -> !act "Action 4" ; !stop (),
+        inr _  -> !wait a1 ; !act "Action 3" ; !stop ()
       },
       inr _  -> !act "Action 2" ; !stop ()
     },

@@ -1,81 +1,53 @@
-do for <- return (rec for g xs ->
+do map <- return (rec map g xs ->
   case uncons xs of {
-    inl _        -> return (),
-    inr (x, xs') -> (g x ; for g xs')
-  })
-in
+    inl _        -> return [],
+    inr (x, xs') -> (g x :: map g xs')
+  }) in
 do concat <- return (rec concat xs ys ->
   case uncons xs of {
     inl _        -> return ys,
     inr (x, xs') -> return (x :: concat xs' ys)
-  })
-in
+  }) in
 
 with handler {
   $node -> Name,
   return x -> return (fun _ -> return x),
-  node (deps, s) k -> return (fun _ ->
+  node (ds, s) k -> return (fun _ ->
     do a <- !fresh () in
     do _ <- !print (hash a ++ " [label=\"" ++ s ++ "\"]") in
-    do _ <- for (fun d -> !print (hash d ++ " -> " ++ hash a)) deps in
+    do _ <- map (fun d -> !print (hash d ++ " -> " ++ hash a)) ds in
     k (a :: []) ()),
   finally f ->
-    !print "" ;
-    !print "digraph { graph [label=\"Dependency graph\"]; ";
-    f ();
-    !print "}\n"
+    !print "digraph { graph [label=\"Dependency graph\"]; " ;
+    f () ;
+    !print "}"
 } handle (
+  effect !node : List $node * Str ~> List $node.
   with handler {
-    $loc -> Name,
-    return x  -> return (fun _ -> return x),
-    get a k -> return (fun s -> k (lookup (a, s)) s),
-    set x k -> return (fun s -> k () (insert (x, s))),
-    ref x k -> do a <- !fresh () in return (fun s ->
-      k a (insert (((a, x), s)))),
-    finally s -> s empty
+    $tid -> List $node,
+    return _   -> return (fun ds -> return ds),
+    act  s k   -> return (fun ds ->
+      do a <- !node (ds, s) in k () a),
+    wait ds' k -> return (fun ds -> k () (concat ds ds')),
+    stop _ k   -> return (fun ds -> return ds),
+    fork _ k   -> return (fun ds ->
+      do a <- k (inr ()) ds in k (inl a) ds),
+    finally f  -> f []
   } handle (
-    effect !get  : $loc ~> List($node).
-    effect !set  : $loc * List($node) ~> Unit.
-    effect !ref  : List($node) ~> $loc.
-    effect !node : List($node) * Str ~> List($node).
+    effect !fork : Unit ~> $tid + Unit.
+    effect !wait : $tid ~> Unit.
+    effect !act  : Str ~> Unit.
+    effect !stop : Unit ~> Void.
 
-    do loc <- !ref [] in
-
-    with handler {
-      $tid -> List($node),
-      return x -> return (inr x),
-      act s k ->
-        do deps <- !get loc in
-        do a <- !node (deps, s) in
-        !set (loc, a) ; k (),
-      wait deps' k ->
-        do deps <- !get loc in
-        !set (loc, concat deps deps') ; k (),
-      stop _ k ->
-        return (inl ()),
-      fork _ k ->
-        do saved <- !get loc in
-        do _ <- k (inr ()) in
-        do child_deps <- !get loc in (
-          !set (loc, saved) ;
-          k (inl child_deps)
-        )
-    } handle (
-      effect !fork : Unit ~> $tid + Unit.
-      effect !wait : $tid ~> Unit.
-      effect !act  : Str ~> Unit.
-      effect !stop : Unit ~> Void.
-
-      case !fork () of {
-        inl a1 -> case !fork () of {
-          inl a2 -> case !fork () of {
-            inl a3 -> !wait a2 ; !act "Action 4" ; return (),
-            inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; return ()
-          },
-          inr _  -> !act "Action 2" ; return ()
+    case !fork () of {
+      inl a1 -> case !fork () of {
+        inl a2 -> !wait a2 ; case !fork () of {
+          inl a3 -> !act "Action 4" ; !stop (),
+          inr _  -> !wait a1 ; !act "Action 3" ; !stop ()
         },
-        inr _ -> !act "Action 1" ; return ()
-      }
-    )
+        inr _  -> !act "Action 2" ; !stop ()
+      },
+      inr _  -> !act "Action 1" ; !stop ()
+    }
   )
 )
