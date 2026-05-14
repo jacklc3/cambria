@@ -1,0 +1,24 @@
+with handler {
+  $tid -> Unit,
+  return x -> return (inr x),
+  act  s k -> !print s ; k (),
+  wait _ k -> k (),
+  stop _ k -> return (inl ()),
+  fork _ k -> k (inl ()) ; k (inr ())
+} handle (
+  effect !fork : Unit ~> $tid + Unit.
+  effect !wait : $tid ~> Unit.
+  effect !act  : Str ~> Unit.
+  effect !stop : Unit ~> Void.
+
+  case !fork () of {
+    inl a1 -> case !fork () of {
+      inl a2 -> case !fork () of {
+        inl a3 -> !wait a2 ; !act "Action 4" ; !stop (),
+        inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; !stop ()
+      },
+      inr _  -> !act "Action 2" ; !stop ()
+    },
+    inr _  -> !act "Action 1" ; !stop ()
+  }
+)
