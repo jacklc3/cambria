@@ -1,14 +1,13 @@
 with handler {
-  $loc -> Name,
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s empty
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then x else s a)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then x else s b)),
+  finally s   -> s (fun _ -> return 0)
 } handle (
   effect !ref : Int ~> $loc.
-
   do a <- !ref 2 in
   do b <- !ref 3 in
   (!set (a, !get b + !get a); !get a)

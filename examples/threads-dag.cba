@@ -12,42 +12,33 @@ do concat <- return (rec concat xs ys ->
 with handler {
   $node -> Name,
   return x -> return (fun _ -> return x),
-  node (ds, s) k -> return (fun _ ->
-    do a <- !fresh () in
-    do _ <- !print (hash a ++ " [label=\"" ++ s ++ "\"]") in
-    do _ <- map (fun d -> !print (hash d ++ " -> " ++ hash a)) ds in
-    k (a :: []) ()),
-  finally f ->
-    !print "digraph { graph [label=\"Dependency graph\"]; " ;
-    f () ;
-    !print "}"
+  node (ds, s) k -> return (fun _ -> do a <- !fresh () in (
+    !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
+    map (fun d -> !print (hash d ++ " -> " ++ hash a)) ds ;
+    k (a :: []) () )),
+  finally f -> !print "digraph {" ; f () ; !print "}"
 } handle (
   effect !node : List $node * Str ~> List $node.
   with handler {
     $tid -> List $node,
     return _   -> return (fun ds -> return ds),
-    act  s k   -> return (fun ds ->
-      do a <- !node (ds, s) in k () a),
+    act  s k   -> return (fun ds -> do a <- !node (ds, s) in k () a),
     wait ds' k -> return (fun ds -> k () (concat ds ds')),
     stop _ k   -> return (fun ds -> return ds),
-    fork _ k   -> return (fun ds ->
-      do a <- k (inr ()) ds in k (inl a) ds),
+    fork _ k   -> return (fun ds -> do a <- k (inr ()) ds in k (inl a) ds),
     finally f  -> f []
   } handle (
     effect !fork : Unit ~> $tid + Unit.
     effect !wait : $tid ~> Unit.
-    effect !act  : Str ~> Unit.
+    effect !act  : Str  ~> Unit.
     effect !stop : Unit ~> Void.
 
     case !fork () of {
       inl a1 -> case !fork () of {
         inl a2 -> !wait a2 ; case !fork () of {
           inl a3 -> !act "Action 4" ; !stop (),
-          inr _  -> !wait a1 ; !act "Action 3" ; !stop ()
-        },
-        inr _  -> !act "Action 2" ; !stop ()
-      },
-      inr _  -> !act "Action 1" ; !stop ()
-    }
+          inr _  -> !wait a1 ; !act "Action 3" ; !stop () },
+        inr _  -> !act "Action 2" ; !stop () },
+      inr _  -> !act "Action 1" ; !stop () }
   )
 )
