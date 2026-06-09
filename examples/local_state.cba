@@ -1,14 +1,21 @@
 with handler {
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
+} handle (
+with handler {
   $loc -> $name,
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
-  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then x else s a)),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
-                   k a (fun b -> if !eq (a, b) then x else s b)),
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
 } handle (
   effect !ref : Int ~> $loc.
   do a <- !ref 2 in
   do b <- !ref 3 in
   (!set (a, !get b + !get a); !get a)
-)
+))
