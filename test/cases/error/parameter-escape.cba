@@ -1,0 +1,16 @@
+-- @expect-error: escape the handler
+-- The handler instantiates parameter $p and handles get : Unit ~> $p, so the
+-- row-level check is satisfied. But the body leaks the $p-typed result through
+-- the outer variable f (forcing f : $p -> _), so $p escapes the handler into
+-- the context. The no-escape side condition dom(s) cap fpv(D, G) = {} must
+-- reject this; without the check the program wrongly infers a type mentioning $p.
+return (fun f ->
+  with handler {
+    $p -> Int,
+    return x -> return x,
+    get a k -> k 5
+  } handle (
+    effect !get : Unit ~> $p.
+    do x <- !get () in
+    f x
+  ))

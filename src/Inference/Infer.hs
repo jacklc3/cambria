@@ -107,17 +107,19 @@ inferComp = \case
     eOut <- freshEffects mempty
     unify tv (THandler (TComp tInVal eIn) mempty (TComp tOutVal eOut))
     ~(THandler tIn ps tOut) <- applySubst tv
+    let badInst = Map.keysSet ps `Set.intersection` free PV ps
+    unless (Set.null badInst) $ throwError
+      $ "Parameter witnesses mention bound parameters: " ++ show (Set.toList badInst)
     tc <- inferComp c
-    let missingOps = Map.filterWithKey (\op ar ->
-          not (Map.keysSet ps `Set.disjoint` free PV ar)
-          && op `Map.notMember` effectOps (effects tIn)) (effectOps (effects tc))
-    unless (Map.null missingOps) $
-      throwError $ "Handler instantiates type parameters " ++ show (Map.keys ps)
-        ++ " but does not handle operations " ++ showOps missingOps
     unify (nullifyEffects (effects tIn)) (effects tOut)
     tIn' <- applySubst tIn
     unify (apply (Parameter ps) tc) tIn'
-    applySubst tOut
+    ctx' <- applySubst =<< ask
+    tOut' <- applySubst tOut
+    let escaped = Map.keysSet ps `Set.intersection` (free PV ctx' <> free PV tOut')
+    unless (Set.null escaped) $ throwError
+      $ "Type parameters " ++ show (Set.toList escaped) ++ " escape the handler"
+    return tOut'
   CAnnot c t -> do
     t' <- inferComp c
     unify t' t
