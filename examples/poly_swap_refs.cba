@@ -4,18 +4,25 @@
 -- We use it at both (Int, Int) and ($p, $p).
 --
 -- When instantiated at $p, swap operates on abstract reference
--- identifiers — values whose concrete type (Name) is hidden
--- by the handler. The polymorphic function treats them as opaque
--- values it can shuffle around without inspecting.
+-- identifiers: values whose concrete type is hidden by the handler.
+-- The polymorphic function treats them as opaque values it can
+-- shuffle around without inspecting.
 
 with handler {
-  $p -> Name,
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert ((a, x), s))),
-  finally s -> s empty
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
+} handle (
+with handler {
+  $p -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return 0)
 } handle (
   effect !get : $p ~> Int.
   effect !set : $p * Int ~> Unit.
@@ -27,10 +34,10 @@ with handler {
   -- Use at (Int, Int)
   do swapped_ints <- swap (10, 20) in
 
-  -- Use at ($p, $p) — swapping abstract reference identifiers!
+  -- Use at ($p, $p): swapping abstract reference identifiers!
   do a <- !ref 100 in
   do b <- !ref 200 in
   do (r1, r2) <- swap (a, b) in
 
   return (swapped_ints, (!get r1, !get r2))
-)
+))

@@ -14,8 +14,11 @@ with handler {
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
 } handle (
+  effect !get : $loc ~> Int.
+  effect !set : $loc * Int ~> Unit.
   effect !ref : Int ~> $loc.
   do a <- !ref 2 in
   do b <- !ref 3 in
-  (!set (a, !get b + !get a); !get a)
+  do _ <- !set (a, !get b) in
+  !get a
 ))

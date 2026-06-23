@@ -1,32 +1,36 @@
 -- Polyas urn implementation of Beta/Bernoulli, via local state
 -- Equivalent to betabernoulli.cba
-do boolToInt <- return (fun b -> if b then return 1 else return 0) in
-do countSuccesses <- return rec countSuccesses n f ->
-   if n == 0 then return 0 else do i <- countSuccesses (n - 1) f in i + boolToInt (f ())
-in
 with handler {
-  $cell -> Name,
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s empty
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
+} handle (
+with handler {
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return (0, 0))
 } handle (
   with handler {
-    $urn -> $cell,
-    urn z k -> k (!ref (1,1)),
-    sample a k ->
-      do (i, j) <- !get a in
-      do b <- !bernoulli (i / (i + j)) in
-      do _ <- !set (a, (i + boolToInt b, j + (1 - boolToInt b))) in
-      k b
+    $urn -> $loc,
+    newurn _ k -> k (!ref (1, 1)),
+    sample urn k ->
+      do (red, blue) <- !get urn in
+      do isRed <- !bernoulli (red / (red + blue)) in
+      do _ <- if isRed then !set (urn, (red + 1, blue))
+                       else !set (urn, (red, blue + 1)) in
+      k isRed
   } handle (
-    effect !urn : Unit ~> $urn.
+    effect !newurn : Unit ~> $urn.
     effect !sample : $urn ~> Bool.
-
-    -- Make a new urn, and draw ten times, reporting the number of trues
-    do a1 <- !urn () in
-    countSuccesses 10 (fun _ -> !sample a1)
+    do urn <- !newurn () in
+    do b1 <- !sample urn in
+    do b2 <- !sample urn in
+    return (b1, b2)
   )
-)
+))

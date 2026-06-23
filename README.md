@@ -27,31 +27,43 @@ Here are a few examples that demonstrate the expressive power of Cambria.
 
 ### Local State
 
-This example implements a handler for local state, where memory cells can be dynamically created and manipulated. The state is managed using a map from parameters (memory locations) to their stored values.
+This example implements a handler for local state, where memory cells can be dynamically created and manipulated. The state is represented as a function from parameters (memory locations) to their stored values, and the location names are supplied by a separate fresh-name handler.
 
 ```
 -- from examples/local_state.cba
 with handler {
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !unique () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s (empty ())
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
 } handle (
+with handler {
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return 0)
+} handle (
+  effect !get : $loc ~> Int.
+  effect !set : $loc * Int ~> Unit.
+  effect !ref : Int ~> $loc.
   do a <- !ref 2 in
   do b <- !ref 3 in
-  (!set (a, !get b + !get a); !get a)
-)
--- returns 5
+  do _ <- !set (a, !get b) in
+  !get a
+))
+-- returns 3
 ```
 
 ### Polymorphic Map over Abstract References
 
-This example demonstrates polymorphic functions operating over lists of abstract references. The same `map` function works at types `Int -> $p` (allocation), `$p -> Int` (reading), and `Int -> Bool` (testing).
+This example demonstrates polymorphic functions operating over lists of abstract references. The same `map` function works at types `Int -> $loc` (allocation), `$loc -> Int` (reading), and `Int -> Bool` (testing).
 
 ```
--- from implementation/examples/poly_fold_refs.cba (excerpt)
+-- from examples/poly_fold_refs.cba (excerpt)
 do map <- return (rec map f xs ->
   case uncons xs of {
     inl _        -> return [],
@@ -60,7 +72,7 @@ do map <- return (rec map f xs ->
 ) in
 do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
 do checks <- map (fun r -> !get r == 20) refs in
-return vals
+return checks
 -- returns [False, True, False]
 ```
 
@@ -71,23 +83,27 @@ This example implements a handler for a theory of substitution and jumps, which 
 ```
 -- from examples/substitution.cba
 with handler {
+  $p -> Name,
   return x  -> return (inl x),
-  var a k -> return (inr a),
-  sub _ k -> do c <- !unique () in
+  var a _ -> return (inr a),
+  sub _ k -> do c <- !fresh () in
     case k (inl c) of {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
     }
 } handle (
+  effect !sub : Unit ~> $p + Unit.
+  effect !var : $p   ~> Void.
+
   case !sub () of {
     inl a -> case !sub () of {
-      inl b -> !var a,
+      inl b -> !var a; return 1,
       inr _ -> return 2
     },
     inr _ -> return 3
   }
 )
--- returns 3
+-- returns inl 3
 ```
 
 ## Getting Started

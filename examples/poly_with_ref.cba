@@ -1,30 +1,37 @@
 -- Polymorphic with_ref combinator
 --
 -- with_ref is a polymorphic resource bracket:
---   forall a. Int -> ($p -> a!S) -> a!S
+--   forall a. Int -> ($loc -> a!S) -> a!S
 --
 -- It allocates a reference with an initial value, passes the abstract
--- reference (of type $p) to a callback, and returns whatever the
+-- reference (of type $loc) to a callback, and returns whatever the
 -- callback returns. The callback's return type `a` is polymorphic,
 -- so the same combinator can be used to produce Int, Bool, pairs, etc.
 --
 -- This demonstrates the interaction of:
 --   - Parametric polymorphism (forall a)
---   - Abstract type parameters ($p is existential from the body's perspective)
+--   - Abstract type parameters ($loc is existential from the body's perspective)
 --   - Effect operations (!ref, !get, !set used inside the callback)
 
 with handler {
-  $p -> Name,
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s empty
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
 } handle (
-  effect !get : $p ~> Int.
-  effect !set : $p * Int ~> Unit.
-  effect !ref : Int ~> $p.
+with handler {
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return 0)
+} handle (
+  effect !get : $loc ~> Int.
+  effect !set : $loc * Int ~> Unit.
+  effect !ref : Int ~> $loc.
 
   -- Define the polymorphic combinator once
   do with_ref <- return (fun init body -> do r <- !ref init in body r) in
@@ -35,7 +42,7 @@ with handler {
   -- Use 2: callback returns Bool (different return type!)
   do result2 <- with_ref 0 (fun r -> return (!get r == 0)) in
 
-  -- Use 3: callback returns (Int, Int) — reads, doubles, writes, reads
+  -- Use 3: callback returns (Int, Int): reads, doubles, writes, reads
   do result3 <- with_ref 5 (fun r ->
     do before <- !get r in
     do _ <- !set (r, before * 2) in
@@ -43,4 +50,4 @@ with handler {
   ) in
 
   return (result1, (result2, result3))
-)
+))

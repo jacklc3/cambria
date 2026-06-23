@@ -13,12 +13,9 @@ with handler {
 
   case !fork () of {
     inl a1 -> case !fork () of {
-      inl a2 -> !wait a2 ; case !fork () of {
-        inl a3 -> !act "Action 4" ; !stop (),
-        inr _  -> !wait a1 ; !act "Action 3" ; !stop ()
-      },
-      inr _  -> !act "Action 2" ; !stop ()
-    },
-    inr _  -> !act "Action 1" ; !stop ()
-  }
+      inl a2 -> case !fork () of {
+        inl a3 -> !wait a2 ; !act "Action 4" ; !stop (),
+        inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; !stop () },
+      inr _  -> !act "Action 2" ; !stop () },
+    inr _ -> !act "Action 1" ; !stop () }
 )
