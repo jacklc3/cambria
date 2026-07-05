@@ -35,7 +35,7 @@
 % ── Listings: Cambria language ───────────────────────────────────────────────
 \lstdefinelanguage{cambria}{
   morekeywords={fun,rec,handler,return,finally,do,in,if,then,else,with,handle,
-                inl,inr,case,of,effect,Unit,Int,Bool,Double,Str,Unique,Map,List,
+                inl,inr,case,of,effect,Unit,Int,Bool,Double,Str,Name,Map,List,
                 true,false},
   sensitive=true,
   morecomment=[l]{--},
@@ -145,7 +145,6 @@ Parameterized Algebraic Effects and Handlers\par}
 \label{sec:running}
 
 \begin{lstlisting}[style=bash]
-cd implementation
 cabal build
 cabal run cambria -- <file.cba>
 \end{lstlisting}
@@ -177,7 +176,7 @@ fine-grained call-by-value discipline.
 \texttt{Bool}   & \cba{true}, \cba{false}     & Booleans \\
 \texttt{Double} & (produced by \texttt{/} and \cba{!uniform}) & Floating-point numbers \\
 \texttt{Str}    & \texttt{"hello"}, \texttt{"a\textbackslash nb"} & Strings (with escapes) \\
-\texttt{Unique} & (produced by \cba{!fresh}) & Opaque unique identifiers \\
+\texttt{Name} & (produced by \cba{!fresh}) & Opaque unique identifiers \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -189,11 +188,11 @@ String escape sequences: \texttt{\textbackslash n}~(newline),
 % ── Compound types ───────────────────────────────────────────────────────────
 \subsection{Compound Types}
 
-\subsubsection*{Pairs \texttt{A \& B}}
+\subsubsection*{Pairs \texttt{A * B}}
 
 \begin{lstlisting}
-(1, 2)              -- Int & Int
-((1, 2), true)      -- (Int & Int) & Bool
+(1, 2)              -- Int * Int
+((1, 2), true)      -- (Int * Int) * Bool
 \end{lstlisting}
 
 \subsubsection*{Sum Types (Either) \texttt{A + B}}
@@ -232,8 +231,8 @@ Types are written in \cba{effect} statements using this syntax:
 \texttt{Bool}        & Boolean type \\
 \texttt{Double}      & Floating-point type \\
 \texttt{Str}         & String type \\
-\texttt{Unique}      & Unique identifier type \\
-\texttt{A \& B}      & Pair type (product) \\
+\texttt{Name}      & Fresh-name identifier type \\
+\texttt{A * B}      & Pair type (product) \\
 \texttt{A + B}       & Sum type (either) \\
 \texttt{Map K V}     & Map type \\
 \texttt{List A}      & List type \\
@@ -243,8 +242,8 @@ Types are written in \cba{effect} statements using this syntax:
 \end{tabular}
 \end{center}
 
-Precedence: \texttt{+} binds looser than \texttt{\&}, so
-\texttt{Int \& Bool + Str} means \texttt{(Int \& Bool) + Str}.
+Precedence: \texttt{+} binds looser than \texttt{*}, so
+\texttt{Int * Bool + Str} means \texttt{(Int * Bool) + Str}.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Values and Computations}
@@ -458,10 +457,10 @@ case v of {
 \toprule
 \textbf{Operator} & \textbf{Types} & \textbf{Result} \\
 \midrule
-\texttt{+} & \texttt{Int \& Int} & \texttt{Int} \\
-\texttt{-} & \texttt{Int \& Int} & \texttt{Int} \\
-\texttt{*} & \texttt{Int \& Int} & \texttt{Int} \\
-\texttt{/} & \texttt{Int \& Int} & \texttt{Double} \\
+\texttt{+} & \texttt{Int * Int} & \texttt{Int} \\
+\texttt{-} & \texttt{Int * Int} & \texttt{Int} \\
+\texttt{*} & \texttt{Int * Int} & \texttt{Int} \\
+\texttt{/} & \texttt{Int * Int} & \texttt{Double} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -475,7 +474,7 @@ Note: \texttt{/} always produces a \texttt{Double}, even for integer operands.
 \toprule
 \textbf{Operator} & \textbf{Types} & \textbf{Result} \\
 \midrule
-\texttt{==} & \texttt{a \& a} & \texttt{Bool} \\
+\texttt{==} & \texttt{a * a} & \texttt{Bool} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -491,7 +490,7 @@ pairs, lists, maps, sum types).
 \toprule
 \textbf{Operator} & \textbf{Types} & \textbf{Result} \\
 \midrule
-\texttt{++} & \texttt{Str \& Str} & \texttt{Str} \\
+\texttt{++} & \texttt{Str * Str} & \texttt{Str} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -503,7 +502,7 @@ pairs, lists, maps, sum types).
 \toprule
 \textbf{Operator} & \textbf{Types} & \textbf{Result} \\
 \midrule
-\texttt{::} & \texttt{a \& List a} & \texttt{List a} \\
+\texttt{::} & \texttt{a * List a} & \texttt{List a} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -701,7 +700,7 @@ to the handler that provides them.
 \begin{lstlisting}
 effect !ref : Int ~> $p.
 effect !get : $p ~> Int.
-effect !set : $p & Int ~> Unit.
+effect !set : $p * Int ~> Unit.
 \end{lstlisting}
 
 Here \texttt{\$p} is an abstract type.  Code that uses these operations knows
@@ -717,7 +716,7 @@ A handler can instantiate a type parameter by including a
 
 \begin{lstlisting}
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x -> ...,
   ref x k -> do a <- !fresh () in k a,
   get a k -> ...,
@@ -725,21 +724,21 @@ with handler {
 } handle (
   effect !ref : Int ~> $p.
   effect !get : $p ~> Int.
-  effect !set : $p & Int ~> Unit.
+  effect !set : $p * Int ~> Unit.
   ...
 )
 \end{lstlisting}
 
-When the handler instantiates \texttt{\$p -> Unique}, all occurrences of
+When the handler instantiates \texttt{\$p -> Name}, all occurrences of
 \texttt{\$p} in the handled body's effect signatures are replaced with
-\texttt{Unique} for type-checking purposes.
+\texttt{Name} for type-checking purposes.
 
 \subsection{Multiple Type Parameters}
 
 Different parameters can be used for different abstract types:
 
 \begin{lstlisting}
-$p -> Unique,
+$p -> Name,
 $q -> Int,
 \end{lstlisting}
 
@@ -763,13 +762,13 @@ checker rejects the program:
 \begin{lstlisting}
 -- ERROR: handler instantiates $p but does not handle !set
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x -> return x,
   get a k -> k 42,
   ref x k -> k ()
 } handle (
   effect !get : $p ~> Int.
-  effect !set : $p & Int ~> Unit.   -- not handled!
+  effect !set : $p * Int ~> Unit.   -- not handled!
   effect !ref : Int ~> $p.
   ...
 )
@@ -794,7 +793,7 @@ Examples:
 
 \begin{lstlisting}
 effect !get : $p ~> Int.
-effect !set : $p & Int ~> Unit.
+effect !set : $p * Int ~> Unit.
 effect !ref : Int ~> $p.
 effect !ask : Unit ~> Int.
 effect !urn : Unit ~> $p.
@@ -821,8 +820,8 @@ These are available in every program without any declaration.
 \toprule
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
-\texttt{fst} & \texttt{a \& b -> a} & First component \\
-\texttt{snd} & \texttt{a \& b -> b} & Second component \\
+\texttt{fst} & \texttt{a * b -> a} & First component \\
+\texttt{snd} & \texttt{a * b -> b} & Second component \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -834,12 +833,12 @@ These are available in every program without any declaration.
 \toprule
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
-\texttt{+}   & \texttt{Int \& Int -> Int}    & Addition \\
-\texttt{-}   & \texttt{Int \& Int -> Int}    & Subtraction \\
-\texttt{*}   & \texttt{Int \& Int -> Int}    & Multiplication \\
-\texttt{/}   & \texttt{Int \& Int -> Double} & Division \\
-\texttt{max} & \texttt{Int \& Int -> Int}    & Maximum \\
-\texttt{==}  & \texttt{a \& a -> Bool}       & Structural equality \\
+\texttt{+}   & \texttt{Int * Int -> Int}    & Addition \\
+\texttt{-}   & \texttt{Int * Int -> Int}    & Subtraction \\
+\texttt{*}   & \texttt{Int * Int -> Int}    & Multiplication \\
+\texttt{/}   & \texttt{Int * Int -> Double} & Division \\
+\texttt{max} & \texttt{Int * Int -> Int}    & Maximum \\
+\texttt{==}  & \texttt{a * a -> Bool}       & Structural equality \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -851,8 +850,8 @@ These are available in every program without any declaration.
 \toprule
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
-\texttt{++}   & \texttt{Str \& Str -> Str} & Concatenation \\
-\texttt{hash} & \texttt{Unique -> Str}      & Convert unique to string \\
+\texttt{++}   & \texttt{Str * Str -> Str} & Concatenation \\
+\texttt{hash} & \texttt{Name -> Str}      & Convert a name to a string \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -864,8 +863,8 @@ These are available in every program without any declaration.
 \toprule
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
-\texttt{::}     & \texttt{a \& List a -> List a}        & Prepend element \\
-\texttt{uncons} & \texttt{List a -> Unit + a \& List a} & List destructor \\
+\texttt{::}     & \texttt{a * List a -> List a}        & Prepend element \\
+\texttt{uncons} & \texttt{List a -> Unit + a * List a} & List destructor \\
 \texttt{null}   & \texttt{List a -> Bool}               & Is empty? \\
 \texttt{[]}     & \texttt{List a}                       & Empty list constant \\
 \bottomrule
@@ -880,10 +879,10 @@ These are available in every program without any declaration.
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
 \texttt{empty}  & \texttt{Map k v}                       & Empty map constant \\
-\texttt{insert} & \texttt{(k \& v) \& Map k v -> Map k v} & Insert or update entry \\
-\texttt{remove} & \texttt{k \& Map k v -> Map k v}        & Remove entry by key \\
-\texttt{lookup} & \texttt{k \& Map k v -> v}              & Lookup by key (partial) \\
-\texttt{member} & \texttt{k \& Map k v -> Bool}           & Key exists? \\
+\texttt{insert} & \texttt{(k * v) * Map k v -> Map k v} & Insert or update entry \\
+\texttt{remove} & \texttt{k * Map k v -> Map k v}        & Remove entry by key \\
+\texttt{lookup} & \texttt{k * Map k v -> v}              & Lookup by key (partial) \\
+\texttt{member} & \texttt{k * Map k v -> Bool}           & Key exists? \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -903,7 +902,7 @@ I/O:
 \toprule
 \textbf{Operation} & \textbf{Signature} & \textbf{Description} \\
 \midrule
-\texttt{!fresh ()}    & \texttt{Unit $\leadsto$ Unique}    & Fresh unique identifier \\
+\texttt{!fresh ()}    & \texttt{Unit $\leadsto$ Name}    & Fresh unique identifier \\
 \texttt{!print s}      & \texttt{Str $\leadsto$ Unit}       & Print string to stdout \\
 \texttt{!read ()}      & \texttt{Unit $\leadsto$ Str}       & Read line from stdin \\
 \texttt{!flip ()}      & \texttt{Unit $\leadsto$ Bool}      & Random boolean (fair coin) \\
@@ -921,9 +920,10 @@ chance to intercept them.
 \section{The Type System}
 \label{sec:typesystem}
 
-Cambria uses an extended Hindley-Milner type inference system with effect
-types.  You never write type annotations on expressions because all types are
-inferred.
+Cambria uses an extended Hindley-Milner type inference system with effect types.
+The only annotation that must be supplied is the arity of any operation whose signature mentions an abstract parameter type (\texttt{\$p}),
+which are introduced with an \cba{effect} declaration.
+Explicit annotations are nonetheless available where desired.
 
 \subsection{Computation Types}
 
@@ -940,7 +940,7 @@ For example:
   \item \texttt{Bool!\{ flip : Unit \(\leadsto\) Bool \}}: a computation
         that may invoke \texttt{!flip} and produces a \texttt{Bool}
   \item \texttt{Unit!\{ print : Str \(\leadsto\) Unit, fresh : Unit
-        \(\leadsto\) Unique \}}: may print and generate uniques
+        \(\leadsto\) Name \}}: may print and generate uniques
 \end{itemize}
 
 \subsection{Effect Rows}
@@ -995,7 +995,7 @@ do swap <- return (fun (x, y) -> return (y, x)) in
 swap (1, 2)              -- at Int
 do a <- !ref 100 in
 do b <- !ref 200 in
-swap (a, b)              -- at $p (Unique, but swap doesn't know)
+swap (a, b)              -- at $p (Name, but swap doesn't know)
 \end{lstlisting}
 
 \subsection{Handler Types}
@@ -1303,7 +1303,7 @@ an accumulator.  Result: \texttt{Pure: ((), "ABC")}.
 
 \begin{lstlisting}
 with handler {
-  $p -> Unique,
+  $p -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
@@ -1312,7 +1312,7 @@ with handler {
   finally s -> s empty
 } handle (
   effect !get : $p ~> Int.
-  effect !set : $p & Int ~> Unit.
+  effect !set : $p * Int ~> Unit.
   effect !ref : Int ~> $p.
 
   do map <- return (rec map f xs ->
@@ -1356,10 +1356,10 @@ process is just a probability sampled once from the uniform distribution:
 \begin{lstlisting}
 do boolToInt <- return (fun b ->
   if b then return 1 else return 0) in
-do countSuccesses <- return rec countSuccesses n f ->
+do countSuccesses <- return (rec countSuccesses n f ->
   if n == 0 then return 0
   else do i <- countSuccesses (n - 1) f in
-       i + boolToInt (f ()) in
+       i + boolToInt (f ())) in
 
 with handler {
   $p -> Double,
@@ -1389,13 +1389,13 @@ holding urn counts:
 \begin{lstlisting}
 do boolToInt <- return (fun b ->
   if b then return 1 else return 0) in
-do countSuccesses <- return rec countSuccesses n f ->
+do countSuccesses <- return (rec countSuccesses n f ->
   if n == 0 then return 0
   else do i <- countSuccesses (n - 1) f in
-       i + boolToInt (f ()) in
+       i + boolToInt (f ())) in
 
 with handler {
-  $q -> Unique,
+  $q -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
@@ -1426,7 +1426,7 @@ Several things to note:
 
 \begin{itemize}
   \item The \textbf{outer handler} provides local state by instantiating
-        \texttt{\$q -> Unique} and handling \texttt{get}/\texttt{set}/\texttt{ref}.
+        \texttt{\$q -> Name} and handling \texttt{get}/\texttt{set}/\texttt{ref}.
   \item The \textbf{inner handler} instantiates \texttt{\$p -> \$q}: a
         parameter mapped to another abstract parameter.  This is possible
         because \texttt{\$q} is in scope from the outer handler.
@@ -1482,10 +1482,10 @@ clause  := return pattern -> comp
 
 -- Types (in declarations)
 type     := typeAtom
-          | typeAtom & typeAtom
+          | typeAtom * typeAtom
           | typeAtom + typeAtom
 typeAtom := Unit | Int | Bool | Double
-          | Str | Unique
+          | Str | Name | Void
           | Map typeAtom typeAtom
           | List typeAtom
           | $param | (type)
