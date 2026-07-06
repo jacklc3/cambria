@@ -14,6 +14,8 @@
 *.DS_Store
 *Parser.hs
 *Lexer.hs
+artefact/*
+artefact.zip
 .claude/*
 !.claude/hooks/
 !.claude/settings.json

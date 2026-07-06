@@ -1,17 +1,4 @@
--- Polymorphic map_pair with abstract parameters
---
--- map_pair is a single polymorphic function with type:
---   forall a b. (a -> b!S) -> (a, a) -> (b, b)!S
---
--- We instantiate it three ways within the same handler scope:
---   1. At (Int -> Int)        -- double both elements of an int pair
---   2. At ($loc -> Int)       -- read from two abstract references
---   3. At (Int -> $loc)       -- allocate two references at once
---
--- The function-encoded local state (as in local_state.cba) instantiates
--- $loc, but the polymorphic function doesn't know or care; it works
--- uniformly over all types.
-
+-- Polymorphic map_pair
 with handler {
   $name -> Int,
   return x   -> return (fun _ -> return x),
@@ -31,20 +18,11 @@ with handler {
   effect !get : $loc ~> Int.
   effect !set : $loc * Int ~> Unit.
   effect !ref : Int ~> $loc.
-
-  -- Define the polymorphic map_pair once
   do map_pair <- return (fun f (a, b) -> return (f a, f b)) in
-
-  -- (1) Instantiate at (Int -> Int): double both
   do (d1, d2) <- map_pair (fun n -> return (n * 2)) (3, 7) in
-
-  -- (2) Instantiate at ($loc -> Int): read from two abstract refs
   do a <- !ref 100 in
   do b <- !ref 200 in
   do (v1, v2) <- map_pair (fun r -> !get r) (a, b) in
-
-  -- (3) Instantiate at (Int -> $loc): allocate two refs at once
   do (nr1, nr2) <- map_pair (fun n -> !ref n) (v1 + v2, d1 + d2) in
-
   return ((d1, d2), (v1 + v2, (!get nr1, !get nr2)))
 ))

@@ -1,3 +1,4 @@
+-- Graphviz DAG dynamic threads handler
 do map <- return (rec map g xs ->
   case uncons xs of {
     inl _        -> return [],

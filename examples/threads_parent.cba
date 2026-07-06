@@ -1,3 +1,4 @@
+-- Parent-biased dynamic threads handler
 with handler {
   $name -> Int,
   return x   -> return (fun _ -> return x),

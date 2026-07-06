@@ -1,19 +1,19 @@
 with handler {
   $p -> Name,
   return x  -> return (inl x),
-  var a _ -> return (inr a),
-  sub _ k -> do c <- !fresh () in
+  goto a _  -> return (inr a),
+  label _ k -> do c <- !fresh () in
     case k (inl c) of {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
     }
 } handle (
-  effect !sub : Unit ~> $p + Unit.
-  effect !var : $p   ~> Void.
+  effect !label : Unit ~> $p + Unit.
+  effect !goto  : $p   ~> Void.
 
-  case !sub () of {
-    inl a -> case !sub () of {
-      inl b -> !var a; return 1,
+  case !label () of {
+    inl a -> case !label () of {
+      inl b -> !goto a; return 1,
       inr _ -> return 2
     },
     inr _ -> return 3

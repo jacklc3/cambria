@@ -1,3 +1,4 @@
+-- Child-biased dynamic threads handler
 with handler {
   $tid -> Unit,
   return _ -> return (),
