@@ -1250,21 +1250,35 @@ $\mathit{State} \to \mathit{Result}$.  The \cba{finally} clause seeds it with
 
 \begin{lstlisting}
 with handler {
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s empty
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
 } handle (
+with handler {
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return 0)
+} handle (
+  effect !get : $loc ~> Int.
+  effect !set : $loc * Int ~> Unit.
+  effect !ref : Int ~> $loc.
   do a <- !ref 2 in
   do b <- !ref 3 in
-  (!set (a, !get b + !get a); !get a)
-)
+  do _ <- !set (a, !get b) in
+  !get a
+))
 \end{lstlisting}
 
-Creates two mutable references with values 2 and 3, sets the first to their
-sum (5), and reads it back.  Result: \texttt{Pure: 5}.
+The state is encoded as a function from locations to values, and a separate
+inner handler supplies the fresh names used as locations.  The program
+allocates two references (holding 2 and 3), copies \texttt{b}'s value into
+\texttt{a}, and reads \texttt{a} back.  Result: \texttt{Pure: 3}.
 
 \subsection{Nondeterministic Maximisation}
 
@@ -1272,10 +1286,8 @@ sum (5), and reads it back.  Result: \texttt{Pure: 5}.
 with handler {
   decide v k -> max (k true, k false)
 } handle (
-  do x1 <- if !decide () then return 15
-           else return 30 in
-  do x2 <- if !decide () then return 5
-           else return 10 in
+  do x1 <- if !decide () then return 15 else return 30 in
+  do x2 <- if !decide () then return 5  else return 10 in
   return (x1 - x2)
 )
 \end{lstlisting}
@@ -1303,143 +1315,165 @@ an accumulator.  Result: \texttt{Pure: ((), "ABC")}.
 
 \begin{lstlisting}
 with handler {
-  $p -> Name,
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s empty
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
 } handle (
-  effect !get : $p ~> Int.
-  effect !set : $p * Int ~> Unit.
-  effect !ref : Int ~> $p.
+with handler {
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return 0)
+} handle (
+  effect !ref : Int ~> $loc.
+  effect !get : $loc ~> Int.
+  effect !set : $loc * Int ~> Unit.
 
+  -- Polymorphic map: forall a b. (a -> b!S) -> List(a) -> List(b)!S
   do map <- return (rec map f xs ->
     case uncons xs of {
       inl _        -> return [],
       inr (x, xs') -> f x :: map f xs'
-    }
-  ) in
+    })
+  in
 
-  do refs <- map (fun n -> !ref n)
-                  (10 :: 20 :: 30 :: []) in
+  -- (1) map at (Int -> $loc): allocate a ref for each number
+  do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
+
+  -- (2) map at ($loc -> Int): read all refs in the list
   do vals <- map (fun r -> !get r) refs in
-  return vals
-)
+
+  -- (3) map at (Int -> Bool): test each value against 20
+  do checks <- map (fun n -> !get n == 20) refs in
+
+  return checks
+))
 \end{lstlisting}
 
-Demonstrates a polymorphic \texttt{map} function used at different type
-instantiations, including the abstract type \texttt{\$p}.
+The same polymorphic \texttt{map} is used at three different type
+instantiations: \texttt{Int -> \$loc} (allocating a reference per element),
+\texttt{\$loc -> Int} (reading each reference), and \texttt{Int -> Bool}
+(testing each value).  \texttt{map} never inspects what \texttt{\$loc} is.
+Result: \texttt{Pure: [False, True, False]}.
 
-\subsection{Nested Handlers and Alternate Implementations}
+\subsection{Two Implementations of a Probabilistic Urn}
 
-A key strength of effect handlers is that the \emph{same} abstract interface
-can be given completely different implementations by swapping the handler.  The
-following two programs both implement a Beta--Bernoulli model with the same
-body code and the same effect interface:
+A key strength of parametrized handlers is that the \emph{same} abstract
+interface can be given completely different implementations by swapping the
+handler.  The following two programs both implement P\'{o}lya's urn with the
+same body code and the same effect interface:
 
 \begin{lstlisting}
-effect !urn : Unit ~> $p.
-effect !sample : $p ~> Bool.
+effect !newurn : Unit ~> $urn.
+effect !sample : $urn ~> Bool.
 \end{lstlisting}
 
-\texttt{!urn} creates a new random process and \texttt{!sample} draws a
-boolean sample from it.  The abstract type \texttt{\$p} hides what a ``process''
-actually is.
-
-\subsubsection*{Implementation 1: Real-number parameter (\texttt{\$p -> Double})}
-
-The simplest implementation instantiates \texttt{\$p} to \texttt{Double}.  A
-process is just a probability sampled once from the uniform distribution:
+\texttt{!newurn} creates a new urn and \texttt{!sample} draws a boolean sample
+from it.  The abstract type \texttt{\$urn} hides what an urn actually is.  The
+shared body draws two samples and returns them as a pair:
 
 \begin{lstlisting}
-do boolToInt <- return (fun b ->
-  if b then return 1 else return 0) in
-do countSuccesses <- return (rec countSuccesses n f ->
-  if n == 0 then return 0
-  else do i <- countSuccesses (n - 1) f in
-       i + boolToInt (f ())) in
+do urn <- !newurn () in
+do b1 <- !sample urn in
+do b2 <- !sample urn in
+return (b1, b2)
+\end{lstlisting}
 
+\subsubsection*{Implementation 1: Real-number parameter (\texttt{\$urn -> Double})}
+
+The simplest implementation instantiates \texttt{\$urn} to \texttt{Double}.  An
+urn is just a bias drawn once from the uniform distribution, and each sample is
+an independent Bernoulli trial with that bias:
+
+\begin{lstlisting}
 with handler {
-  $p -> Double,
-  urn _ k -> k (!uniform ()),
-  sample a k -> k (!bernoulli a)
+  $urn -> Double,
+  newurn _ k -> k (!uniform ()),
+  sample p k -> k (!bernoulli p)
 } handle (
-  effect !urn : Unit ~> $p.
-  effect !sample : $p ~> Bool.
-
-  do a <- !urn () in
-  countSuccesses 10 (fun _ -> !sample a)
+  effect !newurn : Unit ~> $urn.
+  effect !sample : $urn ~> Bool.
+  do urn <- !newurn () in
+  do b1 <- !sample urn in
+  do b2 <- !sample urn in
+  return (b1, b2)
 )
 \end{lstlisting}
 
-Here the handler is flat: \texttt{urn} draws a \texttt{Double} and
-\texttt{sample} passes it directly to \texttt{!bernoulli}.  No state is
-needed.
+The handler is flat: \texttt{newurn} draws a \texttt{Double} and \texttt{sample}
+passes it directly to \texttt{!bernoulli}.  No state is needed.  Result: a pair
+of booleans, e.g.\ \texttt{Pure: (False, True)}.
 
-\subsubsection*{Implementation 2: P\'{o}lya urn via nested handlers
-(\texttt{\$p -> \$q})}
+\subsubsection*{Implementation 2: P\'{o}lya urn via local state (\texttt{\$urn -> \$loc})}
 
-The P\'{o}lya urn implementation uses \emph{nested handlers}.  The inner
-handler maps \texttt{\$p} to \texttt{\$q}, which is itself an abstract type
-belonging to the outer state handler.  A process becomes a mutable reference
-holding urn counts:
+The P\'{o}lya urn implementation instantiates \texttt{\$urn} to a location
+\texttt{\$loc} of the local-state effect, storing a pair of counts (red,
+blue).  Each sample draws a colour with probability proportional to the counts
+and then adds a ball of that colour, so the urn is biased towards the colour
+already drawn (``rich get richer'').  It reuses the function-encoded local
+state from above, with its fresh-name handler underneath:
 
 \begin{lstlisting}
-do boolToInt <- return (fun b ->
-  if b then return 1 else return 0) in
-do countSuccesses <- return (rec countSuccesses n f ->
-  if n == 0 then return 0
-  else do i <- countSuccesses (n - 1) f in
-       i + boolToInt (f ())) in
-
 with handler {
-  $q -> Name,
-  return x  -> return (fun _ -> return x),
-  get a k -> return (fun s -> k (lookup (a, s)) s),
-  set x k -> return (fun s -> k () (insert (x, s))),
-  ref x k -> do a <- !fresh () in return (fun s ->
-    k a (insert (((a, x), s)))),
-  finally s -> s empty
+  $name -> Int,
+  return x   -> return (fun _ -> return x),
+  fresh _ k  -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f  -> f 0
+} handle (
+with handler {
+  $loc -> $name,
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if !eq (a, b) then return x else s b)),
+  finally s   -> s (fun _ -> return (0, 0))
 } handle (
   with handler {
-    $p -> $q,
-    urn z k -> k (!ref (1,1)),
-    sample a k ->
-      do (i, j) <- !get a in
-      do b <- !bernoulli (i / (i + j)) in
-      do _ <- !set (a, (i + boolToInt b,
-                        j + (1 - boolToInt b))) in
-      k b
+    $urn -> $loc,
+    newurn _ k -> k (!ref (1, 1)),
+    sample urn k ->
+      do (red, blue) <- !get urn in
+      do isRed <- !bernoulli (red / (red + blue)) in
+      do _ <- if isRed then !set (urn, (red + 1, blue))
+                       else !set (urn, (red, blue + 1)) in
+      k isRed
   } handle (
-    effect !urn : Unit ~> $p.
-    effect !sample : $p ~> Bool.
-
-    do a <- !urn () in
-    countSuccesses 10 (fun _ -> !sample a)
+    effect !newurn : Unit ~> $urn.
+    effect !sample : $urn ~> Bool.
+    do urn <- !newurn () in
+    do b1 <- !sample urn in
+    do b2 <- !sample urn in
+    return (b1, b2)
   )
-)
+))
 \end{lstlisting}
 
 Several things to note:
 
 \begin{itemize}
-  \item The \textbf{outer handler} provides local state by instantiating
-        \texttt{\$q -> Name} and handling \texttt{get}/\texttt{set}/\texttt{ref}.
-  \item The \textbf{inner handler} instantiates \texttt{\$p -> \$q}: a
-        parameter mapped to another abstract parameter.  This is possible
-        because \texttt{\$q} is in scope from the outer handler.
-  \item \texttt{urn} creates a reference (via \texttt{!ref}) holding the
-        initial urn counts \texttt{(1, 1)}.  Since \texttt{!ref} returns a
-        \texttt{\$q}, and \texttt{\$p} is mapped to \texttt{\$q}, the types
-        align.
-  \item \texttt{sample} reads the urn counts, flips a biased coin, updates the
-        counts, and returns the result.  Each draw changes the urn, producing
-        the characteristic ``rich get richer'' dynamics of a P\'{o}lya urn.
-  \item The \textbf{body code is identical} in both implementations.  Only the
-        handler changes.
+  \item The \textbf{innermost handler} implements the urn on top of local
+        state: \texttt{newurn} allocates a reference holding the initial counts
+        \texttt{(1, 1)}, and \texttt{sample} reads the counts, draws a biased
+        coin, updates the counts, and returns the result.
+  \item It instantiates \texttt{\$urn -> \$loc}: the urn parameter becomes a
+        location of the \emph{outer} local-state handler, itself an abstract
+        parameter.
+  \item The \textbf{middle handler} provides the function-encoded local state
+        (\texttt{\$loc -> \$name}), and the \textbf{outer handler} supplies the
+        fresh location names (\texttt{\$name -> Int}).
+  \item The \textbf{body code is identical} to Implementation~1.  Only the
+        handler stack changes.
 \end{itemize}
+
+Both handlers induce the same distribution on the returned pair (P\'{o}lya's
+identity), so by parametricity the body cannot tell them apart.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Grammar Summary}
