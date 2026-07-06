@@ -1,3 +1,0 @@
--- Declare an operation at top level without handling it
-effect !ask : Unit ~> Int.
-!ask ()

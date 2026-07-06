@@ -1,5 +1,5 @@
 -- Real number implementation of Beta/Bernoulli, without state
--- Equivalent to polya.cba
+-- Equivalent to polya_state.cba
 with handler {
   $urn -> Double,
   newurn _ k -> k (!uniform ()),

@@ -1,5 +1,5 @@
 -- Polyas urn implementation of Beta/Bernoulli, via local state
--- Equivalent to betabernoulli.cba
+-- Equivalent to polya_bias.cba
 with handler {
   $name -> Int,
   return x   -> return (fun _ -> return x),
