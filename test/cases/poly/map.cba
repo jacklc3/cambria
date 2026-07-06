@@ -17,11 +17,8 @@ with handler {
       inr (x,xs') -> f x :: map f xs'
     })
   in
-  do allocator <- map (fun n -> !ref n) in
-  do refs <- allocator (10 :: 20 :: 30 :: []) in
-  do reader <- map (fun r -> !get r) in
-  do vals <- reader refs in
-  do tester <- map (fun n -> return (n == 20)) in
-  do checks <- tester vals in
+  do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
+  do vals <- map (fun r -> !get r) refs in
+  do checks <- map (fun n -> return (n == 20)) vals in
   return (vals, checks)
 )

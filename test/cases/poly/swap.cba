@@ -1,5 +1,5 @@
 -- @expect-type: (Bool * Int)!{}
-do swap <- return (fun p -> return (snd p, fst p)) in
-do a <- swap (1, true) in
-do b <- swap ("hello", 42) in
-return (fst a, fst b)
+do swap <- return (fun (x, y) -> return (y, x)) in
+do (a, _) <- swap (1, true) in
+do (b, _) <- swap ("hello", 42) in
+return (a, b)
