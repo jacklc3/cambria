@@ -36,7 +36,7 @@ instance Unifiable ValueType where
       unify' (TFun a b) (TFun a' b')       = unify a a' >> unify b b'
       unify' (TList a) (TList a')          = unify a a'
       unify' (TMap k v) (TMap k' v')       = unify k k' >> unify v v'
-      unify' (THandler a ps b) (THandler a' ps' b') = unify a a' >> unify b b'
+      unify' (THandler a b) (THandler a' b') = unify a a' >> unify b b'
       unify' a b = throwError $ "Type mismatch: " ++ show a ++ " vs " ++ show b
 
 instance Unifiable CompType where

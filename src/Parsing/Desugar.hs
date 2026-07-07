@@ -18,9 +18,8 @@ fresh = do
   modify succ
   return ("_" ++ show n)
 
-desugar :: SugaredExpr -> Computation
-desugar (SEComp c) = evalState (desugarComp c) 0
-desugar v          = evalState (desugarComp (SCReturn v)) 0
+desugar :: SugaredComp -> Computation
+desugar c = evalState (desugarComp c) 0
 
 desugarComp :: SugaredComp -> Fresh Computation
 desugarComp = \case
@@ -51,10 +50,11 @@ desugarComp = \case
     (k1, v1) <- desugarExpr e1
     (k2, v2) <- desugarExpr e2
     return $ (k1 . k2) (CApp v1 v2)
-  SCWith e s -> do
+  SCWith e sig s -> do
     (k, v) <- desugarExpr e
+    sig' <- traverse (\(p, t) -> (,) p <$> desugarValueType t) sig
     c <- desugarComp s
-    return $ k (CHandle v c)
+    return $ k (CHandle v sig' c)
   SCEffect op ar s -> do
     c <- desugarComp s
     return (CEffect op ar c)
@@ -101,28 +101,26 @@ desugarExpr = \case
 
 desugarHandler :: [HandlerClause] -> Fresh Handler
 desugarHandler cs = do
-  (rc, ocs, fc, ps) <- foldM f (Nothing,[],Nothing,[]) cs
+  (rc, ocs, fc) <- foldM f (Nothing, [], Nothing) cs
   rc' <- case rc of
     Just rc -> return rc
     Nothing -> do
       tmp <- fresh
       return $ RetClause tmp (CReturn (VVar tmp))
-  return $ Handler rc' ocs fc ps
+  return $ Handler rc' ocs fc
     where
-      f (_, ocs, fc, ps) (RC p s) = do
+      f (_, ocs, fc) (RC p s) = do
         c <- desugarComp s
         (x, c') <- desugarPattern p c
-        return (Just (RetClause x c'), ocs, fc, ps)
-      f (rc, ocs, fc, ps) (OC op p k s) = do
+        return (Just (RetClause x c'), ocs, fc)
+      f (rc, ocs, fc) (OC op p k s) = do
         c <- desugarComp s
         (x, c') <- desugarPattern p c
-        return (rc, (op, OpClause x k c') : ocs, fc, ps)
-      f (rc, ocs, _, ps) (FC p s) = do
+        return (rc, (op, OpClause x k c') : ocs, fc)
+      f (rc, ocs, _) (FC p s) = do
         c <- desugarComp s
         (x, c') <- desugarPattern p c
-        return (rc, ocs, Just (FinClause x c'), ps)
-      f (rc, ocs, fc, ps) (TC p t) =
-        return (rc, ocs, fc, (p, t) : ps)
+        return (rc, ocs, Just (FinClause x c'))
 
 desugarPattern :: Pattern -> Computation -> Fresh (Ident, Computation)
 desugarPattern PWild c = return ("_", c)
@@ -162,11 +160,10 @@ desugarValueType = \case
     k' <- desugarValueType k
     v' <- desugarValueType v
     return (TMap k' v')
-  THandler i ps o -> do
-    i'  <- desugarCompType i
-    ps' <- traverse desugarValueType ps
-    o'  <- desugarCompType o
-    return (THandler i' ps' o')
+  THandler i o -> do
+    i' <- desugarCompType i
+    o' <- desugarCompType o
+    return (THandler i' o')
   t -> return t
 
 desugarCompType :: CompType -> Fresh CompType

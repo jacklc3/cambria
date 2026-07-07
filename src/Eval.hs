@@ -45,12 +45,12 @@ eval env = \case
   CAnnot c _ -> eval env c
   COp op v ->
     Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
-  CHandle hv c ->
+  CHandle hv _ c ->
     case evalValue env hv of
       VHandler h -> case finClause h of
         -- Encode finally clause in a do action if it exists
         Just (FinClause x c') ->
-          eval env (CDo x (CHandle (VHandler h{ finClause = Nothing }) c) c')
+          eval env (CDo x (CHandle (VHandler h{ finClause = Nothing }) [] c) c')
         Nothing ->
           case eval env c of
             Pure v ->
@@ -63,7 +63,7 @@ eval env = \case
                   in  eval newEnv cop
                 Nothing -> Impure op v (deepHandle f)
               where
-                deepHandle (VClosure y c env) = VClosure y (CHandle (VHandler h) c) env
+                deepHandle (VClosure y c env) = VClosure y (CHandle (VHandler h) [] c) env
                 deepHandle v                  = error $ "Non-closure in impure continuation: " ++ show v
       v -> error $ "Non-handler in handle statement: " ++ show v
 

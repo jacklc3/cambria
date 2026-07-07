@@ -6,10 +6,9 @@
 -- reject this; without the check the program wrongly infers a type mentioning $p.
 return (fun f ->
   with handler {
-    $p -> Int,
     return x -> return x,
     get a k -> k 5
-  } handle (
+  } [$p -> Int] handle (
     effect !get : Unit ~> $p.
     do x <- !get () in
     f x

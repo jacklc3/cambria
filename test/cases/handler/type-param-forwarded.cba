@@ -3,10 +3,9 @@
 -- at its instantiated arity (Int ~> Unit), so the parameter does not escape: an
 -- operation may be instantiated without being handled.
 with handler {
-  $p -> Int,
   return x -> return x,
   get a k -> k 5
-} handle (
+} [$p -> Int] handle (
   effect !get : Unit ~> $p.
   effect !leak : $p ~> Unit.
   do x <- !get () in

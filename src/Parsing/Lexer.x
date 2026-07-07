@@ -63,6 +63,8 @@ tokens :-
   ")"                        { \p s -> Token p (quotes s) TokRParen }
   "{"                        { \p s -> Token p (quotes s) TokLBrace }
   "}"                        { \p s -> Token p (quotes s) TokRBrace }
+  "["                        { \p s -> Token p (quotes s) TokLBracket }
+  "]"                        { \p s -> Token p (quotes s) TokRBracket }
   ","                        { \p s -> Token p (quotes s) TokComma }
   "!"                        { \p s -> Token p (quotes s) TokExclam }
   "_"                        { \p s -> Token p (quotes s) TokUnderscore }

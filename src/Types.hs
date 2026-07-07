@@ -19,7 +19,7 @@ data ValueType
   | TPair ValueType ValueType
   | TEither ValueType ValueType
   | TFun ValueType CompType
-  | THandler CompType (Map.Map Ident ValueType) CompType
+  | THandler CompType CompType
   | TMap ValueType ValueType
   | TList ValueType
   deriving (Eq)
@@ -57,11 +57,7 @@ showType p (TEither t1 t2) = parensIf (p > 2) $ showType 3 t1 ++ " + " ++ showTy
 showType p (TFun t1 t2) = parensIf (p > 1) $ showType 2 t1 ++ " -> " ++ show t2
 showType _ (TMap k v) = "Map " ++ showType 5 k ++ " " ++ showType 5 v
 showType _ (TList t) = "List " ++ showType 5 t
-showType p (THandler t1 ps t2)
-  | Map.null ps = parensIf (p > 0) $ show t1 ++ " => " ++ show t2
-  | otherwise   = parensIf (p > 0) $ show t1 ++ " =[" ++ showParamSubst ps ++ "]=> " ++ show t2
-  where
-    showParamSubst = intercalate ", " . Map.foldrWithKey (\k v acc -> (k ++ ": " ++ show v) : acc) []
+showType p (THandler t1 t2) = parensIf (p > 0) $ show t1 ++ " => " ++ show t2
 
 parensIf :: Bool -> String -> String
 parensIf True  s = "(" ++ s ++ ")"

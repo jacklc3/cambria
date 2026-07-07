@@ -14,7 +14,7 @@ import Syntax (Side(..))
 import Control.Monad.Except
 }
 
-%name expr
+%name comp
 %tokentype { Token }
 %monad { Except String } { (>>=) } { return }
 %error { parseError }
@@ -61,6 +61,8 @@ import Control.Monad.Except
   ')'                        { Token _ _ TokRParen }
   '{'                        { Token _ _ TokLBrace }
   '}'                        { Token _ _ TokRBrace }
+  '['                        { Token _ _ TokLBracket }
+  ']'                        { Token _ _ TokRBracket }
   ','                        { Token _ _ TokComma }
   '_'                        { Token _ _ TokUnderscore }
   ';'                        { Token _ _ TokSemiColon }
@@ -91,6 +93,10 @@ import Control.Monad.Except
 %nonassoc APP
 
 %%
+
+comp :: { SugaredComp }
+  : compTerm ';' comp                     { SCDo PWild $1 $3 }
+  | compTerm %prec ';'                    { $1 }
 
 expr :: { SugaredExpr }
   : value                                 { $1 }
@@ -154,18 +160,21 @@ handlerClause :: { HandlerClause }
   : return pattern '->' comp              { RC $2 $4 }
   | var pattern wildvar '->' comp         { OC $1 $2 $3 $5 }
   | finally pattern '->' comp             { FC $2 $4 }
-  | typeparam '->' type                   { TC $1 $3 }
 
-comp :: { SugaredComp }
-  : compTerm ';' comp                     { SCDo PWild $1 $3 }
-  | compTerm %prec ';'                    { $1 }
+pSubs :: { [(String, ValueType)] }
+  : {- empty -}                           { [] }
+  | '[' pSubsList ']'                     { $2 }
+
+pSubsList :: { [(String, ValueType)] }
+  : typeparam '->' type                   { [($1, $3)] }
+  | typeparam '->' type ',' pSubsList     { ($1, $3) : $5 }
 
 compTerm :: { SugaredComp }
   : return expr                           { SCReturn $2 }
   | do pattern '<-' comp in compTerm      { SCDo $2 $4 $6 }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
-  | with expr handle compTerm             { SCWith $2 $4 }
+  | with expr pSubs handle compTerm       { SCWith $2 $3 $5 }
   | effect op ':' type '~>' type '.' compTerm  { SCEffect $2 (Arity $4 $6) $8 }
   | compInfix                             { $1 }
 
@@ -198,7 +207,7 @@ inrMatch :: { (Pattern, SugaredComp) }
 type :: { ValueType }
   : typeSum                               { $1 }
   | typeSum '->' compType                 { TFun $1 $3 }
-  | compType '=>' compType                { THandler $1 mempty $3 }
+  | compType '=>' compType                { THandler $1 $3 }
 
 typeSum :: { ValueType }
   : typeProd                              { $1 }
@@ -249,7 +258,7 @@ parseError [] expected =
   throwError $ "Unexpected end of input.\n" ++
                "Expected one of: " ++ unwords expected
 
-parse :: String -> Either String SugaredExpr
-parse = runExcept . expr . alexScanTokens
+parse :: String -> Either String SugaredComp
+parse = runExcept . comp . alexScanTokens
 
 }

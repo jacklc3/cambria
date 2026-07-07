@@ -1,13 +1,12 @@
 -- @expect-type: (List Int * List Bool)!{ fresh : Unit ~> Name }
 with handler {
-  $p -> Name,
   return x  -> return (fun _ -> return x),
   get a k -> return (fun s -> k (lookup (a, s)) s),
   set x k -> return (fun s -> k () (insert (x, s))),
   ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
-} handle (
+} [$p -> Name] handle (
   effect !get : $p ~> Int.
   effect !set : $p * Int ~> Unit.
   effect !ref : Int ~> $p.

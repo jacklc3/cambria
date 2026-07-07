@@ -1,0 +1,11 @@
+-- @expect-type: Int!{ get : $p ~> Int , ref : Int ~> $p }
+-- @expect-value: Impure: !ref 42
+-- Operations mentioning an abstract parameter $p can be used with no handler in
+-- scope. $p stays abstract and flows to the top-level type, exactly like a free
+-- type variable: the program is parametric in $p, so it is sound and is not
+-- rejected. With no handler for !ref, evaluation blocks on it as an unhandled
+-- operation, which is the ordinary behaviour for any unhandled effect.
+effect !get : $p ~> Int.
+effect !ref : Int ~> $p.
+do a <- !ref 42 in
+!get a

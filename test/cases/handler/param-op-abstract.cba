@@ -1,0 +1,15 @@
+-- @expect-type: Int!{ ref : Int ~> $p }
+-- @expect-value: Impure: !ref 10
+-- A handler may handle an operation whose signature mentions $p (!get here)
+-- without instantiating $p: the handle carries no [$p -> ...] list, so $p stays
+-- abstract. !get is discharged; the unhandled !ref is forwarded at its abstract
+-- arity, so $p remains in the residual type.
+with handler {
+  return x -> return x,
+  get a k -> k 42
+} handle (
+  effect !get : $p ~> Int.
+  effect !ref : Int ~> $p.
+  do a <- !ref 10 in
+  !get a
+)

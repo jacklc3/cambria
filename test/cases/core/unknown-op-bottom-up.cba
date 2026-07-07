@@ -1,2 +1,2 @@
--- @expect-type: t0!{ nonexistent : Unit ~> t0 }
+-- @expect-type: _t0!{ nonexistent : Unit ~> _t0 }
 !nonexistent ()

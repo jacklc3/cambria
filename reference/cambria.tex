@@ -574,19 +574,20 @@ implementations for them.
 with handler {
   return x -> returnBody,
   opName pattern contName -> opBody,
-  finally pattern -> finallyBody,
-  $p -> Type
-} handle (
+  finally pattern -> finallyBody
+} [$p -> Type] handle (
   computation
 )
 \end{lstlisting}
 
 A handler is a value (of handler type) applied to a computation via
-\cba{with ... handle ...}.
+\cba{with ... handle ...}.  The optional \cba{[$p -> Type, ...]} list between
+the handler and \cba{handle} instantiates the handler's abstract type
+parameters (Section~\ref{sec:typeparams}); it is omitted when there are none.
 
 \subsection{Handler Clauses}
 
-A handler can contain four kinds of clauses, separated by commas. The ordering is not important.
+A handler can contain three kinds of clauses, separated by commas. The ordering is not important.
 
 \subsubsection{Return Clause: \texttt{return x -> \ldots}}
 
@@ -644,11 +645,6 @@ handler {
 The finally clause is particularly useful for the ``state-passing'' pattern
 where the return clause wraps the result in a function, and \cba{finally}
 applies that function to an initial state.
-
-\subsubsection{Type Parameter Instantiation: \texttt{\$p -> Type}}
-
-Maps an abstract type parameter to a concrete type.  See
-Section~\ref{sec:typeparams}.
 
 \subsection{Handler as a Value}
 
@@ -711,17 +707,16 @@ Attempting to use a \texttt{\$p} value where a concrete type is expected
 
 \subsection{Instantiating Type Parameters in Handlers}
 
-A handler can instantiate a type parameter by including a
-\texttt{\$p -> Type} clause:
+A handler application instantiates a type parameter with a
+\texttt{[\$p -> Type]} list placed between the handler and \cba{handle}:
 
 \begin{lstlisting}
 with handler {
-  $p -> Name,
   return x -> ...,
   ref x k -> do a <- !fresh () in k a,
   get a k -> ...,
   set x k -> ...
-} handle (
+} [$p -> Name] handle (
   effect !ref : Int ~> $p.
   effect !get : $p ~> Int.
   effect !set : $p * Int ~> Unit.
@@ -738,8 +733,7 @@ When the handler instantiates \texttt{\$p -> Name}, all occurrences of
 Different parameters can be used for different abstract types:
 
 \begin{lstlisting}
-$p -> Name,
-$q -> Int,
+with handler { ... } [$p -> Name, $q -> Int] handle (...)
 \end{lstlisting}
 
 \subsection{Nested Parameter Instantiation}
@@ -748,9 +742,8 @@ A type parameter can be instantiated to a type involving another parameter:
 
 \begin{lstlisting}
 with handler {
-  $p1 -> $p2 + Int,
   ...
-} handle (...)
+} [$p1 -> $p2 + Int] handle (...)
 \end{lstlisting}
 
 \subsection{Parameter Coverage Checking}
@@ -762,11 +755,10 @@ checker rejects the program:
 \begin{lstlisting}
 -- ERROR: handler instantiates $p but does not handle !set
 with handler {
-  $p -> Name,
   return x -> return x,
   get a k -> k 42,
   ref x k -> k ()
-} handle (
+} [$p -> Name] handle (
   effect !get : $p ~> Int.
   effect !set : $p * Int ~> Unit.   -- not handled!
   effect !ref : Int ~> $p.
@@ -1250,21 +1242,19 @@ $\mathit{State} \to \mathit{Result}$.  The \cba{finally} clause seeds it with
 
 \begin{lstlisting}
 with handler {
-  $name -> Int,
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} handle (
+} [$name -> Int] handle (
 with handler {
-  $loc -> $name,
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
-} handle (
+} [$loc -> $name] handle (
   effect !get : $loc ~> Int.
   effect !set : $loc * Int ~> Unit.
   effect !ref : Int ~> $loc.
@@ -1315,21 +1305,19 @@ an accumulator.  Result: \texttt{Pure: ((), "ABC")}.
 
 \begin{lstlisting}
 with handler {
-  $name -> Int,
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} handle (
+} [$name -> Int] handle (
 with handler {
-  $loc -> $name,
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
-} handle (
+} [$loc -> $name] handle (
   effect !ref : Int ~> $loc.
   effect !get : $loc ~> Int.
   effect !set : $loc * Int ~> Unit.
@@ -1392,10 +1380,9 @@ an independent Bernoulli trial with that bias:
 
 \begin{lstlisting}
 with handler {
-  $urn -> Double,
   newurn _ k -> k (!uniform ()),
   sample p k -> k (!bernoulli p)
-} handle (
+} [$urn -> Double] handle (
   effect !newurn : Unit ~> $urn.
   effect !sample : $urn ~> Bool.
   do urn <- !newurn () in
@@ -1420,23 +1407,20 @@ state from above, with its fresh-name handler underneath:
 
 \begin{lstlisting}
 with handler {
-  $name -> Int,
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} handle (
+} [$name -> Int] handle (
 with handler {
-  $loc -> $name,
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return (0, 0))
-} handle (
+} [$loc -> $name] handle (
   with handler {
-    $urn -> $loc,
     newurn _ k -> k (!ref (1, 1)),
     sample urn k ->
       do (red, blue) <- !get urn in
@@ -1444,7 +1428,7 @@ with handler {
       do _ <- if isRed then !set (urn, (red + 1, blue))
                        else !set (urn, (red, blue + 1)) in
       k isRed
-  } handle (
+  } [$urn -> $loc] handle (
     effect !newurn : Unit ~> $urn.
     effect !sample : $urn ~> Bool.
     do urn <- !newurn () in
@@ -1499,7 +1483,7 @@ comp    := comp ; comp
          | if expr then comp else comp
          | case expr of { inl p -> comp,
                           inr p -> comp }
-         | with expr handle comp
+         | with expr paramInsts handle comp
          | effect !op : type ~> type . comp
          | expr expr
          | !op expr
@@ -1512,7 +1496,11 @@ pattern := name | _ | (pattern, pattern)
 clause  := return pattern -> comp
          | opName pattern contName -> comp
          | finally pattern -> comp
-         | $param -> type
+
+-- Parameter instantiations (optional, between handler and handle)
+paramInsts := [ paramList ]
+paramList  := $param -> type
+            | $param -> type , paramList
 
 -- Types (in declarations)
 type     := typeAtom

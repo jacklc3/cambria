@@ -1,0 +1,18 @@
+-- @expect-type: (Int * Bool)!{}
+-- @expect-value: Pure: (7, True)
+-- Parameter instantiations live on the `with`, not inside the handler, so one
+-- handler value can be applied at different instantiations. Here `h` is used
+-- once at [$p -> Int] and once at [$p -> Bool].
+do h <- return (handler {
+  return x -> return x,
+  cell a k -> k a
+}) in
+do i <- with h [$p -> Int] handle (
+  effect !cell : Int ~> $p.
+  !cell 7
+) in
+do b <- with h [$p -> Bool] handle (
+  effect !cell : Bool ~> $p.
+  !cell true
+) in
+return (i, b)

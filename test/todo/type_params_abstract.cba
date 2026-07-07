@@ -1,6 +1,0 @@
--- Test: abstract type usage outside handler
--- Ops with $p can be invoked, $p flows as abstract type
-effect !get : $p ~> Int.
-effect !ref : Int ~> $p.
-do a <- !ref 42 in
-!get a

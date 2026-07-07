@@ -20,13 +20,19 @@ fresh :: Infer ValueType
 fresh = do
   n <- gets count
   modify (\st -> st { count = succ n })
-  return $ TVar $ "t" ++ show n
+  return $ TVar $ "_t" ++ show n
+
+freshParam :: Infer Ident
+freshParam = do
+  n <- gets count
+  modify (\st -> st { count = succ n })
+  return $ "_p" ++ show n
 
 freshEffects :: Map.Map Op Arity -> Infer EffectsType
 freshEffects ops = do
   n <- gets count
   modify (\st -> st { count = succ n })
-  return $ Open ops ("e" ++ show n)
+  return $ Open ops ("_e" ++ show n)
 
 runInfer :: Context -> Infer a -> Either String a
 runInfer ctx m = runExcept (evalStateT (runReaderT m ctx) (InferState 0 mempty mempty))

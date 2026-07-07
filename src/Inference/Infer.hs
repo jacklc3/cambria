@@ -52,6 +52,13 @@ generalizeComp tc = do
       genEV = free EV (value tc') Set.\\ (free EV ctx' <> free EV (effects tc'))
   return $ Forall genTV genEV (value tc')
 
+freshen :: Map.Map Ident ValueType -> Computation -> Infer (Map.Map Ident ValueType, Computation)
+freshen sigma c = do
+  ren <- traverse (const freshParam) sigma
+  let rho = Map.map TParam ren
+      ps  = Map.mapKeys (ren Map.!) sigma
+  return (ps, apply (Parameter rho) c)
+
 inferComp :: Computation -> Infer CompType
 inferComp = \case
   CReturn v -> do
@@ -99,24 +106,26 @@ inferComp = \case
     case Map.lookup op (effectOps (effects tc)) of
       Just ar' -> unify ar ar' >> applySubst tc
       Nothing -> return tc
-  CHandle v c -> do
+  CHandle v sigma c -> do
+    let sig = Map.fromList sigma
+        badInst = Map.keysSet sig `Set.intersection` free PV sig
+    unless (Set.null badInst) $ throwError
+      $ "Parameter witnesses mention bound parameters: " ++ show (Set.toList badInst)
+    (sig', c') <- freshen sig c
     tv <- inferValue v
     tInVal <- fresh
     tOutVal <- fresh
     eIn <- freshEffects mempty
     eOut <- freshEffects mempty
-    unify tv (THandler (TComp tInVal eIn) mempty (TComp tOutVal eOut))
-    ~(THandler tIn ps tOut) <- applySubst tv
-    let badInst = Map.keysSet ps `Set.intersection` free PV ps
-    unless (Set.null badInst) $ throwError
-      $ "Parameter witnesses mention bound parameters: " ++ show (Set.toList badInst)
-    tc <- inferComp c
+    unify tv (THandler (TComp tInVal eIn) (TComp tOutVal eOut))
+    ~(THandler tIn tOut) <- applySubst tv
+    tc <- inferComp c'
     unify (nullifyEffects (effects tIn)) (effects tOut)
     tIn' <- applySubst tIn
-    unify (apply (Parameter ps) tc) tIn'
+    unify (apply (Parameter sig') tc) tIn'
     ctx' <- applySubst =<< ask
     tOut' <- applySubst tOut
-    let escaped = Map.keysSet ps `Set.intersection` (free PV ctx' <> free PV tOut')
+    let escaped = Map.keysSet sig' `Set.intersection` (free PV ctx' <> free PV tOut')
     unless (Set.null escaped) $ throwError
       $ "Type parameters " ++ show (Set.toList escaped) ++ " escape the handler"
     return tOut'
@@ -159,7 +168,7 @@ inferValue = \case
              $ inferComp c
     unify tBody (TComp t2 e2)
     applySubst (TFun t1 tBody)
-  VHandler (Handler (RetClause xr cr) opClauses finClause pSubst) -> do
+  VHandler (Handler (RetClause xr cr) opClauses finClause) -> do
     let processOpClause (ops, hOut) (op, OpClause x k cOp) = do
           opArg <- fresh
           opRet <- fresh
@@ -181,7 +190,7 @@ inferValue = \case
         finOut <- extendVariable xf (Forall mempty mempty (value opsOut)) (inferComp cf)
         unify (effects finOut) (effects opsOut)
         applySubst finOut
-    applySubst (THandler (TComp hInVal eIn) (Map.fromList pSubst) finOut)
+    applySubst (THandler (TComp hInVal eIn) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
   VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
   VAnnot v t -> do

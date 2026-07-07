@@ -73,7 +73,7 @@ data Computation
   | CIf Value Computation Computation
   | CCase Value Ident Computation Ident Computation
   | CApp Value Value
-  | CHandle Value Computation
+  | CHandle Value [(Ident, ValueType)] Computation
   | CEffect Op Arity Computation
   | CAnnot Computation CompType
 
@@ -86,7 +86,10 @@ instance Show Computation where
     "case " ++ show v ++ " of { inl " ++ show x1 ++ " -> " ++ show c1 ++ ", inr "
     ++ show x2 ++ " -> " ++ show c2 ++ " }"
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
-  show (CHandle h c)  = "with " ++ show h ++ " handle " ++ show c
+  show (CHandle h sig c) = "with " ++ show h ++ showInsts sig ++ " handle " ++ show c
+    where
+      showInsts [] = ""
+      showInsts ts = " [" ++ intercalate ", " (map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) ts) ++ "]"
   show (CEffect op ar c) = "effect !" ++ op ++ " : " ++ show ar ++ ". " ++ show c
   show (CAnnot c t)   = "(" ++ show c ++ " : " ++ show t ++ ")"
 
@@ -96,18 +99,16 @@ data FinClause = FinClause Ident Computation
 data Handler = Handler {
   retClause :: RetClause,
   opClauses :: [(Op, OpClause)],
-  finClause :: Maybe FinClause,
-  typeInsts :: [(String, ValueType)]
+  finClause :: Maybe FinClause
 }
 
 instance Show Handler where
-  show (Handler (RetClause xr cr) ocs fc ps) =
+  show (Handler (RetClause xr cr) ocs fc) =
     let
-      tiStrs = map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) ps
       retStr = "return " ++ xr ++ " -> " ++ show cr
       opStrs = map (\(op, OpClause x k c) -> op ++ " " ++ x ++ " " ++ k ++ " -> " ++ show c) ocs
       finStr = case fc of
         Just (FinClause xf cf) -> ", finally " ++ xf ++ " -> " ++ show cf
         Nothing -> ""
     in
-      "handler { " ++ intercalate ", " (tiStrs ++ retStr : opStrs) ++ finStr ++ " }"
+      "handler { " ++ intercalate ", " (retStr : opStrs) ++ finStr ++ " }"

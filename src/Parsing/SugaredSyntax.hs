@@ -29,7 +29,7 @@ data SugaredComp
   | SCIf SugaredExpr SugaredComp SugaredComp
   | SCCase SugaredExpr (Pattern, SugaredComp) (Pattern, SugaredComp)
   | SCApp SugaredExpr SugaredExpr
-  | SCWith SugaredExpr SugaredComp
+  | SCWith SugaredExpr [(String, ValueType)] SugaredComp
   | SCEffect Op Arity SugaredComp
   | SCAnnot SugaredComp CompType
 
@@ -37,4 +37,3 @@ data HandlerClause
   = RC Pattern SugaredComp
   | OC Op Pattern Ident SugaredComp
   | FC Pattern SugaredComp
-  | TC String ValueType

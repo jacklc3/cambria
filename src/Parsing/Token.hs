@@ -54,6 +54,8 @@ data TokenKind
   | TokRParen
   | TokLBrace
   | TokRBrace
+  | TokLBracket
+  | TokRBracket
   | TokComma
   | TokExclam
   | TokUnderscore

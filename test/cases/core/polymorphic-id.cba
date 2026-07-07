@@ -1,2 +1,2 @@
--- @expect-type: (t0 -> t0!{e1})!{}
+-- @expect-type: (_t0 -> _t0!{_e1})!{}
 return (fun x -> return x)

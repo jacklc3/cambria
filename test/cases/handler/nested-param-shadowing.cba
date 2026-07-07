@@ -1,0 +1,22 @@
+-- @expect-type: (Int * Bool)!{}
+-- Two nested handlers bind the same parameter name $p with different witnesses
+-- (Int for the outer, Bool for the inner). The outer-bound result `outer : $p`
+-- sits in the context while the inner handler is checked. Parameters must be
+-- freshened per handler, otherwise the inner instantiation {$p -> Bool} would
+-- also rewrite the outer's $p and the result would collapse to (Bool * Bool)
+-- or fail to unify. Correct freshening keeps them distinct: (Int * Bool).
+with handler {
+  return x -> return x,
+  op1 a k -> k 5
+} [$p -> Int] handle (
+  effect !op1 : Unit ~> $p.
+  do outer <- !op1 () in
+  with handler {
+    return y -> return y,
+    op2 a k -> k true
+  } [$p -> Bool] handle (
+    effect !op2 : Unit ~> $p.
+    do inner <- !op2 () in
+    return (outer, inner)
+  )
+)
