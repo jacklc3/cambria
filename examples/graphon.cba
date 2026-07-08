@@ -1,5 +1,4 @@
 -- Erdos-Renyi graphon
--- Equivalent to graph_bias.cba
 with handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
