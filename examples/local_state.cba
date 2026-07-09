@@ -1,17 +1,17 @@
-with handler {
+with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} [$name -> Int] handle (
-with handler {
+} handle (
+with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
-} [$loc -> $name] handle (
+} handle (
   effect !get : $loc ~> Int.
   effect !set : $loc * Int ~> Unit.
   effect !ref : Int ~> $loc.

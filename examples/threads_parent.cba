@@ -1,33 +1,33 @@
 -- Parent-biased dynamic threads handler
-with handler {
+with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} [$name -> Int] handle (
-with handler {
+} handle (
+with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return false)
-} [$loc -> $name] handle (
+} handle (
   effect !get : $loc ~> Bool.
   effect !set : $loc * Bool ~> Unit.
   effect !ref : Bool ~> $loc.
 
-  with handler {
+  with [$tid -> Unit -> Unit!{...}] handler {
     return _ -> return (),
     act  s k -> !print s ; k (),
     wait t k -> t () ; k (),
     stop _ k -> return (),
     fork _ k ->
-      do called <- !ref false in
-      do thunk <- return (fun _ -> if !get called then return ()
-        else ( !set (called, true) ; k (inr ()) )) in
+      do hasRun <- !ref false in
+      do thunk <- return (fun _ -> if !get hasRun then return ()
+        else ( !set (hasRun, true) ; k (inr ()) )) in
       ( k (inl thunk) ; thunk () )
-  } [$tid -> Unit -> Unit!{...}] handle (
+  } handle (
     effect !fork : Unit ~> $tid + Unit.
     effect !wait : $tid ~> Unit.
     effect !act  : Str ~> Unit.

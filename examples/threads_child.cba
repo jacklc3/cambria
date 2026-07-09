@@ -1,11 +1,11 @@
 -- Child-biased dynamic threads handler
-with handler {
+with [$tid -> Unit] handler {
   return _ -> return (),
   act  s k -> !print s ; k (),
   wait _ k -> k (),
   stop _ k -> return (),
   fork _ k -> k (inr ()) ; k (inl ())
-} [$tid -> Unit] handle (
+} handle (
   effect !fork : Unit ~> $tid + Unit.
   effect !wait : $tid ~> Unit.
   effect !act  : Str  ~> Unit.

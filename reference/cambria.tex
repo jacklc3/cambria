@@ -571,18 +571,18 @@ implementations for them.
 \subsection{Handler Syntax}
 
 \begin{lstlisting}
-with handler {
+with [$p -> Type] handler {
   return x -> returnBody,
   opName pattern contName -> opBody,
   finally pattern -> finallyBody
-} [$p -> Type] handle (
+} handle (
   computation
 )
 \end{lstlisting}
 
 A handler is a value (of handler type) applied to a computation via
 \cba{with ... handle ...}.  The optional \cba{[$p -> Type, ...]} list between
-the handler and \cba{handle} instantiates the handler's abstract type
+\cba{with} and the handler instantiates the handler's abstract type
 parameters (Section~\ref{sec:typeparams}); it is omitted when there are none.
 
 \subsection{Handler Clauses}

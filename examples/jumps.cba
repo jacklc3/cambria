@@ -1,4 +1,4 @@
-with handler {
+with [$p -> Name] handler {
   return x  -> return (inl x),
   goto a _  -> return (inr a),
   label _ k -> do c <- !fresh () in
@@ -6,7 +6,7 @@ with handler {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
     }
-} [$p -> Name] handle (
+} handle (
   effect !label : Unit ~> $p + Unit.
   effect !goto  : $p   ~> Void.
 

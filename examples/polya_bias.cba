@@ -1,9 +1,9 @@
 -- Real number implementation of Beta/Bernoulli, without state
 -- Equivalent to polya_state.cba
-with handler {
+with [$urn -> Double] handler {
   newurn _ k -> k (!uniform ()),
   sample p k -> k (!bernoulli p)
-} [$urn -> Double] handle (
+} handle (
   effect !newurn : Unit ~> $urn.
   effect !sample : $urn ~> Bool.
   do urn <- !newurn () in

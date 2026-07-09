@@ -2,10 +2,10 @@
 -- A $p-relevant operation (leak) is forwarded rather than handled. It is exposed
 -- at its instantiated arity (Int ~> Unit), so the parameter does not escape: an
 -- operation may be instantiated without being handled.
-with handler {
+with [$p -> Int] handler {
   return x -> return x,
   get a k -> k 5
-} [$p -> Int] handle (
+} handle (
   effect !get : Unit ~> $p.
   effect !leak : $p ~> Unit.
   do x <- !get () in

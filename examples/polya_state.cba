@@ -1,20 +1,20 @@
 -- Polyas urn implementation of Beta/Bernoulli, via local state
 -- Equivalent to polya_bias.cba
-with handler {
+with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} [$name -> Int] handle (
-with handler {
+} handle (
+with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return (0, 0))
-} [$loc -> $name] handle (
-  with handler {
+} handle (
+  with [$urn -> $loc] handler {
     newurn _ k -> k (!ref (1, 1)),
     sample urn k ->
       do (red, blue) <- !get urn in
@@ -22,7 +22,7 @@ with handler {
       do _ <- if isRed then !set (urn, (red + 1, blue))
                        else !set (urn, (red, blue + 1)) in
       k isRed
-  } [$urn -> $loc] handle (
+  } handle (
     effect !newurn : Unit ~> $urn.
     effect !sample : $urn ~> Bool.
     do urn <- !newurn () in

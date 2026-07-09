@@ -1,12 +1,12 @@
 -- Erdos-Renyi graphon
-with handler {
+with [$loc -> Name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
   set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if a == b then return x else s b)),
   finally s   -> s (fun _ -> return empty)
-} [$loc -> Name] handle (
+} handle (
   with handler {
     newgraph z k -> k (!ref empty),
     newnode z k -> k (!fresh ()),

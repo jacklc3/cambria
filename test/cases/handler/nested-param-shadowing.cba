@@ -5,16 +5,16 @@
 -- freshened per handler, otherwise the inner instantiation {$p -> Bool} would
 -- also rewrite the outer's $p and the result would collapse to (Bool * Bool)
 -- or fail to unify. Correct freshening keeps them distinct: (Int * Bool).
-with handler {
+with [$p -> Int] handler {
   return x -> return x,
   op1 a k -> k 5
-} [$p -> Int] handle (
+} handle (
   effect !op1 : Unit ~> $p.
   do outer <- !op1 () in
-  with handler {
+  with [$p -> Bool] handler {
     return y -> return y,
     op2 a k -> k true
-  } [$p -> Bool] handle (
+  } handle (
     effect !op2 : Unit ~> $p.
     do inner <- !op2 () in
     return (outer, inner)

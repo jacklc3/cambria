@@ -5,10 +5,10 @@
 -- the context. The no-escape side condition dom(s) cap fpv(D, G) = {} must
 -- reject this; without the check the program wrongly infers a type mentioning $p.
 return (fun f ->
-  with handler {
+  with [$p -> Int] handler {
     return x -> return x,
     get a k -> k 5
-  } [$p -> Int] handle (
+  } handle (
     effect !get : Unit ~> $p.
     do x <- !get () in
     f x

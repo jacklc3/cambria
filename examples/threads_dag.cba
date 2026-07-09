@@ -10,23 +10,23 @@ do concat <- return (rec concat xs ys ->
     inr (x, xs') -> return (x :: concat xs' ys)
   }) in
 
-with handler {
+with [$node -> Name] handler {
   return _ -> return (fun _ -> return ()),
   node (ds, s) k -> return (fun _ -> do a <- !fresh () in (
     !print (hash a ++ " [label=\"" ++ s ++ "\"]") ;
     map (fun d -> !print (hash d ++ " -> " ++ hash a)) ds ;
     k a () )),
   finally f -> !print "digraph {" ; f () ; !print "}"
-} [$node -> Name] handle (
+} handle (
   effect !node : List $node * Str ~> $node.
-  with handler {
+  with [$tid -> List $node] handler {
     return _   -> return (fun ds -> return ds),
     act  s k   -> return (fun ds -> do a <- !node (ds, s) in k () (a :: [])),
     wait ds' k -> return (fun ds -> k () (concat ds ds')),
     stop _ k   -> return (fun ds -> return ds),
     fork _ k   -> return (fun ds -> do a <- k (inr ()) ds in k (inl a) ds),
     finally f  -> f []
-  } [$tid -> List $node] handle (
+  } handle (
     effect !fork : Unit ~> $tid + Unit.
     effect !wait : $tid ~> Unit.
     effect !act  : Str  ~> Unit.

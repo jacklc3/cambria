@@ -7,11 +7,11 @@ do h <- return (handler {
   return x -> return x,
   cell a k -> k a
 }) in
-do i <- with h [$p -> Int] handle (
+do i <- with [$p -> Int] h handle (
   effect !cell : Int ~> $p.
   !cell 7
 ) in
-do b <- with h [$p -> Bool] handle (
+do b <- with [$p -> Bool] h handle (
   effect !cell : Bool ~> $p.
   !cell true
 ) in

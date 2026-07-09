@@ -174,7 +174,7 @@ compTerm :: { SugaredComp }
   | do pattern '<-' comp in compTerm      { SCDo $2 $4 $6 }
   | if expr then comp else compTerm       { SCIf $2 $4 $6 }
   | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
-  | with expr pSubs handle compTerm       { SCWith $2 $3 $5 }
+  | with pSubs expr handle compTerm       { SCWith $3 $2 $5 }
   | effect op ':' type '~>' type '.' compTerm  { SCEffect $2 (Arity $4 $6) $8 }
   | compInfix                             { $1 }
 
