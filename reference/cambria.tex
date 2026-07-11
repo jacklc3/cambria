@@ -34,9 +34,9 @@
 
 % ── Listings: Cambria language ───────────────────────────────────────────────
 \lstdefinelanguage{cambria}{
-  morekeywords={fun,rec,handler,return,finally,do,in,if,then,else,with,handle,
-                inl,inr,case,of,effect,Unit,Int,Bool,Double,Str,Name,Map,List,
-                true,false},
+  morekeywords={fun,rec,let,and,infixl,infixr,infix,handler,return,finally,do,
+                in,if,then,else,with,handle,inl,inr,case,of,effect,Unit,Int,
+                Bool,Double,Str,Name,Map,List,true,false},
   sensitive=true,
   morecomment=[l]{--},
   morestring=[b]",
@@ -300,6 +300,53 @@ do _ <- !print "world" in
 return ()
 \end{lstlisting}
 
+Note that \texttt{;} sequences two complete computations, so a \texttt{;}
+placed after the body of a \cba{do} closes the whole \cba{do} chain: in
+\cba{do x <- c in c1 ; c2}, the variable \texttt{x} is not in scope in
+\texttt{c2}.  Use another \cba{do} (or \cba{let}) when the binding must
+scope over the continuation.
+
+\subsection{\texttt{let} Bindings}
+
+\cba{let} binds the result of an expression or computation to a pattern:
+
+\begin{lstlisting}
+let x = 5 in
+let (a, b) = (1, 2) in
+let y = !get r in       -- the right-hand side may perform effects
+return (x + a + b + y)
+\end{lstlisting}
+
+\cba{let x = e in c} is shorthand for \cba{do x <- return e in c} (or
+\cba{do x <- e in c} when \texttt{e} is a computation).
+
+With argument patterns, \cba{let} defines a function, and \cba{let rec} a
+recursive function:
+
+\begin{lstlisting}
+let double x = x + x in
+let addPair (x, y) = x + y in
+let rec fact n =
+  if n == 0 then return 1
+  else do r <- fact (n - 1) in return (n * r)
+in fact 5
+\end{lstlisting}
+
+These are shorthand for binding a \cba{fun} or \cba{rec} value:
+\cba{let f x = c in ...} desugars to \cba{do f <- return (fun x -> c) in ...}.
+
+Mutually recursive functions are joined with \cba{and}:
+
+\begin{lstlisting}
+let rec even n = if n == 0 then return true  else odd (n - 1)
+and     odd  n = if n == 0 then return false else even (n - 1)
+in even 10
+\end{lstlisting}
+
+This desugars to a single recursive function over a tagged sum (one summand
+per definition), together with a wrapper binding for each name; the
+definitions must therefore agree on their result type.
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Functions}
 \label{sec:functions}
@@ -362,14 +409,29 @@ closure.
 \label{sec:patterns}
 
 Patterns appear in \cba{do}-bindings, function arguments, \cba{rec} arguments,
-handler clauses, and \cba{case} branches.  A pattern is one of:
+\cba{let} bindings, handler clauses, and \cba{case} branches.
+
+Binding positions (\cba{do}, \cba{fun}, \cba{rec}, \cba{let}, handler
+clauses) accept only \emph{irrefutable} patterns, which always match:
 
 \begin{itemize}
   \item A variable name (e.g.\ \texttt{x}): binds the matched value
   \item A wildcard \cba{_}: matches anything, discards the value
+  \item The unit pattern \cba{()}
   \item A pair pattern \texttt{(\emph{p1}, \emph{p2})}: destructs a pair,
         matching each component with a sub-pattern
 \end{itemize}
+
+\cba{case} branches additionally accept \emph{refutable} patterns, which can
+fail to match (Section~\ref{sec:control}):
+
+\begin{itemize}
+  \item Sum patterns \cba{inl} \emph{p} and \cba{inr} \emph{p}
+  \item List patterns \cba{[]} and \emph{p1} \cba{::} \emph{p2}
+  \item Literal patterns: integers, booleans, and strings
+\end{itemize}
+
+All of these nest freely, e.g.\ \cba{inl (x :: (1, _) :: rest)}.
 
 \subsection{Wildcards}
 
@@ -426,25 +488,47 @@ are computations:
 if x == 0 then return "zero" else return "nonzero"
 \end{lstlisting}
 
-\subsection{Case Expressions (Sum Types)}
+\subsection{Case Expressions}
 
-Pattern match on sum types (\cba{inl}/\cba{inr}):
+\cba{case} matches a value against a sequence of clauses:
 
 \begin{lstlisting}
 case expr of {
-  inl x -> computation1,
-  inr y -> computation2
+  pattern1 -> computation1,
+  pattern2 -> computation2,
+  ...
 }
 \end{lstlisting}
 
-The two branches can appear in either order:
+The scrutinee may be a computation; it is evaluated once, before matching.
+Clauses are tried top to bottom and the first matching clause wins, so an
+earlier clause may overlap a later one:
 
 \begin{lstlisting}
+case xs of {
+  []        -> return 0,
+  x :: rest -> return x
+}
+
+case n of {
+  0 -> return "zero",
+  1 -> return "one",
+  _ -> return "many"
+}
+
 case v of {
-  inr y -> return y,
-  inl x -> return x
+  inl (x :: _)   -> return x,
+  inl []         -> return 0,
+  inr (true, y)  -> return y,
+  inr (false, _) -> return 99
 }
 \end{lstlisting}
+
+Matching compiles down to the kernel's binary sum \cba{case}, the built-in
+\cba{uncons}, and equality tests; a two-clause \cba{inl}/\cba{inr} match maps
+directly onto the kernel construct.  If no clause matches at runtime the
+program aborts with a pattern-match failure, so end with an irrefutable
+clause when the earlier clauses are not exhaustive.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Operators}
@@ -527,6 +611,43 @@ pairs, lists, maps, sum types).
 
 All infix operators desugar into function applications.  For example,
 \texttt{x + y} becomes \texttt{(+) (x, y)}.
+
+\subsection{User-Defined Operators (Fixity Declarations)}
+
+A fixity declaration introduces an infix operator and says what it elaborates
+to; like \cba{effect} declarations, it is terminated by a dot and scopes over
+the rest of the program:
+
+\begin{lstlisting}
+infixr 1 => = !mkImpl.    -- effect operation as infix
+infixl 3 <+ = snoc.       -- ordinary function as infix
+\end{lstlisting}
+
+\cba{infixl}, \cba{infixr} and \cba{infix} declare a left-, right- and
+non-associative operator respectively, at the given precedence level (1 to
+9, loosest to tightest, on the same scale as the built-in table above:
+\texttt{::} sits at 2, \texttt{==} at 3, \texttt{++} at 4, \texttt{+} at 5,
+\texttt{*} at 6).  The right-hand side is either an operation name
+\texttt{!op} or a function name; \texttt{a OP b} then elaborates to
+\texttt{!op (a, b)} or \texttt{f (a, b)}, with operands evaluated left to
+right.
+
+Operator names are sequences of the symbol characters
+\verb!+ - * / < > = & | ^ @ % ? ~!, excluding the reserved symbols
+(\texttt{->}, \texttt{<-}, \texttt{=}, \texttt{==}, \texttt{::}, \ldots).
+The reserved-but-unused tokens \texttt{=>}, \texttt{\&\&}, \texttt{||},
+\texttt{<}, \texttt{>}, \texttt{<=}, \texttt{>=}, \texttt{/=} may also be
+declared.  Built-in operators cannot be redeclared, using an undeclared
+operator is an error, and non-associative operators cannot be chained.
+
+For example, with the \texttt{=>} declaration above, Peirce's law is written
+
+\begin{lstlisting}
+((p => q) => p) => p
+\end{lstlisting}
+
+which elaborates to
+\cba{!mkImpl (!mkImpl (!mkImpl (p, q), p), p)}.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Effects and Operations}
