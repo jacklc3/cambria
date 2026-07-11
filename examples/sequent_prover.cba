@@ -1,0 +1,172 @@
+-- A terminating prover: avoiding infinite search trees (companion to
+-- examples/natural_deduction.cba).  Staton, FoSSaCS 2013.
+--   https://www.cs.ox.ac.uk/people/samuel.staton/papers/fossacs13.pdf
+--
+-- examples/natural_deduction.cba searches for proofs in natural deduction and
+-- needs a depth bound: its =>-elimination rule invents an arbitrary "cut"
+-- formula  q  (via !free) and then proves  q=>p  and  q.  Because q ranges
+-- over formulas of unbounded size, the search tree is infinite; only a fuel
+-- bound keeps it finite.
+--
+-- The infinity is not fundamental -- it is a defect of natural deduction,
+-- whose eliminated formula need not be a subformula of the goal.  The standard
+-- cure from proof theory is a CUT-FREE, CONTRACTION-FREE sequent calculus:
+-- Roy Dyckhoff's G4ip (LJT), "Contraction-free sequent calculi for
+-- intuitionistic logic", JSL 1992.  Every rule produces only SUBFORMULAS of
+-- the sequent, and a well-founded measure strictly decreases at each step, so
+-- backward search terminates with NO depth bound at all -- a genuine decision
+-- procedure for intuitionistic implicational logic.
+--
+-- We implement the implicational fragment of G4ip.  Sequents are  ctx |- g,
+-- with ctx a list of formulas.  The rules (P atomic):
+--
+--   axiom       g in ctx
+--   R->         ctx, A |- B                       ==>  ctx |- A->B
+--   L-> atom    ctx, P, B |- g                     ==>  ctx, P, P->B |- g
+--   L-> ->      ctx, D->B |- C->D    ctx, B |- g   ==>  ctx, (C->D)->B |- g
+--
+-- The two left rules REPLACE the principal implication (no contraction), which
+-- is exactly what makes the measure decrease and the search terminate.
+--
+-- Formulas are ground first-order terms on a heap (an atom, or "=>"(a, b)),
+-- the same representation as natural_deduction.cba but without logic
+-- variables.  The domain of discourse is observed through structural effects
+-- (!isImpl, !ante, !concl, !same); disjunction !or drives the nondeterministic
+-- choice of rule and principal formula, and !bottom prunes dead branches.  The
+-- handler keeps the first successful proof.  The infix declaration
+-- infixr 1 => = !mkImpl lets goals be written as  ((p => q) => p) => p.
+--
+-- Note the last two queries: p->q is not a theorem and Peirce's law
+-- ((p->q)->p)->p is classically valid but NOT intuitionistically provable.
+-- The prover returns no proof for both AND TERMINATES, with no fuel bound --
+-- the point of the example.
+--
+-- Expected output:
+--   Pure: [("|- p->p", [["=>(p, p)"]]),
+--          ("|- (p->q)->(q->r)->(p->r)", [["=>(=>(p, q), =>(=>(q, r), =>(p, r)))"]]),
+--          ("|- p->q", []),
+--          ("|- ((p->q)->p)->p  (Peirce)", [])]
+--          : List (Str * List List Str)!{ fresh : Unit ~> Name }
+
+effect !mkAtom : Str      ~> $p.   -- build an atom
+effect !mkImpl : $p * $p  ~> $p.   -- build an implication
+effect !isImpl : $p       ~> Bool. -- is the formula an implication?
+effect !ante   : $p       ~> $p.   -- antecedent of an implication
+effect !concl  : $p       ~> $p.   -- consequent of an implication
+effect !same   : $p * $p  ~> Bool. -- structural equality of formulas
+effect !bottom : Unit     ~> Void. -- fail (prune this branch)
+effect !or     : Unit     ~> Bool. -- choose
+
+infixr 1 => = !mkImpl.
+
+let rec mapC (f, xs) = case xs of {
+  []       -> return [],
+  x :: xs' -> do y <- f x in do ys <- mapC (f, xs') in return (y :: ys)
+} in
+
+-- reify a formula name, or a list of argument names, back to a string
+let rec showT (n, h) =
+  let nd = lookup (n, h) in
+  case snd nd of {
+    []     -> return (fst nd),
+    _ :: _ -> do s <- showArgs (snd nd, h) in return (fst nd ++ "(" ++ s ++ ")")
+  }
+and showArgs (xs, h) = case xs of {
+  []       -> return "",
+  x :: xs' -> do sx <- showT (x, h) in
+              case xs' of {
+                []     -> return sx,
+                _ :: _ -> do sr <- showArgs (xs', h) in return (sx ++ ", " ++ sr)
+              }
+} in
+
+-- the free model: a heap (Map Name (Str * List Name)), first successful proof
+let engine = handler {
+  return xs -> return (fun h -> do sol <- mapC ((fun n -> showT (n, h)), xs) in return (sol :: [])),
+  bottom _ k -> return (fun h -> return []),
+  or _ k -> return (fun h -> do r1 <- k true h in
+              case r1 of { [] -> k false h, _ :: _ -> return r1 }),
+  mkAtom s k -> return (fun h -> do c <- !fresh () in k c (insert ((c, (s, [])), h))),
+  mkImpl (a, b) k -> return (fun h -> do c <- !fresh () in k c (insert ((c, ("=>", a :: b :: [])), h))),
+  isImpl f k -> return (fun h -> k (fst (lookup (f, h)) == "=>") h),
+  ante f k -> return (fun h -> case snd (lookup (f, h)) of {
+    []     -> k f h,
+    a :: _ -> k a h }),
+  concl f k -> return (fun h -> case snd (lookup (f, h)) of {
+    _ :: b :: _ -> k b h,
+    _           -> k f h }),
+  same (a, b) k -> return (fun h -> do sa <- showT (a, h) in do sb <- showT (b, h) in k (sa == sb) h),
+  finally f -> f empty
+} in
+let solve q = with [$p -> Name] engine handle (q ()) in
+
+-- context helpers (do not recurse into the prover)
+let rec inCtx (ctx, f) = case ctx of {
+  []      -> return false,
+  x :: xs -> do e <- !same (x, f) in if e then return true else inCtx (xs, f)
+} in
+let rec remove (ctx, f) = case ctx of {
+  []      -> return [],
+  x :: xs -> do e <- !same (x, f) in
+             if e then return xs
+             else do r <- remove (xs, f) in return (x :: r)
+} in
+let rec memberEq (ctx, g) = case ctx of {
+  []      -> !bottom () ; return (),
+  x :: xs -> if !or () then do e <- !same (x, g) in
+                            if e then return () else (!bottom () ; return ())
+             else memberEq (xs, g)
+} in
+
+-- G4ip proof search.  prove is the main judgement  ctx |- g;  left iterates
+-- the left rules over the candidate principal formulas.
+-- No fuel: every rule strictly decreases Dyckhoff's measure, so search is finite.
+let rec prove (ctx, g) =
+  if !or () then memberEq (ctx, g)                                  -- axiom
+  else if !or () then                                               -- R-> :  ctx |- A->B
+    do imp <- !isImpl g in
+    if imp then do a <- !ante g in do b <- !concl g in prove (a :: ctx, b)
+    else (!bottom () ; return ())
+  else left (ctx, (ctx, g))                                         -- try the left rules
+and left (rem, (ctx, g)) = case rem of {
+  []        -> !bottom () ; return (),
+  f :: rest ->
+    if !or () then
+      do imp <- !isImpl f in
+      if imp then
+        do a <- !ante f in do b <- !concl f in
+        do rctx <- remove (ctx, f) in                     -- drop the principal
+        do aImpl <- !isImpl a in
+        if aImpl then
+          do d <- !concl a in                             -- f = (C->D)->B ; a = C->D
+          do _ <- prove ((d => b) :: rctx, a) in          --   L-> -> :  rctx,D->B |- C->D
+          prove (b :: rctx, g)                            --             rctx,B    |- G
+        else
+          do hasP <- inCtx (rctx, a) in                   -- f = p->B, p atomic
+          if hasP then prove (b :: rctx, g)               --   L-atom (needs p)
+          else (!bottom () ; return ())
+      else (!bottom () ; return ())
+    else left (rest, (ctx, g))
+} in
+
+-- decide a closed goal: report the goal string when provable, [] otherwise
+let decide q = solve (fun _ ->
+  do goal <- q () in
+  do _ <- prove ([], goal) in
+  return (goal :: [])) in
+
+let p1 = decide (fun _ -> let p = !mkAtom "p" in p => p) in
+let p2 = decide (fun _ ->
+  let p = !mkAtom "p" in let q = !mkAtom "q" in let r = !mkAtom "r" in
+  (p => q) => (q => r) => (p => r)) in
+let p3 = decide (fun _ -> !mkAtom "p" => !mkAtom "q") in
+let p4 = decide (fun _ ->
+  let p = !mkAtom "p" in let q = !mkAtom "q" in
+  ((p => q) => p) => p) in
+
+return (
+  ("|- p->p",                        p1) ::
+  ("|- (p->q)->(q->r)->(p->r)",      p2) ::
+  ("|- p->q",                        p3) ::
+  ("|- ((p->q)->p)->p  (Peirce)",    p4) :: []
+)
