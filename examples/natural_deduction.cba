@@ -194,6 +194,7 @@ let solveAll q = with [$p -> Name] engineAll handle (q ()) in
 
 -- ---- the proof searcher (SML prototype, Appendix A.4) ----
 
+let atom s = !cons (s, []) in
 let impl (a, b) = !cons ("=>", a :: b :: []) in
 infixr 1 => = impl.
 
@@ -216,30 +217,30 @@ in
 
 -- Q1:  |- p -> p
 let q1 = solve (fun _ ->
-  let p = !cons ("p", []) in
+  let p = atom "p" in
   let goal = p => p in
   do _ <- ded (3, ([], goal)) in return (goal :: [])) in
 
 -- Q2:  p->q, q->r  |-  p->r     (transitivity of implication)
 let q2 = solve (fun _ ->
-  let p = !cons ("p", []) in let q = !cons ("q", []) in let r = !cons ("r", []) in
-  let pq = p => q in let qr = q => r in let goal = p => r in
-  do _ <- ded (6, (pq :: qr :: [], goal)) in return (goal :: [])) in
+  let p = atom "p" in let q = atom "q" in let r = atom "r" in
+  let goal = p => r in
+  do _ <- ded (6, ((p => q) :: (q => r) :: [], goal)) in return (goal :: [])) in
 
 -- Q3:  |- p -> q     (not a tautology: no proof within the depth bound)
 let q3 = solve (fun _ ->
-  let goal = !cons ("p", []) => !cons ("q", []) in
+  let goal = atom "p" => atom "q" in
   do _ <- ded (4, ([], goal)) in return (goal :: [])) in
 
 -- Q4:  find a hypothesis  a  under which  a |- p->q     (first witness)
 let q4 = solve (fun _ ->
-  let goal = !cons ("p", []) => !cons ("q", []) in
+  let goal = atom "p" => atom "q" in
   let a = !free () in
   do _ <- ded (4, (a :: [], goal)) in return (a :: [])) in
 
 -- Q5:  enumerate several such hypotheses (bounded, de-duplicated, first 6)
 let q5raw = solveAll (fun _ ->
-  let goal = !cons ("p", []) => !cons ("q", []) in
+  let goal = atom "p" => atom "q" in
   let a = !free () in
   do _ <- ded (3, (a :: [], goal)) in return (a :: [])) in
 let rec flat xs = case xs of {
