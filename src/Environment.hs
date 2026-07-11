@@ -39,6 +39,7 @@ primitives =
       []     -> VEither L VUnit
       (x:xs) -> VEither R (VPair x (VList xs)))
   , ("absurd", \_ -> error "absurd: applied to a value of type Void")
+  , ("matchfail", \_ -> error "Pattern match failure: no clause matched")
   ]
 
 constants :: [(Ident, Value)]

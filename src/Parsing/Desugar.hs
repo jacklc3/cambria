@@ -7,21 +7,41 @@ module Parsing.Desugar (
 import Syntax
 import Parsing.SugaredSyntax
 
-import Control.Monad (foldM)
-import Control.Monad.State (State, evalState, get, modify)
+import qualified Data.Map as Map
+import Control.Monad (foldM, when)
+import Control.Monad.State (StateT, evalStateT, get, gets, lift, modify)
 
-type Fresh a = State Integer a
+type FixEnv = Map.Map String (Assoc, Int, OpTarget)
 
-fresh :: Fresh Ident
+-- same relative precedences as before, loosest to tightest
+builtinFixities :: FixEnv
+builtinFixities = Map.fromList
+  [ ("::", (ARight, 2, TargetVar "::"))
+  , ("==", (ANone,  3, TargetVar "=="))
+  , ("++", (ALeft,  4, TargetVar "++"))
+  , ("+",  (ALeft,  5, TargetVar "+"))
+  , ("-",  (ALeft,  5, TargetVar "-"))
+  , ("*",  (ALeft,  6, TargetVar "*"))
+  , ("/",  (ALeft,  6, TargetVar "/"))
+  ]
+
+data DState = DState { counter :: Integer, fixities :: FixEnv }
+
+type Desugar a = StateT DState (Either String) a
+
+fresh :: Desugar Ident
 fresh = do
-  n <- get
-  modify succ
+  n <- gets counter
+  modify (\st -> st { counter = n + 1 })
   return ("_" ++ show n)
 
-desugar :: SugaredComp -> Computation
-desugar c = evalState (desugarComp c) 0
+err :: String -> Desugar a
+err = lift . Left
 
-desugarComp :: SugaredComp -> Fresh Computation
+desugar :: SugaredComp -> Either String Computation
+desugar c = evalStateT (desugarComp c) (DState 0 builtinFixities)
+
+desugarComp :: SugaredComp -> Desugar Computation
 desugarComp = \case
   SCReturn e -> do
     (k, v) <- desugarExpr e
@@ -39,13 +59,27 @@ desugarComp = \case
     c1 <- desugarComp s1
     c2 <- desugarComp s2
     return $ k (CIf v c1 c2)
-  SCCase e (p1, s1) (p2, s2) -> do
+  -- a two-clause inl/inr match is just the kernel case construct
+  SCMatch e [(PEither L p1, s1), (PEither R p2, s2)]
+    | irrefutable p1 && irrefutable p2 -> do
     (k1, v) <- desugarExpr e
     c1 <- desugarComp s1
     (x1, c1') <- desugarPattern p1 c1
     c2 <- desugarComp s2
     (x2, c2') <- desugarPattern p2 c2
     return $ k1 (CCase v x1 c1' x2 c2')
+  SCMatch e [(PEither R p2, s2), (PEither L p1, s1)]
+    | irrefutable p1 && irrefutable p2 ->
+    desugarComp (SCMatch e [(PEither L p1, s1), (PEither R p2, s2)])
+  SCMatch e clauses -> do
+    (k, v) <- desugarExpr e
+    (s, wrap) <- case v of
+      VVar x -> return (x, id)
+      _      -> do
+        t <- fresh
+        return (t, CDo t (CReturn v))
+    body <- compileClauses s clauses
+    return $ k (wrap body)
   SCApp e1 e2 -> do
     (k1, v1) <- desugarExpr e1
     (k2, v2) <- desugarExpr e2
@@ -62,8 +96,21 @@ desugarComp = \case
     c <- desugarComp s
     ct' <- desugarCompType ct
     return $ CAnnot c ct'
+  SCLetRec defs body -> desugarLetRec defs body
+  SCFixity assoc prec name target rest -> do
+    when (Map.member name builtinFixities) $
+      err ("Cannot redeclare built-in operator " ++ name)
+    when (prec < 1 || prec > 9) $
+      err ("Operator precedence must be between 1 and 9: " ++ name)
+    modify (\st -> st { fixities = Map.insert name (assoc, prec, target) (fixities st) })
+    desugarComp rest
+  SCOpChain e0 rest -> do
+    (e, leftover) <- climb 0 e0 rest
+    case leftover of
+      [] -> desugarComp (exprToComp e)
+      _  -> err "Internal error: unconsumed operator chain"
 
-desugarExpr :: SugaredExpr -> Fresh (Computation -> Computation, Value)
+desugarExpr :: SugaredExpr -> Desugar (Computation -> Computation, Value)
 desugarExpr = \case
   SEVar x     -> return (id, VVar x)
   SEUnit      -> return (id, VUnit)
@@ -99,7 +146,142 @@ desugarExpr = \case
     t' <- desugarValueType t
     return (k, VAnnot v t')
 
-desugarHandler :: [HandlerClause] -> Fresh Handler
+exprToComp :: SugaredExpr -> SugaredComp
+exprToComp (SEComp c) = c
+exprToComp e          = SCReturn e
+
+-- precedence climbing over the flat chains from the parser
+climb :: Int -> SugaredExpr -> [(String, SugaredExpr)]
+      -> Desugar (SugaredExpr, [(String, SugaredExpr)])
+climb _ lhs [] = return (lhs, [])
+climb minPrec lhs rest@((opName, rhs0) : more) = do
+  (assoc, prec, target) <- lookupFixity opName
+  if prec < minPrec then return (lhs, rest)
+  else do
+    let nextMin = case assoc of
+          ARight -> prec
+          _      -> prec + 1
+    (rhs, rest') <- climb nextMin rhs0 more
+    case (assoc, rest') of
+      (ANone, (op2, _) : _) -> do
+        (_, prec2, _) <- lookupFixity op2
+        when (prec2 == prec) $
+          err ("Non-associative operators cannot be chained: " ++ opName ++ ", " ++ op2)
+      _ -> return ()
+    climb minPrec (SEComp (applyTarget target lhs rhs)) rest'
+
+lookupFixity :: String -> Desugar (Assoc, Int, OpTarget)
+lookupFixity opName = do
+  fe <- gets fixities
+  case Map.lookup opName fe of
+    Just f  -> return f
+    Nothing -> err ("Operator " ++ opName ++ " has no fixity declaration")
+
+applyTarget :: OpTarget -> SugaredExpr -> SugaredExpr -> SugaredComp
+applyTarget (TargetVar f) l r = SCApp (SEVar f) (SEPair l r)
+applyTarget (TargetOp op) l r = SCOp op (SEPair l r)
+
+irrefutable :: Pattern -> Bool
+irrefutable (PVar _)      = True
+irrefutable PWild         = True
+irrefutable PUnit         = True
+irrefutable (PPair p1 p2) = irrefutable p1 && irrefutable p2
+irrefutable _             = False
+
+matchFail :: Computation
+matchFail = CApp (VVar "matchfail") VUnit
+
+-- clauses tried top to bottom; each fall-through is a join point
+compileClauses :: Ident -> [(Pattern, SugaredComp)] -> Desugar Computation
+compileClauses _ [] = return matchFail
+compileClauses s [(p, body)] = do
+  bodyC <- desugarComp body
+  matchPat s p bodyC matchFail
+compileClauses s ((p, body) : rest) = do
+  restC <- compileClauses s rest
+  bodyC <- desugarComp body
+  f <- fresh
+  m <- matchPat s p bodyC (CApp (VVar f) VUnit)
+  return $ CDo f (CReturn (VFun "_" restC)) m
+
+matchPat :: Ident -> Pattern -> Computation -> Computation -> Desugar Computation
+matchPat s (PVar x) succ_ _ = return $ CDo x (CReturn (VVar s)) succ_
+matchPat _ PWild    succ_ _ = return succ_
+matchPat s PUnit       succ_ failC = eqTest s VUnit succ_ failC
+matchPat s (PInt i)    succ_ failC = eqTest s (VInt i) succ_ failC
+matchPat s (PBool b)   succ_ failC = eqTest s (VBool b) succ_ failC
+matchPat s (PString t) succ_ failC = eqTest s (VString t) succ_ failC
+matchPat s (PPair p1 p2) succ_ failC = do
+  a <- fresh
+  b <- fresh
+  inner2 <- matchPat b p2 succ_ failC
+  inner1 <- matchPat a p1 inner2 failC
+  return $ CDo a (CApp (VVar "fst") (VVar s)) $
+           CDo b (CApp (VVar "snd") (VVar s)) inner1
+matchPat s (PEither side p) succ_ failC = do
+  x <- fresh
+  inner <- matchPat x p succ_ failC
+  return $ case side of
+    L -> CCase (VVar s) x inner "_" failC
+    R -> CCase (VVar s) "_" failC x inner
+matchPat s PNil succ_ failC = do
+  u <- fresh
+  return $ CDo u (CApp (VVar "uncons") (VVar s)) $
+           CCase (VVar u) "_" succ_ "_" failC
+matchPat s (PCons p1 p2) succ_ failC = do
+  u  <- fresh
+  pr <- fresh
+  h  <- fresh
+  t  <- fresh
+  inner2 <- matchPat t p2 succ_ failC
+  inner1 <- matchPat h p1 inner2 failC
+  return $ CDo u (CApp (VVar "uncons") (VVar s)) $
+           CCase (VVar u) "_" failC pr
+             (CDo h (CApp (VVar "fst") (VVar pr)) $
+              CDo t (CApp (VVar "snd") (VVar pr)) inner1)
+
+eqTest :: Ident -> Value -> Computation -> Computation -> Desugar Computation
+eqTest s lit succ_ failC = do
+  b <- fresh
+  return $ CDo b (CApp (VVar "==") (VPair (VVar s) lit)) (CIf (VVar b) succ_ failC)
+
+-- mutual recursion as a single rec over a tagged sum (Bekic)
+desugarLetRec :: [(Ident, [Pattern], SugaredComp)] -> SugaredComp -> Desugar Computation
+desugarLetRec defs body = do
+  h   <- fresh
+  arg <- fresh
+  let n = length defs
+  wrappers <- mapM (wrapper h n) (zip [0..] defs)
+  let clauses  = [ (injPat i n (tuplePat ps), c) | (i, (_, ps, c)) <- zip [0..] defs ]
+      hBody    = bindAll wrappers (SCMatch (SEVar arg) clauses)
+      hDef     = SERec h [PVar arg] hBody
+      whole    = SCDo (PVar h) (SCReturn hDef) (bindAll wrappers body)
+  desugarComp whole
+  where
+    bindAll ws c = foldr (\(f, w) acc -> SCDo (PVar f) (SCReturn w) acc) c ws
+
+    wrapper h n (i, (f, ps, _)) = do
+      xs <- mapM (const fresh) ps
+      let tup = tupleExpr (map SEVar xs)
+      return (f, SEFun (map PVar xs) (SCApp (SEVar h) (injExpr i n tup)))
+
+    tupleExpr [e]    = e
+    tupleExpr (e:es) = SEPair e (tupleExpr es)
+    tupleExpr []     = SEUnit
+
+    tuplePat [p]    = p
+    tuplePat (p:ps) = PPair p (tuplePat ps)
+    tuplePat []     = PUnit
+
+    injExpr i n e
+      | i == n - 1 = iterate (SEEither R) e !! i
+      | otherwise  = iterate (SEEither R) (SEEither L e) !! i
+
+    injPat i n p
+      | i == n - 1 = iterate (PEither R) p !! i
+      | otherwise  = iterate (PEither R) (PEither L p) !! i
+
+desugarHandler :: [HandlerClause] -> Desugar Handler
 desugarHandler cs = do
   (rc, ocs, fc) <- foldM f (Nothing, [], Nothing) cs
   rc' <- case rc of
@@ -122,8 +304,10 @@ desugarHandler cs = do
         (x, c') <- desugarPattern p c
         return (rc, ocs, Just (FinClause x c'))
 
-desugarPattern :: Pattern -> Computation -> Fresh (Ident, Computation)
+-- binding positions are irrefutable; the parser enforces this
+desugarPattern :: Pattern -> Computation -> Desugar (Ident, Computation)
 desugarPattern PWild c = return ("_", c)
+desugarPattern PUnit c = return ("_", c)
 desugarPattern (PVar x) c = return (x, c)
 desugarPattern (PPair p1 p2) c = do
   tmp <- fresh
@@ -131,15 +315,16 @@ desugarPattern (PPair p1 p2) c = do
   (x1, c2) <- desugarPattern p1 c1
   return (tmp, CDo x1 (CApp (VVar "fst") (VVar tmp)) $
     CDo x2 (CApp (VVar "snd") (VVar tmp)) c2)
+desugarPattern _ _ = err "Refutable pattern in binding position"
 
-desugarArguments :: [Pattern] -> Computation -> Fresh Computation
+desugarArguments :: [Pattern] -> Computation -> Desugar Computation
 desugarArguments [] c = return c
 desugarArguments (p:ps) c = do
   c1 <- desugarArguments ps c
   (x, c2) <- desugarPattern p c1
   return (CReturn (VFun x c2))
 
-desugarValueType :: ValueType -> Fresh ValueType
+desugarValueType :: ValueType -> Desugar ValueType
 desugarValueType = \case
   TPair t1 t2 -> do
     t1' <- desugarValueType t1
@@ -166,13 +351,13 @@ desugarValueType = \case
     return (THandler i' o')
   t -> return t
 
-desugarCompType :: CompType -> Fresh CompType
+desugarCompType :: CompType -> Desugar CompType
 desugarCompType (TComp v effs) = do
   v'    <- desugarValueType v
   effs' <- desugarEffects effs
   return (TComp v' effs')
 
-desugarEffects :: EffectsType -> Fresh EffectsType
+desugarEffects :: EffectsType -> Desugar EffectsType
 desugarEffects (Closed m) = do
   m' <- traverse desugarArity m
   return (Closed m')
@@ -181,7 +366,7 @@ desugarEffects (Open m _) = do
   r  <- fresh
   return (Open m' r)
 
-desugarArity :: Arity -> Fresh Arity
+desugarArity :: Arity -> Desugar Arity
 desugarArity (Arity a r) = do
   a' <- desugarValueType a
   r' <- desugarValueType r
