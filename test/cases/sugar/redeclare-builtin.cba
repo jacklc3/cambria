@@ -1,0 +1,5 @@
+-- Built-in operators cannot be redeclared.
+-- @expect-error: redeclare built-in
+effect !conj : Bool * Bool ~> Bool.
+infixl 5 + = !conj.
+return 1

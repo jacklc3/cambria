@@ -1,0 +1,13 @@
+-- Nested patterns: sums over lists and pairs, with literals inside.
+-- @expect-type: (Str * (Str * Str))!{}
+-- @expect-value: Pure: ("head 4", ("empty", "false pair"))
+let classify v = case v of {
+  inl (x :: _)    -> do s <- return (x + 0) in if s == 4 then return "head 4" else return "head other",
+  inl []          -> return "empty",
+  inr (true, _)   -> return "true pair",
+  inr (false, _)  -> return "false pair"
+} in
+do a <- classify (inl (4 :: [])) in
+do b <- classify (inl []) in
+do c <- classify (inr (false, 9)) in
+return (a, (b, c))

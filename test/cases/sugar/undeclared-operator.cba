@@ -1,0 +1,3 @@
+-- Symbolic operators must be given a fixity before use.
+-- @expect-error: no fixity declaration
+return (1 <+> 2)
