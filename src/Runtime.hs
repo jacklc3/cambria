@@ -27,7 +27,7 @@ inbuiltOps =
 -- Parses, desugars and infers
 compile :: String -> Either String (Computation, CompType)
 compile src = do
-  ast <- desugar <$> parse src
+  ast <- parse src >>= desugar
   t <- infer ast
   return (ast, t)
 
