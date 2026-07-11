@@ -206,13 +206,11 @@ let rec ded (fuel, (ps, p)) =
   else if !or () then member (ps, p)                             -- axiom
   else if !or () then                                            -- =>-introduction
     do q <- !free () in do r <- !free () in
-    do qr <- q => r in
-    do _ <- !eq (p, qr) in
+    do _ <- !eq (p, q => r) in
     ded (fuel - 1, (q :: ps, r))
   else                                                           -- =>-elimination
     do q <- !free () in
-    do qp <- q => p in
-    do _ <- ded (fuel - 1, (ps, qp)) in
+    do _ <- ded (fuel - 1, (ps, q => p)) in
     ded (fuel - 1, (ps, q))
 in
 
