@@ -1,0 +1,9 @@
+-- let binds a value; pair patterns and unit patterns are allowed;
+-- the right-hand side may be a computation (direct style).
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 16
+let x = 5 in
+let (a, b) = (1, 2) in
+let () = () in
+let y = x + a + b in
+y + y

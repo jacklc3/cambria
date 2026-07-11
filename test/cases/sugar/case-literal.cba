@@ -1,0 +1,11 @@
+-- Literal patterns; clauses are tried top to bottom, first match wins.
+-- @expect-type: (Str * Str)!{}
+-- @expect-value: Pure: ("one", "many")
+let describe n = case n of {
+  0 -> return "zero",
+  1 -> return "one",
+  _ -> return "many"
+} in
+do a <- describe 1 in
+do b <- describe 7 in
+return (a, b)

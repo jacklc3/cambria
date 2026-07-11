@@ -1,0 +1,7 @@
+-- let with argument patterns defines a function; multiple arguments curry.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 11
+let double x = x + x in
+let addMul x y (u, v) = x + y * u + v in
+do d <- double 3 in
+addMul d 1 (2, 3)
