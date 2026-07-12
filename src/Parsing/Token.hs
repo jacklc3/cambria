@@ -6,9 +6,15 @@ data TokenKind
   | TokString String
   | TokIdent String
   | TokOp String
+  | TokSymOp String
   -- Keywords
   | TokFun
   | TokRec
+  | TokLet
+  | TokKwAnd
+  | TokInfixl
+  | TokInfixr
+  | TokInfix
   | TokHandler
   | TokReturn
   | TokFinally

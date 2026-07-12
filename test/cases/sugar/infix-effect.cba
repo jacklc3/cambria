@@ -1,0 +1,15 @@
+-- A fixity declaration can bind an infix operator to an effect operation.
+-- Operands elaborate left to right; => is declared right-associative.
+-- @expect-type: Str!{}
+-- @expect-value: Pure: "(((p=>q)=>p)=>p)"
+effect !mkAtom : Str ~> $p.
+effect !mkImpl : $p * $p ~> $p.
+infixr 1 => = !mkImpl.
+with [$p -> Str] handler {
+  mkAtom s k      -> k s,
+  mkImpl (a, b) k -> k ("(" ++ a ++ "=>" ++ b ++ ")")
+} handle (
+  let p = !mkAtom "p" in
+  let q = !mkAtom "q" in
+  ((p => q) => p) => p
+)

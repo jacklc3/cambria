@@ -1,0 +1,12 @@
+-- The scrutinee may be a computation; it is evaluated once, then matched.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 42
+effect !supply : Unit ~> List Int.
+with handler {
+  supply _ k -> k (42 :: [])
+} handle (
+  case !supply () of {
+    x :: _ -> return x,
+    []     -> return 0
+  }
+)

@@ -34,6 +34,7 @@ primitives =
   , ("null",   mkPrimScheme ["a"] (TList (TVar "a")) TBool)
   , ("uncons", mkPrimScheme ["a"] (TList (TVar "a")) (TEither TUnit (TPair (TVar "a") (TList (TVar "a")))))
   , ("absurd", mkPrimScheme ["a"] TVoid (TVar "a"))
+  , ("matchfail", mkPrimScheme ["a"] TUnit (TVar "a"))
   ]
 
 constants :: [(String, Scheme)]

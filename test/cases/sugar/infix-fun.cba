@@ -1,0 +1,7 @@
+-- A fixity declaration can bind an infix operator to an ordinary function;
+-- declared operators mix with the built-in precedences.
+-- @expect-type: List Int!{}
+-- @expect-value: Pure: [7, 1]
+let snoc (xs, x) = return (x :: xs) in
+infixl 3 <+ = snoc.
+[] <+ 1 <+ 3 + 4

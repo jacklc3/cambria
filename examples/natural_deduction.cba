@@ -1,0 +1,260 @@
+-- Natural-deduction proof search (Staton, FoSSaCS 2013).
+--   https://www.cs.ox.ac.uk/people/samuel.staton/papers/fossacs13.pdf
+--
+-- The paper's Standard ML prototype (Appendix A.4) closes with "a slightly
+-- more elaborate demonstration": a proof searcher for the implicational
+-- fragment of propositional logic, written as a logic program over the four
+-- generic effects of disjunctive predicate logic --  or (choose), bottom
+-- (fail), eq (unify) and free (a fresh logic variable).  This file
+-- reproduces it, including the toplevel transcript in Appendix A.5.
+--
+-- Formulas are arbitrary first-order terms (an atom "p", or an implication
+-- "=>"(a, b)), so we need GENERAL unification.  The paper's SML represents a
+-- parameter with mutable pointers; we mirror that with a heap.  A parameter
+-- is a Name pointing into a store  Map Name Node  where
+--
+--     Node = (Unit + Name) + (Str * List Name)
+--       inl (inl ())   an unbound logic variable
+--       inl (inr w)    a variable linked to w        (union-find)
+--       inr (l, args)  the constructor l applied to sub-term names
+--
+-- On this heap  uni  is textbook first-order unification with union-find and
+-- an occurs check;  showT  reifies a term back to a string (unbound variables
+-- print as _<id>).  The parameter signature is the SML's  cons : string *
+-- param list -> param, exposed as the effect  !cons; the infix declaration
+-- infixr 1 => = impl  lets formulas be written as  p => q.
+--
+-- The prover follows the SML verbatim, with three inference rules chosen
+-- nondeterministically by  !or, and a fuel argument bounding the search depth
+-- (the paper relies on interactive interruption instead; a bound makes the
+-- non-theorem terminate):
+--
+--     ded(fuel, ps, p) =
+--         member ps p                              -- axiom: p is in context ps
+--       | E q r. (p = q=>r) ; ded(fuel-1, q::ps, r)          -- =>-introduction
+--       | E q.   ded(fuel-1, ps, q=>p) ; ded(fuel-1, ps, q)  -- =>-elimination
+--
+-- Two handlers realise the free model: "solve" keeps the first successful
+-- proof (angelic search); "solveAll" collects every proof within the depth
+-- bound, used to enumerate hypotheses.
+--
+-- Queries (compare the SML transcript in Appendix A.5):
+--   Q1  |- p->p                        provable        -> [["=>(p, p)"]]
+--   Q2  p->q, q->r |- p->r             provable        -> [["=>(p, r)"]]
+--   Q3  |- p->q                        no proof (bound) -> []
+--   Q4  find a  with  a |- p->q        first witness   -> [["=>(p, q)"]]
+--   Q5  find a  with  a |- p->q        several witnesses (assume p->q; assume q;
+--                                      assume (X->X)->(p->q); ... )
+--
+-- Expected output:
+--   Pure: [("|- p->p", [["=>(p, p)"]]),
+--          ("p->q, q->r |- p->r", [["=>(p, r)"]]),
+--          ("|- p->q  (unprovable)", []),
+--          ("?a. a |- p->q", [["=>(p, q)"]]),
+--          ("?a. a |- p->q (many)", [["=>(p, q)", "q", "=>(=>(_267, _267), =>(p, q))"]])]
+--          : List (Str * List List Str)!{ fresh : Unit ~> Name }
+
+effect !cons   : Str * List $p ~> $p.   -- constructor: label + sub-term list
+effect !free   : Unit    ~> $p.         -- E : fresh logic variable
+effect !eq     : $p * $p ~> Unit.       -- unify
+effect !bottom : Unit    ~> Void.       -- fail
+effect !or     : Unit    ~> Bool.       -- choose
+
+-- ---- generic list helpers ----
+
+let rec append (xs, ys) = case xs of {
+  []       -> return ys,
+  x :: xs' -> do r <- append (xs', ys) in return (x :: r)
+} in
+let rec mapC (f, xs) = case xs of {
+  []       -> return [],
+  x :: xs' -> do y <- f x in do ys <- mapC (f, xs') in return (y :: ys)
+} in
+let rec take (n, xs) =
+  if n == 0 then return []
+  else case xs of {
+    []       -> return [],
+    x :: xs' -> do r <- take (n - 1, xs') in return (x :: r)
+  } in
+let rec elem (x, ys) = case ys of {
+  []       -> return false,
+  y :: ys' -> if x == y then return true else elem (x, ys')
+} in
+let rec dedup (seen, xs) = case xs of {
+  []       -> return [],
+  x :: xs' -> do seen' <- elem (x, seen) in
+              if seen' then dedup (seen, xs')
+              else do r <- dedup (x :: seen, xs') in return (x :: r)
+} in
+
+-- ---- the heap: general first-order unification ----
+
+let rec walk (n, h) = case lookup (n, h) of {
+  inl (inl _) -> return n,
+  inl (inr w) -> walk (w, h),
+  inr _       -> return n
+} in
+let rec occurs v todo h = case todo of {
+  []        -> return false,
+  n :: rest ->
+    do rn <- walk (n, h) in
+    if rn == v then return true
+    else case lookup (rn, h) of {
+      inl _  -> occurs v rest h,
+      inr la -> do more <- append (snd la, rest) in occurs v more h
+    }
+} in
+let rec zipPairs (xs, ys) = case (xs, ys) of {
+  ([], [])             -> return (inr []),
+  (x :: xs', y :: ys') -> do r <- zipPairs (xs', ys') in
+                          case r of {
+                            inl _  -> return (inl ()),
+                            inr ps -> return (inr ((x, y) :: ps))
+                          },
+  _                    -> return (inl ())
+} in
+-- uni: unify a worklist of Name pairs.  Returns inl () on clash, inr h' on success.
+let rec uni (pairs, h) = case pairs of {
+  [] -> return (inr h),
+  (a, b) :: rest ->
+    do ra <- walk (a, h) in do rb <- walk (b, h) in
+    if ra == rb then uni (rest, h)
+    else case lookup (ra, h) of {
+      inl _  -> do occ <- occurs ra (rb :: []) h in
+                if occ then return (inl ())
+                else uni (rest, insert ((ra, inl (inr rb)), h)),
+      inr la -> case lookup (rb, h) of {
+        inl _  -> do occ <- occurs rb (ra :: []) h in
+                  if occ then return (inl ())
+                  else uni (rest, insert ((rb, inl (inr ra)), h)),
+        inr lb ->
+          if fst la == fst lb then
+            do zr <- zipPairs (snd la, snd lb) in
+            case zr of {
+              inl _  -> return (inl ()),
+              inr ps -> do np <- append (ps, rest) in uni (np, h)
+            }
+          else return (inl ())
+      }
+    }
+} in
+-- reify a term name, or a list of argument names, back to a string
+let rec showT (n, h) =
+  do rn <- walk (n, h) in
+  case lookup (rn, h) of {
+    inl _  -> return ("_" ++ hash rn),
+    inr la -> case snd la of {
+      []     -> return (fst la),
+      _ :: _ -> do s <- showArgs (snd la, h) in return (fst la ++ "(" ++ s ++ ")")
+    }
+  }
+and showArgs (xs, h) = case xs of {
+  []       -> return "",
+  x :: xs' -> do sx <- showT (x, h) in
+              case xs' of {
+                []     -> return sx,
+                _ :: _ -> do sr <- showArgs (xs', h) in return (sx ++ ", " ++ sr)
+              }
+} in
+
+-- ---- two free-model handlers over the heap ----
+
+-- angelic search: keep the first branch that yields a solution.
+let engine = handler {
+  return xs   -> return (fun h ->
+                  do sol <- mapC ((fun n -> showT (n, h)), xs) in return (sol :: [])),
+  bottom _ k  -> return (fun h -> return []),
+  or _ k      -> return (fun h -> do r1 <- k true h in
+                  case r1 of { [] -> k false h, _ :: _ -> return r1 }),
+  eq (a, b) k -> return (fun h -> do r <- uni ((a, b) :: [], h) in case r of {
+                   inl _  -> return [],
+                   inr h' -> k () h'
+                 }),
+  free _ k    -> return (fun h -> do v <- !fresh () in k v (insert ((v, inl (inl ())), h))),
+  cons (l, args) k -> return (fun h -> do c <- !fresh () in k c (insert ((c, inr (l, args)), h))),
+  finally f   -> f empty
+} in
+let solve q = with [$p -> Name] engine handle (q ()) in
+
+-- collect every solution (finite because the search is depth-bounded).
+let engineAll = handler {
+  return xs   -> return (fun h ->
+                  do sol <- mapC ((fun n -> showT (n, h)), xs) in return (sol :: [])),
+  bottom _ k  -> return (fun h -> return []),
+  or _ k      -> return (fun h -> do r1 <- k true h in do r2 <- k false h in append (r1, r2)),
+  eq (a, b) k -> return (fun h -> do r <- uni ((a, b) :: [], h) in case r of {
+                   inl _  -> return [],
+                   inr h' -> k () h'
+                 }),
+  free _ k    -> return (fun h -> do v <- !fresh () in k v (insert ((v, inl (inl ())), h))),
+  cons (l, args) k -> return (fun h -> do c <- !fresh () in k c (insert ((c, inr (l, args)), h))),
+  finally f   -> f empty
+} in
+let solveAll q = with [$p -> Name] engineAll handle (q ()) in
+
+-- ---- the proof searcher (SML prototype, Appendix A.4) ----
+
+let atom s = !cons (s, []) in
+let impl (a, b) = !cons ("=>", a :: b :: []) in
+infixr 1 => = impl.
+
+let rec member (ps, p) = case ps of {
+  []       -> !bottom () ; return (),
+  x :: xs' -> if !or () then !eq (x, p) else member (xs', p)
+} in
+let rec ded (fuel, (ps, p)) =
+  if fuel == 0 then (!bottom () ; return ())
+  else if !or () then member (ps, p)                             -- axiom
+  else if !or () then                                            -- =>-introduction
+    do q <- !free () in do r <- !free () in
+    do _ <- !eq (p, q => r) in
+    ded (fuel - 1, (q :: ps, r))
+  else                                                           -- =>-elimination
+    do q <- !free () in
+    do _ <- ded (fuel - 1, (ps, q => p)) in
+    ded (fuel - 1, (ps, q))
+in
+
+-- Q1:  |- p -> p
+let q1 = solve (fun _ ->
+  let p = atom "p" in
+  let goal = p => p in
+  do _ <- ded (3, ([], goal)) in return (goal :: [])) in
+
+-- Q2:  p->q, q->r  |-  p->r     (transitivity of implication)
+let q2 = solve (fun _ ->
+  let p = atom "p" in let q = atom "q" in let r = atom "r" in
+  let goal = p => r in
+  do _ <- ded (6, ((p => q) :: (q => r) :: [], goal)) in return (goal :: [])) in
+
+-- Q3:  |- p -> q     (not a tautology: no proof within the depth bound)
+let q3 = solve (fun _ ->
+  let goal = atom "p" => atom "q" in
+  do _ <- ded (4, ([], goal)) in return (goal :: [])) in
+
+-- Q4:  find a hypothesis  a  under which  a |- p->q     (first witness)
+let q4 = solve (fun _ ->
+  let goal = atom "p" => atom "q" in
+  let a = !free () in
+  do _ <- ded (4, (a :: [], goal)) in return (a :: [])) in
+
+-- Q5:  enumerate several such hypotheses (bounded, de-duplicated, first 6)
+let q5raw = solveAll (fun _ ->
+  let goal = atom "p" => atom "q" in
+  let a = !free () in
+  do _ <- ded (3, (a :: [], goal)) in return (a :: [])) in
+let rec flat xs = case xs of {
+  []       -> return [],
+  x :: xs' -> do r <- flat xs' in append (x, r)
+} in
+let q5f = flat q5raw in
+let q5d = dedup ([], q5f) in
+let q5  = take (6, q5d) in
+
+return (
+  ("|- p->p",                q1) ::
+  ("p->q, q->r |- p->r",     q2) ::
+  ("|- p->q  (unprovable)",  q3) ::
+  ("?a. a |- p->q",          q4) ::
+  ("?a. a |- p->q (many)",   q5 :: []) :: []
+)

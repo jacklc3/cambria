@@ -29,11 +29,13 @@ main = do
       content <- readFile filename
       case parse content of
         Left err -> putStrLn err
-        Right sugaredAst -> do
-          let ast = desugar sugaredAst
-          case infer ast of
+        Right sugaredAst ->
+          case desugar sugaredAst of
             Left err -> putStrLn err
-            Right t -> do
-              result <- evalIO initialEnv ast
-              putStrLn $ show result ++ " : " ++ show t
+            Right ast ->
+              case infer ast of
+                Left err -> putStrLn err
+                Right t -> do
+                  result <- evalIO initialEnv ast
+                  putStrLn $ show result ++ " : " ++ show t
     _ -> putStrLn "Usage: run-handler <filename>"

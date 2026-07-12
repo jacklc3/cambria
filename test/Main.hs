@@ -33,7 +33,7 @@ type Run = Either String (String, String)
 runProgram :: String -> Run
 runProgram src = do
   sast <- parse src
-  let ast = desugar sast
+  ast  <- desugar sast
   t    <- infer ast
   return (show t, show (eval initialEnv ast))
 

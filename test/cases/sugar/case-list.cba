@@ -1,0 +1,8 @@
+-- List patterns in case clauses.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 6
+let rec sum xs = case xs of {
+  []        -> return 0,
+  x :: rest -> do s <- sum rest in return (x + s)
+} in
+sum (1 :: 2 :: 3 :: [])
