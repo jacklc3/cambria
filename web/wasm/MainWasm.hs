@@ -1,12 +1,6 @@
--- Wasm entry point for the Cambria playground.
---
--- Built with the GHC wasm backend in reactor mode; the browser calls
--- runCambria with the program text and gets back the combined output
--- (print lines, then the result and its type), the same format as the CLI.
---
--- Differences from the CLI driver (src/Main.hs):
---   * !print output is accumulated and returned rather than written to stdout
---   * !read is not available (there is no stdin in the playground)
+-- Wasm entry point for the playground: the browser calls runCambria with the
+-- program text.  Same as src/Main.hs except !print output is accumulated into
+-- the returned string and !read is unavailable.
 
 module Main where
 
@@ -43,7 +37,6 @@ runSource src =
           return $ concatMap (++ "\n") (reverse printed)
                    ++ out ++ " : " ++ show t
 
--- The CLI's evalIO loop, with print captured and read refused.
 run :: Env -> Computation -> [String] -> IO (String, [String])
 run env c printed =
   case eval env c of
