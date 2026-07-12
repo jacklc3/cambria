@@ -19,3 +19,8 @@ artefact.zip
 .claude/*
 !.claude/hooks/
 !.claude/settings.json
+
+# Playground build artifacts (web/wasm/build.sh regenerates them)
+web/cambria.wasm
+web/ghc_wasm_jsffi.js
+web/wasm/ghc_wasm_jsffi.mjs

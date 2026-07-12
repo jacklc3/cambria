@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cambria Playground</title>
+<style>
+  :root {
+    --border: #d8d8d8;
+    --bg: #ffffff;
+    --bg-alt: #f7f7f5;
+    --fg: #1c1c1c;
+    --accent: #0064aa;
+    --err: #a02020;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--fg); background: var(--bg);
+  }
+  header {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    background: var(--bg-alt);
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header h1 .play { color: var(--accent); font-weight: 400; }
+  header .spacer { flex: 1; }
+  select, button {
+    font: inherit; font-size: 13px; padding: 4px 10px;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
+    color: var(--fg); cursor: pointer;
+  }
+  button.run { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:active { transform: translateY(1px); }
+  .hint { font-size: 12px; color: #777; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #editor { flex: 3; min-width: 0; }
+  #right {
+    flex: 2; min-width: 280px; max-width: 44%;
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; background: var(--bg-alt);
+  }
+  #right .label {
+    padding: 6px 12px; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .08em; color: #888; border-bottom: 1px solid var(--border);
+  }
+  #output {
+    flex: 1; margin: 0; padding: 12px; overflow: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.45;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  #output.error { color: var(--err); }
+  footer {
+    padding: 6px 16px; border-top: 1px solid var(--border);
+    font-size: 12px; color: #888; background: var(--bg-alt);
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cambria <span class="play">playground</span></h1>
+  <span class="hint">parametrized algebraic effects and handlers</span>
+  <span class="spacer"></span>
+  <select id="examples"><option value="">Examples…</option></select>
+  <button id="share" title="Copy a link to this program">Share</button>
+  <button id="run" class="run" title="Cmd/Ctrl-Enter">Run&ensp;&#9656;</button>
+</header>
+<main>
+  <div id="editor"></div>
+  <div id="right">
+    <div class="label">Output</div>
+    <pre id="output">Press Run to evaluate the program.</pre>
+  </div>
+</main>
+<footer>
+  Programs run with a 5&#8201;s timeout.
+  Syntax reference: <a href="https://github.com/jacklc3/cambria" target="_blank">jacklc3/cambria</a>.
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
+<script>
+const DEFAULT_PROGRAM = `-- Cambria: algebraic effects with parametrized handlers.
+-- Press Cmd/Ctrl-Enter (or Run) to evaluate, or pick an example above.
+
+effect !decide : Unit ~> Bool.
+
+-- a handler that explores both branches and keeps the larger outcome
+with handler {
+  decide _ k -> max (k true, k false)
+} handle (
+  do x <- if !decide () then return 15 else return 30 in
+  do y <- if !decide () then return 5  else return 10 in
+  return (x - y)
+)
+`;
+
+require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs" } });
+require(["vs/editor/editor.main"], function () {
+
+  monaco.languages.register({ id: "cambria" });
+  monaco.languages.setMonarchTokensProvider("cambria", {
+    defaultToken: "",
+    tokenizer: {
+      root: [
+        [/--.*$/, "comment"],
+        [/"([^"\\]|\\.)*"/, "string"],
+        [/\$[a-z][\w']*/, "type.param"],
+        [/![a-z][\w']*/, "operation"],
+        [/\b(fun|rec|let|and|infixl|infixr|infix|handler|return|finally|do|in|if|then|else|with|handle|inl|inr|case|of|effect)\b/, "keyword"],
+        [/\b(true|false)\b/, "constant"],
+        [/\b(Unit|Void|Int|Bool|Double|Str|Name|Map|List)\b/, "type"],
+        [/\b\d+\b/, "number"],
+        [/[a-z][\w']*/, "identifier"],
+        [/[+\-*\/<>=&|^@%?~:.;,]+/, "operator"],
+      ],
+    },
+  });
+  monaco.languages.setLanguageConfiguration("cambria", {
+    comments: { lineComment: "--" },
+    brackets: [["(", ")"], ["{", "}"], ["[", "]"]],
+    autoClosingPairs: [
+      { open: "(", close: ")" }, { open: "{", close: "}" },
+      { open: "[", close: "]" }, { open: '"', close: '"' },
+    ],
+  });
+
+  // Palette matches reference/cambria.tex listings.
+  monaco.editor.defineTheme("cambria-light", {
+    base: "vs", inherit: true,
+    rules: [
+      { token: "keyword",   foreground: "0064aa", fontStyle: "bold" },
+      { token: "operation", foreground: "8c4614" },
+      { token: "type.param",foreground: "7a1fa2", fontStyle: "italic" },
+      { token: "type",      foreground: "1a7f37" },
+      { token: "comment",   foreground: "646464", fontStyle: "italic" },
+      { token: "string",    foreground: "a02020" },
+      { token: "number",    foreground: "1a5fb4" },
+      { token: "constant",  foreground: "1a5fb4" },
+    ],
+    colors: { "editor.background": "#ffffff" },
+  });
+
+  const fromHash = () => {
+    if (location.hash.startsWith("#code=")) {
+      try { return decodeURIComponent(escape(atob(location.hash.slice(6)))); }
+      catch (e) { return null; }
+    }
+    return null;
+  };
+
+  const editor = monaco.editor.create(document.getElementById("editor"), {
+    value: fromHash() || DEFAULT_PROGRAM,
+    language: "cambria",
+    theme: "cambria-light",
+    fontSize: 14,
+    fontFamily: "ui-monospace, SF Mono, Menlo, Consolas, monospace",
+    minimap: { enabled: false },
+    automaticLayout: true,
+    scrollBeyondLastLine: false,
+    padding: { top: 12 },
+    renderLineHighlight: "line",
+  });
+
+  const output = document.getElementById("output");
+  let errorDecorations = editor.createDecorationsCollection();
+
+  function markError(text) {
+    const m = text.match(/line (\d+), column (\d+)/);
+    errorDecorations.clear();
+    if (!m) return;
+    const line = +m[1], col = +m[2];
+    editor.revealLineInCenter(line);
+    editor.setPosition({ lineNumber: line, column: col });
+    errorDecorations.set([{
+      range: new monaco.Range(line, 1, line, 1),
+      options: { isWholeLine: true, className: "error-line",
+                 inlineClassName: undefined,
+                 overviewRuler: { color: "#a02020", position: 4 } },
+    }]);
+  }
+
+  // Execution backends: wasm worker when web/cambria.wasm has been built
+  // (see web/wasm/build.sh), otherwise the dev server's /run endpoint.
+  let worker = null, workerReady = null;
+  function spawnWorker() {
+    worker = new Worker("worker.js", { type: "module" });
+    workerReady = new Promise((resolve) => {
+      const onmsg = (e) => {
+        if ("ready" in e.data) {
+          worker.removeEventListener("message", onmsg);
+          resolve(e.data.ready);
+        }
+      };
+      worker.addEventListener("message", onmsg);
+    });
+  }
+  const wasmAvailable = fetch("cambria.wasm", { method: "HEAD" })
+    .then(r => r.ok).catch(() => false);
+
+  async function execute(code, timeoutMs = 5000) {
+    if (await wasmAvailable) {
+      if (!worker) spawnWorker();
+      if (await workerReady) {
+        return new Promise((resolve) => {
+          const timer = setTimeout(() => {
+            worker.terminate(); worker = null;
+            resolve({ output: `Timed out after ${timeoutMs / 1000} seconds.`, timedOut: true });
+          }, timeoutMs);
+          worker.onmessage = (e) => {
+            if ("ready" in e.data) return;
+            clearTimeout(timer);
+            resolve({ output: e.data.output ?? e.data.error, timedOut: false, backend: "wasm" });
+          };
+          worker.postMessage({ code });
+        });
+      }
+    }
+    const res = await fetch("/run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    return { ...(await res.json()), backend: "server" };
+  }
+
+  async function run() {
+    output.textContent = "Running…";
+    output.classList.remove("error");
+    const t0 = performance.now();
+    try {
+      const { output: out, timedOut, backend } = await execute(editor.getValue());
+      const ms = Math.round(performance.now() - t0);
+      const failed = timedOut || /error|failure|unbound|unexpected/i.test(out);
+      output.textContent = out || "(no output)";
+      output.classList.toggle("error", failed);
+      if (failed) markError(out); else errorDecorations.clear();
+      if (!failed) output.textContent += `\n\n— ${ms} ms (${backend})`;
+    } catch (e) {
+      output.textContent = "Could not reach the run server: " + e;
+      output.classList.add("error");
+    }
+  }
+
+  document.getElementById("run").addEventListener("click", run);
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
+
+  document.getElementById("share").addEventListener("click", () => {
+    const encoded = btoa(unescape(encodeURIComponent(editor.getValue())));
+    const url = location.origin + location.pathname + "#code=" + encoded;
+    history.replaceState(null, "", url);
+    navigator.clipboard.writeText(url);
+    const btn = document.getElementById("share");
+    btn.textContent = "Copied!";
+    setTimeout(() => (btn.textContent = "Share"), 1200);
+  });
+
+  const select = document.getElementById("examples");
+  fetch("/examples").then(r => r.json()).then(({ examples }) => {
+    for (const name of examples) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name.replace(/\.cba$/, "");
+      select.appendChild(opt);
+    }
+  }).catch(() => {});
+  select.addEventListener("change", async () => {
+    if (!select.value) return;
+    const src = await fetch("/examples/" + select.value).then(r => r.text());
+    editor.setValue(src);
+    output.textContent = "Press Run to evaluate the program.";
+    output.classList.remove("error");
+    errorDecorations.clear();
+    history.replaceState(null, "", location.pathname);
+  });
+});
+</script>
+<style>
+  .error-line { background: rgba(160, 32, 32, 0.08); }
+</style>
+</body>
+</html>
