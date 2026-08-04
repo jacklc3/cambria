@@ -21,10 +21,14 @@ with [$loc -> Name] handler {
         do _ <- !set (g, insert (((a,b),e), m)) in
         k e
   } handle (
-    -- Make a new graph, pick two nodes, and check an edge between them
+    -- Make a new graph, pick three nodes, and check for a triangle
     do g <- !newgraph () in
     do a <- !newnode g in
     do b <- !newnode g in
-    !isedge (g,(a,b))
+    do c <- !newnode g in
+    do e1 <- !isedge (g,(a,b)) in
+    do e2 <- !isedge (g,(b,c)) in
+    do e3 <- !isedge (g,(a,c)) in
+    if e1 then (if e2 then return e3 else return false) else return false
   )
 )
