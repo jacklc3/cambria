@@ -8,11 +8,10 @@ import System.Directory (doesDirectoryExist, listDirectory)
 import System.Exit (exitFailure, exitSuccess)
 import System.FilePath
   ((</>), dropExtension, makeRelative, takeDirectory, takeExtension)
+
 import Environment (initialEnv)
-import Eval (eval)
-import Parsing.Parser (parse)
-import Parsing.Desugar (desugar)
-import Inference.Infer (infer)
+import Runtime (compile)
+import Semantics (eval)
 
 casesDir :: FilePath
 casesDir = "test/cases"
@@ -30,11 +29,9 @@ data Outcome = Pass | Fail String
 
 type Run = Either String (String, String)
 
-runProgram :: String -> Run
-runProgram src = do
-  sast <- parse src
-  let ast = desugar sast
-  t    <- infer ast
+run :: String -> Run
+run src = do
+  (ast, t) <- compile src
   return (show t, show (eval initialEnv ast))
 
 findCases :: FilePath -> IO [FilePath]
@@ -93,7 +90,7 @@ printGroup grp@((p, _) : _)  = do
 judge :: String -> Outcome
 judge src = case parseDirectives src of
   []  -> Fail "no expectation directives found"
-  exs -> case mapMaybe (check (runProgram src)) exs of
+  exs -> case mapMaybe (check (run src)) exs of
     []    -> Pass
     fails -> Fail (intercalate "\n  " fails)
 

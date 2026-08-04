@@ -42,8 +42,8 @@ constants =
   , ("empty", Forall (Set.fromList ["k","v"]) mempty (TMap (TVar "k") (TVar "v")))
   ]
 
-primitiveOps :: [(String, Arity)]
-primitiveOps =
+inbuiltOps :: [(String, Arity)]
+inbuiltOps =
   [ ("fresh",     Arity TUnit TName)
   , ("print",     Arity TString TUnit)
   , ("read",      Arity TUnit TString)

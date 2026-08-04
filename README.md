@@ -8,6 +8,7 @@ It is a tool for programming with computational effects that involve dynamically
 * **Effects and Handlers:** Cambria is built on a fine-grained call-by-value effect calculus.
 * **Type and Effect System:** We introduce a new parameter type that may be instantiated based on the effect implementation, while maintaining type safety.
 * **Haskell Implementation:** The language is implemented with a parser, desugarer, type inference, and evaluator.
+* **Browser Playground:** A playground runs the interpreter compiled to WebAssembly at [cambria-lang.org](https://cambria-lang.org).
 
 ## Examples
 
@@ -98,8 +99,6 @@ with [$p -> Name] handler {
 
 * [GHC (Glasgow Haskell Compiler)](https://www.haskell.org/ghc/)
 * [Cabal](https://www.haskell.org/cabal/)
-* Alex
-* Happy
 
 ### Building
 

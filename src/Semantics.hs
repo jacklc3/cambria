@@ -1,6 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Eval where
+module Semantics where
 
 import Syntax
 import Environment (def, find)

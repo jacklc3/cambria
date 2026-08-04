@@ -18,7 +18,7 @@ import Inference.Substitutable
 infer :: Computation -> Either String CompType
 infer c = runInfer initialCtx $ do
   tc <- inferComp c
-  let prims = Map.fromList primitiveOps
+  let prims = Map.fromList inbuiltOps
   mapM_ (\(op, ar) -> case Map.lookup op prims of
     Just ar' -> unify ar ar'
     Nothing  -> return ()) (Map.toList (effectOps (effects tc)))

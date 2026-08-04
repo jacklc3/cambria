@@ -1,0 +1,93 @@
+name: Playground
+
+# Cross-compiles the interpreter to wasm and publishes web/ to GitHub Pages.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/**
+      - web/**
+      - examples/**
+      - cambria.cabal
+      - .github/workflows/playground.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # Bump to discard the cached ~/.ghc-wasm toolchain
+  GHC_WASM_EPOCH: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Native alex/happy must be built before the wasm toolchain lands on PATH:
+      # add_to_github_path.sh exports CC/LD/AR for wasi-sdk, which breaks native builds.
+      - name: Install alex and happy
+        run: |
+          cabal update
+          cabal install alex happy --installdir="$HOME/.local/bin" --overwrite-policy=always
+
+      - name: Cache the GHC wasm toolchain
+        id: wasm-toolchain
+        uses: actions/cache@v6
+        with:
+          path: ~/.ghc-wasm
+          key: ${{ runner.os }}-ghc-wasm-${{ env.GHC_WASM_EPOCH }}
+
+      - name: Install the GHC wasm toolchain
+        if: steps.wasm-toolchain.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/archive/master/ghc-wasm-meta-master.tar.gz | tar xz
+          (cd ghc-wasm-meta-master && ./setup.sh)
+          rm -rf ghc-wasm-meta-master
+
+      - name: Put the wasm toolchain on PATH
+        run: ~/.ghc-wasm/add_to_github_path.sh
+
+      - name: Cache the cross build
+        uses: actions/cache@v6
+        with:
+          path: dist-newstyle
+          key: ${{ runner.os }}-wasm-dist-${{ env.GHC_WASM_EPOCH }}-${{ hashFiles('cambria.cabal') }}
+          restore-keys: ${{ runner.os }}-wasm-dist-${{ env.GHC_WASM_EPOCH }}-
+
+      - name: Build the wasm interpreter
+        run: ./web/wasm/build.sh
+
+      - name: Smoke test
+        run: node --no-warnings web/wasm/test.mjs
+
+      - name: Stage the site
+        run: |
+          python3 web/examples.py
+          mkdir -p _site
+          cp web/index.html web/worker.js web/cambria.wasm web/ghc_wasm_jsffi.js _site/
+          cp -r web/examples _site/examples
+          cp -r web/vendor _site/vendor
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
