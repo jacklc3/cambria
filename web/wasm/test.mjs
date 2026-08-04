@@ -18,19 +18,25 @@ Object.assign(exports, instance.exports);
 wasi.initialize(instance);
 instance.exports.hs_init(0, 0);
 
+// runCambria replies with an {ok, output} object
 const example = await readFile(at("../../examples/pattern_matching.cba"), "utf8");
 const tests = [
-  ["arith", "return (1 + 1)", "Pure: 2 : Int!{}"],
-  ["print", `!print "hi" ; return 0`, "hi\nPure: 0 : Int!{ print : Str ~> Unit }"],
+  ["arith", "return (1 + 1)",
+   (r) => r.ok && r.output === "Pure: 2 : Int!{}"],
+  ["capture", `!print "a" ; !print "b" ; return 42`,
+   (r) => r.ok && r.output === "a\nb\nPure: 42 : Int!{ print : Str ~> Unit }"],
   ["fresh", "do n <- !fresh () in do m <- !fresh () in return (n == m)",
-   "Pure: False : Bool!{ fresh : Unit ~> Name }"],
-  ["example", example, null],
+   (r) => r.ok && r.output === "Pure: False : Bool!{ fresh : Unit ~> Name }"],
+  ["type error", "return (1 + true)",
+   (r) => !r.ok && r.output.startsWith("Type mismatch:")],
+  ["example", example,
+   (r) => r.ok && r.output.startsWith("Pure:")],
 ];
 
 let failed = 0;
-for (const [name, code, expected] of tests) {
+for (const [name, code, check] of tests) {
   const out = await instance.exports.runCambria(code);
-  const ok = expected === null ? out.startsWith("Pure:") : out === expected;
+  const ok = check(out);
   console.log(ok ? "PASS" : "FAIL", name, ok ? "" : JSON.stringify(out));
   if (!ok) failed++;
 }

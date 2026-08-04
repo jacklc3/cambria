@@ -1,11 +1,18 @@
 // Web Worker that runs the Cambria interpreter compiled to WebAssembly.
-// Receives {code}, replies {output} or {error}.  The main page terminates
-// and respawns this worker if a program runs past the timeout.
+// Receives {code, id}, replies {id, result} with the {ok, output} object
+// runCambria returns, or {id, error}.
 
 import ghc_wasm_jsffi from "./ghc_wasm_jsffi.js";
-import { WASI, OpenFile, File, ConsoleStdout } from "https://esm.sh/@bjorn3/browser_wasi_shim@0.3.0";
+import { WASI, OpenFile, File, ConsoleStdout } from "./vendor/browser_wasi_shim.js";
 
-const instancePromise = (async () => {
+const modulePromise = (async () => {
+  const response = await fetch("./cambria.wasm");
+  if (!response.ok) throw new Error(`cambria.wasm: ${response.status} ${response.statusText}`);
+  return WebAssembly.compile(await response.arrayBuffer());
+})();
+
+// Fresh instance per run to refresh global counters (i.e. fresh names).
+async function newInstance() {
   // args[0] must be present (the RTS reads argv), and env must not contain
   // PWD (hs_init_ghc tries to chdir into it, which fails without a filesystem).
   const wasi = new WASI(["cambria-wasm"], [], [
@@ -14,9 +21,7 @@ const instancePromise = (async () => {
     ConsoleStdout.lineBuffered(l => console.warn("[cambria]", l)), // stderr
   ]);
   const exports = {};
-  const response = await fetch("./cambria.wasm");
-  const bytes = await response.arrayBuffer();
-  const { instance } = await WebAssembly.instantiate(bytes, {
+  const instance = await WebAssembly.instantiate(await modulePromise, {
     wasi_snapshot_preview1: wasi.wasiImport,
     ghc_wasm_jsffi: ghc_wasm_jsffi(exports),
   });
@@ -24,20 +29,20 @@ const instancePromise = (async () => {
   wasi.initialize(instance);
   instance.exports.hs_init(0, 0);
   return instance;
-})();
+}
 
 self.onmessage = async (e) => {
+  const { code, id } = e.data;
   try {
-    const instance = await instancePromise;
-    const output = await instance.exports.runCambria(e.data.code);
-    self.postMessage({ output });
+    const instance = await newInstance();
+    self.postMessage({ id, result: await instance.exports.runCambria(code) });
   } catch (err) {
-    self.postMessage({ error: String(err) });
+    self.postMessage({ id, error: String(err) });
   }
 };
 
 // Signal readiness so the page can decide between wasm and the dev server.
-instancePromise.then(
+modulePromise.then(
   () => self.postMessage({ ready: true }),
   (err) => self.postMessage({ ready: false, error: String(err) }),
 );

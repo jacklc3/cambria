@@ -36,6 +36,7 @@
   }
   button.run { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button:active { transform: translateY(1px); }
+  button:disabled { opacity: .55; cursor: default; transform: none; }
   .hint { font-size: 12px; color: #777; }
   main { flex: 1; display: flex; min-height: 0; }
   #editor { flex: 3; min-width: 0; }
@@ -59,6 +60,7 @@
     font-size: 12px; color: #888; background: var(--bg-alt);
   }
   footer a { color: var(--accent); text-decoration: none; }
+  .error-line { background: rgba(160, 32, 32, 0.08); }
 </style>
 </head>
 <body>
@@ -78,7 +80,7 @@
   </div>
 </main>
 <footer>
-  Programs run with a 5&#8201;s timeout.
+  Programs run with a <span id="timeout"></span> timeout.
   Syntax reference: <a href="https://github.com/jacklc3/cambria" target="_blank">jacklc3/cambria</a>.
 </footer>
 
@@ -87,17 +89,24 @@
 const DEFAULT_PROGRAM = `-- Cambria: algebraic effects with parametrized handlers.
 -- Press Cmd/Ctrl-Enter (or Run) to evaluate, or pick an example above.
 
-effect !decide : Unit ~> Bool.
-
 -- a handler that explores both branches and keeps the larger outcome
 with handler {
   decide _ k -> max (k true, k false)
 } handle (
+  effect !decide : Unit ~> Bool.
   do x <- if !decide () then return 15 else return 30 in
   do y <- if !decide () then return 5  else return 10 in
   return (x - y)
 )
 `;
+
+const TIMEOUT_MS = 5000;
+// Allow for a cold fetch before giving up on it
+const READY_TIMEOUT_MS = 15000;
+// the /run fallback only exists on the dev server (web/serve.py)
+const DEV = ["localhost", "127.0.0.1"].includes(location.hostname);
+
+document.getElementById("timeout").textContent = `${TIMEOUT_MS / 1000} s`;
 
 require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs" } });
 require(["vs/editor/editor.main"], function () {
@@ -111,7 +120,7 @@ require(["vs/editor/editor.main"], function () {
         [/"([^"\\]|\\.)*"/, "string"],
         [/\$[a-z][\w']*/, "type.param"],
         [/![a-z][\w']*/, "operation"],
-        [/\b(fun|rec|let|and|infixl|infixr|infix|handler|return|finally|do|in|if|then|else|with|handle|inl|inr|case|of|effect)\b/, "keyword"],
+        [/\b(fun|rec|handler|return|finally|do|in|if|then|else|with|handle|inl|inr|case|of|effect)\b/, "keyword"],
         [/\b(true|false)\b/, "constant"],
         [/\b(Unit|Void|Int|Bool|Double|Str|Name|Map|List)\b/, "type"],
         [/\b\d+\b/, "number"],
@@ -129,7 +138,7 @@ require(["vs/editor/editor.main"], function () {
     ],
   });
 
-  // Palette matches reference/cambria.tex listings.
+  // Palette extends reference/cambria.tex listings.
   monaco.editor.defineTheme("cambria-light", {
     base: "vs", inherit: true,
     rules: [
@@ -145,12 +154,20 @@ require(["vs/editor/editor.main"], function () {
     colors: { "editor.background": "#ffffff" },
   });
 
+  // Share links carry the program as base64 of its UTF-8 bytes.
+  const encodeProgram = (text) => {
+    let binary = "";
+    for (const b of new TextEncoder().encode(text)) binary += String.fromCharCode(b);
+    return btoa(binary);
+  };
   const fromHash = () => {
-    if (location.hash.startsWith("#code=")) {
-      try { return decodeURIComponent(escape(atob(location.hash.slice(6)))); }
-      catch (e) { return null; }
+    if (!location.hash.startsWith("#code=")) return null;
+    try {
+      const bytes = Uint8Array.from(atob(location.hash.slice(6)), c => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes);
+    } catch (e) {
+      return null;
     }
-    return null;
   };
 
   const editor = monaco.editor.create(document.getElementById("editor"), {
@@ -167,8 +184,10 @@ require(["vs/editor/editor.main"], function () {
   });
 
   const output = document.getElementById("output");
-  let errorDecorations = editor.createDecorationsCollection();
+  const runButton = document.getElementById("run");
+  const errorDecorations = editor.createDecorationsCollection();
 
+  // Only the parser reports positions (src/Parsing/Parser.y).
   function markError(text) {
     const m = text.match(/line (\d+), column (\d+)/);
     errorDecorations.clear();
@@ -179,108 +198,170 @@ require(["vs/editor/editor.main"], function () {
     errorDecorations.set([{
       range: new monaco.Range(line, 1, line, 1),
       options: { isWholeLine: true, className: "error-line",
-                 inlineClassName: undefined,
                  overviewRuler: { color: "#a02020", position: 4 } },
     }]);
   }
 
   // Execution backends: wasm worker when web/cambria.wasm has been built
   // (see web/wasm/build.sh), otherwise the dev server's /run endpoint.
-  let worker = null, workerReady = null;
+  let readyWorker = null, workerError = null;
+
   function spawnWorker() {
-    worker = new Worker("worker.js", { type: "module" });
-    workerReady = new Promise((resolve) => {
-      const onmsg = (e) => {
-        if ("ready" in e.data) {
-          worker.removeEventListener("message", onmsg);
-          resolve(e.data.ready);
+    const w = new Worker("worker.js", { type: "module" });
+    readyWorker = new Promise((resolve) => {
+      // settle(null) means ready, else a string provides the error message.
+      // Worker reported failures are permanent and latches workerError,
+      // otherwise it clears readyWorker and lets the next run try again.
+      const settle = (err, permanent) => {
+        clearTimeout(timer);
+        w.removeEventListener("message", onmsg);
+        w.onerror = null;
+        if (err) {
+          w.terminate();
+          if (permanent) workerError = err; else readyWorker = null;
         }
+        resolve(err ? null : w);
       };
-      worker.addEventListener("message", onmsg);
+      const onmsg = (e) => {
+        if ("ready" in e.data)
+          settle(e.data.ready ? null : e.data.error || "the wasm module did not load", true);
+      };
+      const timer = setTimeout(() => settle("still downloading", false), READY_TIMEOUT_MS);
+      w.addEventListener("message", onmsg);
+      w.onerror = (e) => settle(e.message || "the wasm worker failed to load", true);
     });
+    return readyWorker;
   }
+
   const wasmAvailable = fetch("cambria.wasm", { method: "HEAD" })
     .then(r => r.ok).catch(() => false);
 
-  async function execute(code, timeoutMs = 5000) {
-    if (await wasmAvailable) {
-      if (!worker) spawnWorker();
-      if (await workerReady) {
+  // A worker reply is runCambria's {ok, output} object, or a thrown error.
+  function fromWorker(data) {
+    return data.error ? { ok: false, output: data.error } : data.result;
+  }
+
+  let nextRequest = 1;
+
+  async function execute(code) {
+    // workerError, once set, means the worker cannot load at all: do not retry
+    if (!workerError && await wasmAvailable) {
+      const mine = readyWorker || spawnWorker();
+      const w = await mine;
+      if (w) {
         return new Promise((resolve) => {
+          const id = nextRequest++;
           const timer = setTimeout(() => {
-            worker.terminate(); worker = null;
-            resolve({ output: `Timed out after ${timeoutMs / 1000} seconds.`, timedOut: true });
-          }, timeoutMs);
-          worker.onmessage = (e) => {
-            if ("ready" in e.data) return;
+            w.removeEventListener("message", onmsg);
+            w.terminate();
+            if (readyWorker === mine) readyWorker = null;
+            resolve({ ok: false, output: `Timed out after ${TIMEOUT_MS / 1000} seconds.` });
+          }, TIMEOUT_MS);
+          const onmsg = (e) => {
+            if (e.data.id !== id) return;   // a stale run, or the readiness ping
             clearTimeout(timer);
-            resolve({ output: e.data.output ?? e.data.error, timedOut: false, backend: "wasm" });
+            w.removeEventListener("message", onmsg);
+            resolve({ ...fromWorker(e.data), backend: "wasm" });
           };
-          worker.postMessage({ code });
+          w.addEventListener("message", onmsg);
+          w.postMessage({ code, id });
         });
       }
     }
-    const res = await fetch("/run", {
+    if (!DEV) {
+      const reason = workerError
+        || (await wasmAvailable ? "still downloading, press Run again"
+                                : "cambria.wasm was not found");
+      return { ok: false, output: `Cannot run: the WebAssembly build is unavailable (${reason}).` };
+    }
+    const res = await fetch("run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
     });
+    if (!res.ok) {
+      return { ok: false, output: `The run server replied ${res.status} ${res.statusText}.` };
+    }
     return { ...(await res.json()), backend: "server" };
   }
 
+  let running = false;
+
   async function run() {
+    if (running) return;
+    running = true;
+    runButton.disabled = true;
     output.textContent = "Running…";
     output.classList.remove("error");
     const t0 = performance.now();
     try {
-      const { output: out, timedOut, backend } = await execute(editor.getValue());
+      const { ok, output: out, backend } = await execute(editor.getValue());
       const ms = Math.round(performance.now() - t0);
-      const failed = timedOut || /error|failure|unbound|unexpected/i.test(out);
       output.textContent = out || "(no output)";
-      output.classList.toggle("error", failed);
-      if (failed) markError(out); else errorDecorations.clear();
-      if (!failed) output.textContent += `\n\n— ${ms} ms (${backend})`;
+      output.classList.toggle("error", !ok);
+      if (!ok) markError(out); else errorDecorations.clear();
+      if (ok) output.textContent += `\n\n(${ms} ms, ${backend})`;
     } catch (e) {
-      output.textContent = "Could not reach the run server: " + e;
+      output.textContent = "Could not run the program: " + e;
       output.classList.add("error");
+    } finally {
+      running = false;
+      runButton.disabled = false;
     }
   }
 
-  document.getElementById("run").addEventListener("click", run);
+  runButton.addEventListener("click", run);
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, run);
 
-  document.getElementById("share").addEventListener("click", () => {
-    const encoded = btoa(unescape(encodeURIComponent(editor.getValue())));
-    const url = location.origin + location.pathname + "#code=" + encoded;
-    history.replaceState(null, "", url);
-    navigator.clipboard.writeText(url);
+  document.getElementById("share").addEventListener("click", async () => {
     const btn = document.getElementById("share");
-    btn.textContent = "Copied!";
+    const url = location.origin + location.pathname + "#code=" + encodeProgram(editor.getValue());
+    history.replaceState(null, "", url);
+    try {
+      await navigator.clipboard.writeText(url);
+      btn.textContent = "Copied!";
+    } catch (e) {
+      console.warn("Could not copy the link:", e);
+      btn.textContent = "Copy failed";
+    }
     setTimeout(() => (btn.textContent = "Share"), 1200);
   });
 
   const select = document.getElementById("examples");
-  fetch("/examples").then(r => r.json()).then(({ examples }) => {
+  fetch("examples/index.json").then(r => {
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    return r.json();
+  }).then(({ examples }) => {
     for (const name of examples) {
       const opt = document.createElement("option");
       opt.value = name;
       opt.textContent = name.replace(/\.cba$/, "");
       select.appendChild(opt);
     }
-  }).catch(() => {});
+  }).catch(e => console.warn("Could not load the examples list:", e));
+
   select.addEventListener("change", async () => {
     if (!select.value) return;
-    const src = await fetch("/examples/" + select.value).then(r => r.text());
-    editor.setValue(src);
+    const res = await fetch("examples/" + select.value);
+    if (!res.ok) {
+      output.textContent = `Could not load ${select.value}: ${res.status} ${res.statusText}`;
+      output.classList.add("error");
+      return;
+    }
+    editor.setValue(await res.text());
     output.textContent = "Press Run to evaluate the program.";
     output.classList.remove("error");
     errorDecorations.clear();
     history.replaceState(null, "", location.pathname);
   });
+}, function (err) {
+  const output = document.getElementById("output");
+  output.textContent = "Could not load the editor from the CDN, so the playground "
+                     + "cannot start. Details are in the browser console.";
+  output.classList.add("error");
+  document.getElementById("run").disabled = true;
+  console.error("monaco failed to load:", err);
 });
 </script>
-<style>
-  .error-line { background: rgba(160, 32, 32, 0.08); }
-</style>
 </body>
 </html>

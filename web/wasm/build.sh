@@ -4,31 +4,32 @@
 # Prerequisites: the GHC wasm toolchain (https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta)
 # installed to ~/.ghc-wasm.  Native alex/happy are installed on first run.
 #
-# Produces web/cambria.wasm and web/ghc_wasm_jsffi.js.
+# Produces web/cambria.wasm, web/ghc_wasm_jsffi.js, and web/wasm/ghc_wasm_jsffi.mjs.
 
 set -euo pipefail
 cd "$(dirname "$0")/../.."   # repo root
 
-# 1. The cross build runs alex/happy natively; install them if missing.
+# 1. The cross build runs alex/happy natively, installing them if missing.
 export PATH="$HOME/.local/bin:$PATH"
 command -v happy >/dev/null || cabal install happy --installdir="$HOME/.local/bin" --overwrite-policy=always
 command -v alex  >/dev/null || cabal install alex  --installdir="$HOME/.local/bin" --overwrite-policy=always
 
 # 2. Cross-compile with the wasm toolchain.
-source ~/.ghc-wasm/env
+if [ ! -f "$HOME/.ghc-wasm/env" ]; then
+  echo "GHC wasm toolchain not found at ~/.ghc-wasm/env" >&2
+  echo "Bootstrap it first: https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta" >&2
+  exit 1
+fi
+source "$HOME/.ghc-wasm/env"
 wasm32-wasi-cabal build exe:cambria-wasm
 
-WASM=$(find dist-newstyle -type f \( -name 'cambria-wasm.wasm' -o -name 'cambria-wasm' \) | grep wasm32 | head -1)
-[ -n "$WASM" ] || { echo "cambria-wasm artifact not found"; exit 1; }
+WASM=$(wasm32-wasi-cabal list-bin exe:cambria-wasm)
+[ -f "$WASM" ] || { echo "cambria-wasm artifact not found at $WASM" >&2; exit 1; }
 
-# 3. Generate the JS FFI glue module (plus an .mjs copy for the node test).
+# 3. Generate the JS FFI glue module.
 "$(wasm32-wasi-ghc --print-libdir)"/post-link.mjs -i "$WASM" -o web/ghc_wasm_jsffi.js
 cp web/ghc_wasm_jsffi.js web/wasm/ghc_wasm_jsffi.mjs
 
-# 4. Optionally shrink with wasm-opt, then install into web/.
-if command -v wasm-opt >/dev/null; then
-  wasm-opt -Oz "$WASM" -o web/cambria.wasm
-else
-  cp "$WASM" web/cambria.wasm
-fi
+# 4. Shrink with wasm-opt, which the toolchain supplies via binaryen.
+wasm-opt -Oz "$WASM" -o web/cambria.wasm
 ls -lh web/cambria.wasm web/ghc_wasm_jsffi.js

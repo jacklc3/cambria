@@ -1,8 +1,7 @@
 module Environment where
 
 import qualified Data.Map as Map
-import Data.Unique (hashUnique, newUnique)
-import System.Random (randomIO)
+import Data.Unique (hashUnique)
 
 import Syntax
 
@@ -45,16 +44,6 @@ constants :: [(Ident, Value)]
 constants =
   [ ("[]",    VList [])
   , ("empty", VMap [])
-  ]
-
-primitiveOps :: [(Op, Value -> Value -> IO Computation)]
-primitiveOps =
-  [ ("fresh",     \_           k -> CApp k . VName         <$> newUnique)
-  , ("print",     \(VString s) k -> CApp k . const VUnit   <$> putStrLn s)
-  , ("read",      \_           k -> CApp k . VString       <$> getLine)
-  , ("flip",      \_           k -> CApp k . VBool         <$> randomIO)
-  , ("bernoulli", \(VDouble n) k -> CApp k . VBool . (< n) <$> randomIO)
-  , ("uniform",   \_           k -> CApp k . VDouble       <$> randomIO)
   ]
 
 initialEnv :: Env
