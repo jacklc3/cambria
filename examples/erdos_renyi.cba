@@ -1,4 +1,4 @@
--- Erdos-Renyi graphon
+-- Erdos-Renyi random graph
 with [$loc -> Name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
