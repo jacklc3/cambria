@@ -2,7 +2,7 @@
 with [$loc -> Name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
-  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  set (a,x) k -> return (fun s -> k () (fun b -> if a == b then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if a == b then return x else s b)),
   finally s   -> s (fun _ -> return empty)
@@ -13,13 +13,13 @@ with [$loc -> Name] handler {
     isedge (g, (a, b)) k ->
       do m <- !get g in
       if member ((a,b), m) then
-        lookup ((a,b), m)
+        k (lookup ((a,b), m))
       else if member ((b,a), m) then
-        lookup ((b,a), m)
+        k (lookup ((b,a), m))
       else
         do e <- !flip () in
         do _ <- !set (g, insert (((a,b),e), m)) in
-        return e
+        k e
   } handle (
     -- Make a new graph, pick two nodes, and check an edge between them
     do g <- !newgraph () in
