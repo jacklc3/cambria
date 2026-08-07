@@ -70,13 +70,19 @@ A handler for a theory of code jumps, with labels and goto commands.
 
 ```
 -- from examples/jumps.cba
-with [$p -> Name] handler {
+with [$name -> Int] handler {
+  return x  -> return (fun _ -> return x),
+  fresh _ k -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
+  finally f -> f 0
+} handle (
+with [$p -> $name] handler {
   return x  -> return (inl x),
-  goto a _ -> return (inr a),
+  goto a _  -> return (inr a),
   label _ k -> do c <- !fresh () in
     case k (inl c) of {
       inl x -> return (inl x),
-      inr d -> if d == c then k (inr ()) else return (inr d)
+      inr d -> if !eq (d, c) then k (inr ()) else return (inr d)
     }
 } handle (
   effect !label : Unit ~> $p + Unit.
@@ -89,6 +95,7 @@ with [$p -> Name] handler {
     },
     inr _ -> return 3
   }
+)
 )
 -- returns inl 3
 ```
