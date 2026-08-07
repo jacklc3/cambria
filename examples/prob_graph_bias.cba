@@ -10,7 +10,7 @@ with [$loc -> Name] handler {
 } handle (
   with [$graph -> $loc, $node -> Name] handler {
     newgraph _ k -> do p <- !uniform () in k (!ref (p, empty)),
-    newnode z k -> k (!fresh ()),
+    newnode _ k -> k (!fresh ()),
     isedge (g, (a, b)) k ->
       do (p, m) <- !get g in
       if member ((a,b), m) then

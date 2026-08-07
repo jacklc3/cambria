@@ -1,4 +1,4 @@
--- Nondeterminism resolved by maximizing over both continuations
+-- Nondeterminism resolved by maximizing over both resumptions
 -- cf. Handlers of algebraic effects, ESOP 2009
 with handler {
   decide v k -> max (k true, k false)

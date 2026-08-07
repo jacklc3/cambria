@@ -1,4 +1,4 @@
--- Capture printed output in the result, purely
+-- Capture printed output in the result
 with handler {
   return x -> return (x, ""),
   print s k -> do (v, acc) <- k () in

@@ -1,5 +1,5 @@
--- Graphviz DAG of the dependencies; same client program as threads_child.cba
--- cf. An equational axiomatization of dynamic threads, POPL 2026
+-- Graphviz DAG of the action dependencies; same client program as threads_child.cba
+-- cf. An equational axiomatization of dynamic threads via algebraic effects, POPL 2026
 do map <- return (rec map g xs ->
   case uncons xs of {
     inl _        -> return [],

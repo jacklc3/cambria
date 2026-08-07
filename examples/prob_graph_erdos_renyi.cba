@@ -9,8 +9,8 @@ with [$loc -> Name] handler {
   finally s   -> s (fun _ -> return empty)
 } handle (
   with [$graph -> $loc, $node -> Name] handler {
-    newgraph z k -> k (!ref empty),
-    newnode z k -> k (!fresh ()),
+    newgraph _ k -> k (!ref empty),
+    newnode _ k -> k (!fresh ()),
     isedge (g, (a, b)) k ->
       do m <- !get g in
       if member ((a,b), m) then

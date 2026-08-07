@@ -3,6 +3,7 @@
 with [$name -> Int] handler {
   return x  -> return (fun _ -> return x),
   fresh _ k -> return (fun n -> k n (n+1)),
+  eq (a,b) k -> k (a == b),
   finally f -> f 0
 } handle (
 with [$p -> $name] handler {
@@ -11,7 +12,7 @@ with [$p -> $name] handler {
   label _ k -> do c <- !fresh () in
     case k (inl c) of {
       inl x -> return (inl x),
-      inr d -> if d == c then k (inr ()) else return (inr d)
+      inr d -> if !eq (d, c) then k (inr ()) else return (inr d)
     }
 } handle (
   effect !label : Unit ~> $p + Unit.

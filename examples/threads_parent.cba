@@ -1,5 +1,5 @@
 -- Parent-biased dynamic threads handler; same client program as threads_child.cba
--- cf. An equational axiomatization of dynamic threads, POPL 2026
+-- cf. An equational axiomatization of dynamic threads via algebraic effects, POPL 2026
 -- State handlers as in local_state.cba
 with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),

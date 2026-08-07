@@ -1,5 +1,5 @@
 -- Child-biased dynamic threads handler
--- cf. An equational axiomatization of dynamic threads, POPL 2026
+-- cf. An equational axiomatization of dynamic threads via algebraic effects, POPL 2026
 with [$tid -> Unit] handler {
   return _ -> return (),
   act  s k -> !print s ; k (),
