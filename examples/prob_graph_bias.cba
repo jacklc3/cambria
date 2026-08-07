@@ -1,0 +1,38 @@
+-- Erdos-Renyi with a random edge density: the graph analogue of prob_polya_bias.cba
+-- cf. Probabilistic programming interfaces for random graphs, POPL 2024
+with [$loc -> Name] handler {
+  return x    -> return (fun _ -> return x),
+  get a k     -> return (fun s -> k (s a) s),
+  set (a,x) k -> return (fun s -> k () (fun b -> if a == b then return x else s b)),
+  ref x k     -> do a <- !fresh () in return (fun s ->
+                   k a (fun b -> if a == b then return x else s b)),
+  finally s   -> s (fun _ -> return (0 / 1, empty))
+} handle (
+  with [$graph -> $loc, $node -> Name] handler {
+    newgraph _ k -> do p <- !uniform () in k (!ref (p, empty)),
+    newnode z k -> k (!fresh ()),
+    isedge (g, (a, b)) k ->
+      do (p, m) <- !get g in
+      if member ((a,b), m) then
+        k (lookup ((a,b), m))
+      else if member ((b,a), m) then
+        k (lookup ((b,a), m))
+      else
+        do e <- !bernoulli p in
+        do _ <- !set (g, (p, insert (((a,b),e), m))) in
+        k e
+  } handle (
+    effect !newgraph : Unit ~> $graph.
+    effect !newnode : $graph ~> $node.
+    effect !isedge : $graph * ($node * $node) ~> Bool.
+    -- Make a new graph, pick three nodes, and check for a triangle
+    do g <- !newgraph () in
+    do a <- !newnode g in
+    do b <- !newnode g in
+    do c <- !newnode g in
+    do e1 <- !isedge (g,(a,b)) in
+    do e2 <- !isedge (g,(b,c)) in
+    do e3 <- !isedge (g,(a,c)) in
+    if e1 then (if e2 then return e3 else return false) else return false
+  )
+)
