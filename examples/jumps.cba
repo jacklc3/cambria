@@ -1,4 +1,11 @@
-with [$p -> Name] handler {
+-- First-class labels and goto via multi-shot continuations
+-- cf. Substitution, jumps, and algebraic effects, LICS 2014
+with [$name -> Int] handler {
+  return x  -> return (fun _ -> return x),
+  fresh _ k -> return (fun n -> k n (n+1)),
+  finally f -> f 0
+} handle (
+with [$p -> $name] handler {
   return x  -> return (inl x),
   goto a _  -> return (inr a),
   label _ k -> do c <- !fresh () in
@@ -17,4 +24,5 @@ with [$p -> Name] handler {
     },
     inr _ -> return 3
   }
+)
 )
