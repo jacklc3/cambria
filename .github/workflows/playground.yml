@@ -9,6 +9,7 @@ on:
       - src/**
       - web/**
       - examples/**
+      - reference/**
       - cambria.cabal
       - .github/workflows/playground.yml
   workflow_dispatch:
@@ -31,6 +32,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - name: Build the syntax reference
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends latexmk lmodern \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended
+          latexmk -pdf -cd -interaction=nonstopmode -halt-on-error reference/cambria.tex
 
       # Native alex/happy must be built before the wasm toolchain lands on PATH:
       # add_to_github_path.sh exports CC/LD/AR for wasi-sdk, which breaks native builds.
@@ -74,6 +82,7 @@ jobs:
           python3 web/examples.py
           mkdir -p _site
           cp web/index.html web/worker.js web/cambria.wasm web/ghc_wasm_jsffi.js _site/
+          cp reference/cambria.pdf _site/reference.pdf
           cp -r web/examples _site/examples
           cp -r web/vendor _site/vendor
 

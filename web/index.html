@@ -13,36 +13,98 @@
     --accent: #0064aa;
     --err: #a02020;
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --gutter: 7px;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html { height: 100%; }
   body {
+    height: 100%;
+    height: 100dvh;
+    height: var(--app-height, 100dvh);
+    margin: 0; overflow: hidden; overscroll-behavior: none;
     display: flex; flex-direction: column;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--fg); background: var(--bg);
+    -webkit-text-size-adjust: 100%;
   }
   header {
-    display: flex; align-items: baseline; gap: 14px;
-    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
     background: var(--bg-alt);
   }
   header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .2px; }
   header h1 .play { color: var(--accent); font-weight: 400; }
-  header .spacer { flex: 1; }
+  .tools, .actions { display: flex; align-items: center; gap: 8px; }
+  .tools { margin-left: auto; }
   select, button {
     font: inherit; font-size: 13px; padding: 4px 10px;
     border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
     color: var(--fg); cursor: pointer;
+    user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
   button.run { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   button:active { transform: translateY(1px); }
   button:disabled { opacity: .55; cursor: default; transform: none; }
+  button.icon { padding: 4px 7px; display: inline-flex; align-items: center; color: #555; }
+  button.icon:hover { color: var(--accent); }
+  button.icon[hidden] { display: none; }
+  #orient[data-target="h"] .ico-v, #orient[data-target="v"] .ico-h { display: none; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  .seg button {
+    border: 0; border-radius: 0; color: #555;
+    padding: 4px 9px; background: none;
+  }
+  .seg button:first-child { border-radius: 5px 0 0 5px; }
+  .seg button:last-child { border-radius: 0 5px 5px 0; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: #e6eef5; color: var(--accent); font-weight: 600; }
   .hint { font-size: 12px; color: #777; }
-  main { flex: 1; display: flex; min-height: 0; }
-  #editor { flex: 3; min-width: 0; }
+
+  main {
+    flex: 1; min-height: 0; display: grid;
+    --split-v: 58%; --split-h: 55%;
+  }
+  main[data-view="split"][data-orient="v"] {
+    grid-template-columns: minmax(84px, var(--split-v)) var(--gutter) minmax(104px, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  main[data-view="split"][data-orient="h"] {
+    grid-template-rows: minmax(64px, var(--split-h)) var(--gutter) minmax(76px, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+  }
+  main[data-view="code"], main[data-view="output"] {
+    grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  }
+  main[data-view="code"] > #divider, main[data-view="code"] > #right,
+  main[data-view="output"] > #divider, main[data-view="output"] > #editor { display: none; }
+
+  #editor { min-width: 0; min-height: 0; overflow: hidden; }
+
+  #divider {
+    position: relative; background: var(--bg-alt);
+    touch-action: none; -webkit-tap-highlight-color: transparent;
+  }
+  main[data-orient="v"] > #divider { cursor: col-resize; border-left: 1px solid var(--border); }
+  main[data-orient="h"] > #divider { cursor: row-resize; border-top: 1px solid var(--border); }
+  /* a grab area wider than the gutter */
+  #divider::before { content: ""; position: absolute; }
+  main[data-orient="v"] > #divider::before { inset: 0 -3px; }
+  main[data-orient="h"] > #divider::before { inset: -3px 0; }
+  #divider::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); background: #bdbdbd; border-radius: 2px;
+  }
+  main[data-orient="v"] > #divider::after { width: 2px; height: 24px; }
+  main[data-orient="h"] > #divider::after { width: 24px; height: 2px; }
+  #divider:hover::after, #divider:focus-visible::after, #divider.dragging::after { background: var(--accent); }
+  #divider:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  body.resizing { user-select: none; -webkit-user-select: none; }
+  body.resizing #editor, body.resizing #right { pointer-events: none; }
+
   #right {
-    flex: 2; min-width: 280px; max-width: 44%;
-    border-left: 1px solid var(--border);
+    min-width: 0; min-height: 0;
     display: flex; flex-direction: column; background: var(--bg-alt);
   }
   #right .label {
@@ -50,9 +112,10 @@
     letter-spacing: .08em; color: #888; border-bottom: 1px solid var(--border);
   }
   #output {
-    flex: 1; margin: 0; padding: 12px; overflow: auto;
+    flex: 1; margin: 0; padding: 12px; overflow: auto; overscroll-behavior: contain;
     font-family: var(--mono); font-size: 13px; line-height: 1.45;
     white-space: pre-wrap; word-break: break-word;
+    -webkit-overflow-scrolling: touch;
   }
   #output.error { color: var(--err); }
   footer {
@@ -61,28 +124,236 @@
   }
   footer a { color: var(--accent); text-decoration: none; }
   .error-line { background: rgba(160, 32, 32, 0.08); }
+
+  @media (max-width: 900px) { .hint { display: none; } }
+
+  @media (max-width: 640px) {
+    header { padding: 7px 12px; gap: 7px 10px; }
+    header h1 { font-size: 15px; }
+    .tools { order: 3; width: 100%; margin-left: 0; }
+    .actions { order: 2; margin-left: auto; }
+    #examples { flex: 1; min-width: 0; }
+    #right .label { padding: 5px 12px; }
+    #output { padding: 10px 12px; }
+    footer { padding: 5px 12px; font-size: 11px; }
+  }
+
+  /* the link text carries it, and a timed out program prints its timeout */
+  @media (max-width: 480px) { footer .timeout, footer .lbl { display: none; } }
+
+  @media (pointer: coarse) {
+    :root { --gutter: 12px; }
+    main[data-orient="v"] > #divider::before { inset: 0 -8px; }
+    main[data-orient="h"] > #divider::before { inset: -8px 0; }
+    select, button { font-size: 15px; padding: 6px 11px; min-height: 34px; }
+    select { font-size: 16px; }             /* iOS zooms in on smaller controls */
+    .seg button { padding: 6px 10px; }
+    button.icon { padding: 6px 9px; }
+    #divider::after { background: #a8a8a8; }
+    main[data-orient="v"] > #divider::after { height: 34px; }
+    main[data-orient="h"] > #divider::after { width: 34px; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>Cambria <span class="play">playground</span></h1>
   <span class="hint">parametrized algebraic effects and handlers</span>
-  <span class="spacer"></span>
-  <select id="examples"><option value="">Examples…</option></select>
-  <button id="share" title="Copy a link to this program">Share</button>
-  <button id="run" class="run" title="Cmd/Ctrl-Enter">Run&ensp;&#9656;</button>
+  <div class="tools">
+    <select id="examples" aria-label="Examples"><option value="">Examples…</option></select>
+    <div class="seg" id="views" role="group" aria-label="Panes">
+      <button type="button" data-view="code">Code</button>
+      <button type="button" data-view="split">Split</button>
+      <button type="button" data-view="output">Output</button>
+    </div>
+    <button type="button" id="orient" class="icon">
+      <svg class="ico-v" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.6"
+              fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <path d="M8 2.6V13.4" stroke="currentColor" stroke-width="1.3"/>
+      </svg>
+      <svg class="ico-h" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true">
+        <rect x="1.6" y="2.6" width="12.8" height="10.8" rx="1.6"
+              fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <path d="M1.6 8H14.4" stroke="currentColor" stroke-width="1.3"/>
+      </svg>
+    </button>
+  </div>
+  <div class="actions">
+    <button id="share" title="Copy a link to this program">Share</button>
+    <button id="run" class="run" title="Cmd/Ctrl-Enter">Run&ensp;&#9656;</button>
+  </div>
 </header>
-<main>
+<main id="panes">
   <div id="editor"></div>
+  <div id="divider" role="separator" tabindex="0" aria-label="Resize the panes"
+       aria-valuemin="0" aria-valuemax="100"></div>
   <div id="right">
     <div class="label">Output</div>
     <pre id="output">Press Run to evaluate the program.</pre>
   </div>
 </main>
 <footer>
-  Programs run with a <span id="timeout"></span> timeout.
-  Syntax reference: <a href="https://github.com/jacklc3/cambria" target="_blank">jacklc3/cambria</a>.
+  <span class="timeout">Programs run with a <span id="timeout"></span> timeout.</span>
+  <span class="lbl">Syntax reference:</span> <a href="reference.pdf" target="_blank">reference.pdf</a>.
+  <span class="lbl">Source:</span> <a href="https://github.com/jacklc3/cambria" target="_blank">jacklc3/cambria</a>.
+  <span class="lbl">Preprint:</span> <a href="https://jackliellcock.com/papers/cambria/paper.pdf" target="_blank">paper.pdf</a>.
 </footer>
+
+<script>
+// Pane layout, kept out of the editor script so the shell survives a CDN failure.
+const PANES = (() => {
+  const KEY = "cambria.playground.layout";
+  const ONE_COLUMN = 620;
+  const MIN_PX = 88;
+  const DEFAULTS = { view: null, orient: "v", v: 58, h: 55 };
+
+  const panes = document.getElementById("panes");
+  const divider = document.getElementById("divider");
+  const orientBtn = document.getElementById("orient");
+  const segs = [...document.querySelectorAll("#views button")];
+
+  const stored = () => {
+    try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+  };
+  const state = { ...DEFAULTS, ...stored() };
+  if (!["code", "split", "output"].includes(state.view)) state.view = null;
+  for (const k of ["v", "h"])
+    if (!(typeof state[k] === "number" && state[k] > 5 && state[k] < 95)) state[k] = DEFAULTS[k];
+
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* private mode */ }
+  };
+
+  const stacked = () => window.innerWidth < ONE_COLUMN;
+  const axis = () => (state.orient === "v" && !stacked() ? "v" : "h");
+  // no stored choice: follow the window
+  const view = () => state.view || (stacked() ? "code" : "split");
+
+  // rescheduled rather than latched: a frame that never arrives must not wedge it
+  let pending = 0;
+  const resized = () => {
+    cancelAnimationFrame(pending);
+    pending = requestAnimationFrame(() => PANES.onResize?.());
+  };
+
+  const setSplit = (pct) => {
+    if (!Number.isFinite(pct)) return;
+    const a = axis();
+    state[a] = pct;
+    panes.style.setProperty(a === "v" ? "--split-v" : "--split-h", pct + "%");
+    divider.setAttribute("aria-valuenow", String(Math.round(pct)));
+    resized();
+  };
+
+  const apply = () => {
+    const a = axis();
+    panes.dataset.view = view();
+    panes.dataset.orient = a;
+    panes.style.setProperty("--split-v", state.v + "%");
+    panes.style.setProperty("--split-h", state.h + "%");
+    divider.setAttribute("aria-orientation", a === "v" ? "vertical" : "horizontal");
+    divider.setAttribute("aria-valuenow", String(Math.round(state[a])));
+    for (const b of segs) b.setAttribute("aria-pressed", String(b.dataset.view === view()));
+    orientBtn.hidden = view() !== "split" || stacked();
+    orientBtn.dataset.target = state.orient === "v" ? "h" : "v";
+    const label = state.orient === "v" ? "Stack the panes" : "Put the panes side by side";
+    orientBtn.title = label;
+    orientBtn.setAttribute("aria-label", label);
+    resized();
+  };
+
+  const setView = (v, persist = true) => {
+    state.view = v;
+    apply();
+    if (persist) save();
+  };
+
+  for (const b of segs) b.addEventListener("click", () => setView(b.dataset.view));
+
+  orientBtn.addEventListener("click", () => {
+    state.orient = state.orient === "v" ? "h" : "v";
+    apply();
+    save();
+  });
+
+  divider.addEventListener("pointerdown", (e) => {
+    if (e.button) return;
+    const a = axis();
+    const box = panes.getBoundingClientRect();
+    const total = a === "v" ? box.width : box.height;
+    if (!(total > 0)) return;              // laid out to nothing
+    const gutter = a === "v" ? divider.offsetWidth : divider.offsetHeight;
+    const min = (MIN_PX / total) * 100;
+    e.preventDefault();
+    // capture hides the drag from the editor; the window listeners work either way
+    try { divider.setPointerCapture(e.pointerId); } catch (err) {}
+    divider.classList.add("dragging");
+    document.body.classList.add("resizing");
+    document.body.style.cursor = a === "v" ? "col-resize" : "row-resize";
+
+    const move = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      const at = (a === "v" ? ev.clientX - box.left : ev.clientY - box.top) - gutter / 2;
+      const pct = (at / total) * 100;
+      setSplit(Math.min(Math.max(pct, min), Math.max(min, 100 - min - gutter / total * 100)));
+    };
+    const done = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", done);
+      window.removeEventListener("pointercancel", done);
+      divider.classList.remove("dragging");
+      document.body.classList.remove("resizing");
+      document.body.style.cursor = "";
+      save();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", done);
+    window.addEventListener("pointercancel", done);
+  });
+
+  divider.addEventListener("keydown", (e) => {
+    const a = axis();
+    const step = e.shiftKey ? 10 : 2;
+    const keys = a === "v" ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
+    let pct = state[a];
+    if (e.key === keys[0]) pct -= step;
+    else if (e.key === keys[1]) pct += step;
+    else if (e.key === "Home") pct = 20;
+    else if (e.key === "End") pct = 80;
+    else if (e.key === "Enter" || e.key === " ") pct = DEFAULTS[a];
+    else return;
+    e.preventDefault();
+    setSplit(Math.min(Math.max(pct, 10), 90));
+    save();
+  });
+
+  divider.addEventListener("dblclick", () => { setSplit(DEFAULTS[axis()]); save(); });
+
+  window.addEventListener("resize", apply);
+
+  // an on-screen keyboard shrinks the visual viewport but not innerHeight
+  const vv = window.visualViewport;
+  if (vv) {
+    const fit = () => {
+      const covered = window.innerHeight - vv.height;
+      if (covered > 120) document.documentElement.style.setProperty("--app-height", vv.height + "px");
+      else document.documentElement.style.removeProperty("--app-height");
+      resized();
+    };
+    vv.addEventListener("resize", fit);
+    fit();
+  }
+
+  apply();
+  return {
+    onResize: null,
+    view,
+    show: (v) => setView(v, false),
+  };
+})();
+</script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.45.0/min/vs/loader.min.js"></script>
 <script>
@@ -170,18 +441,39 @@ require(["vs/editor/editor.main"], function () {
     }
   };
 
-  const editor = monaco.editor.create(document.getElementById("editor"), {
+  // 16px stops iOS zooming into monaco's textarea; the pane, not the window, is narrow
+  const touch = matchMedia("(pointer: coarse)").matches;
+  const pane = document.getElementById("editor");
+  const responsiveOptions = () => {
+    const narrow = (pane.clientWidth || window.innerWidth) < (touch ? 560 : 460);
+    return {
+      fontSize: touch ? 16 : 14,
+      wordWrap: narrow ? "on" : "off",
+      lineNumbersMinChars: narrow ? 2 : 3,
+      lineDecorationsWidth: narrow ? 2 : 10,
+      folding: !narrow,
+      padding: { top: narrow ? 8 : 12 },
+    };
+  };
+
+  const editor = monaco.editor.create(pane, {
     value: fromHash() || DEFAULT_PROGRAM,
     language: "cambria",
     theme: "cambria-light",
-    fontSize: 14,
     fontFamily: "ui-monospace, SF Mono, Menlo, Consolas, monospace",
     minimap: { enabled: false },
     automaticLayout: true,
     scrollBeyondLastLine: false,
-    padding: { top: 12 },
     renderLineHighlight: "line",
+    quickSuggestions: !touch,
+    contextmenu: !touch,
+    ...responsiveOptions(),
   });
+
+  PANES.onResize = () => {
+    editor.layout();
+    editor.updateOptions(responsiveOptions());
+  };
 
   const output = document.getElementById("output");
   const runButton = document.getElementById("run");
@@ -291,6 +583,7 @@ require(["vs/editor/editor.main"], function () {
     if (running) return;
     running = true;
     runButton.disabled = true;
+    if (PANES.view() === "code") PANES.show("output");
     output.textContent = "Running…";
     output.classList.remove("error");
     const t0 = performance.now();
@@ -352,6 +645,7 @@ require(["vs/editor/editor.main"], function () {
     output.textContent = "Press Run to evaluate the program.";
     output.classList.remove("error");
     errorDecorations.clear();
+    if (PANES.view() === "output") PANES.show("code");
     history.replaceState(null, "", location.pathname);
   });
 }, function (err) {
@@ -359,6 +653,7 @@ require(["vs/editor/editor.main"], function () {
   output.textContent = "Could not load the editor from the CDN, so the playground "
                      + "cannot start. Details are in the browser console.";
   output.classList.add("error");
+  if (PANES.view() === "code") PANES.show("output");
   document.getElementById("run").disabled = true;
   console.error("monaco failed to load:", err);
 });

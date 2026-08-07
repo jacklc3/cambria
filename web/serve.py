@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """Local dev server for the Cambria playground.
 
-Serves the static playground from web/, including the repo's examples staged
-into web/examples/ at startup, plus a post /run endpoint that executes programs
-with the locally built interpreter under a timeout.  The front end prefers the
-interpreter compiled to WebAssembly and only falls back to /run when the wasm
-build is unavailable.
+Serves the static playground from web/, staging the repo's examples into
+web/examples/ and the syntax reference into web/reference.pdf at startup, plus
+a post /run endpoint that executes programs with the locally built interpreter
+under a timeout.  The front end prefers the interpreter compiled to
+WebAssembly and only falls back to /run when the wasm build is unavailable.
 """
 
 import glob
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -21,12 +22,34 @@ ROOT = os.path.dirname(os.path.abspath(__file__))   # web/
 REPO = os.path.dirname(ROOT)
 PORT = int(os.environ.get("PORT", "8642"))
 TIMEOUT = float(os.environ.get("CAMBRIA_TIMEOUT", "5"))
+LATEX_TIMEOUT = 120
 MAX_BODY = 1 << 20
 
 BIN = os.environ.get("CAMBRIA_BIN") or next(
     iter(glob.glob(os.path.join(REPO, "dist-newstyle", "**", "x", "cambria",
                                 "build", "cambria", "cambria"),
                    recursive=True)), None)
+
+
+def reference():
+    """Build reference/cambria.tex, stage it as web/reference.pdf, and return it."""
+    src = os.path.join(REPO, "reference", "cambria.tex")
+    pdf = os.path.join(REPO, "reference", "cambria.pdf")
+    try:
+        r = subprocess.run(["latexmk", "-pdf", "-cd", "-interaction=nonstopmode",
+                            "-halt-on-error", src],
+                           capture_output=True, timeout=LATEX_TIMEOUT)
+        if r.returncode:
+            print("latexmk failed; see reference/cambria.log")
+    except FileNotFoundError:
+        print("No latexmk found; not building the syntax reference")
+    except subprocess.TimeoutExpired:
+        print(f"latexmk timed out after {LATEX_TIMEOUT:g} seconds")
+    if not os.path.exists(pdf):
+        return None
+    dest = os.path.join(ROOT, "reference.pdf")
+    shutil.copyfile(pdf, dest)
+    return dest
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -86,6 +109,8 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     staged = examples.sync()
+    ref = reference()
     print(f"Cambria playground: http://127.0.0.1:{PORT}  "
-          f"(binary: {BIN}, {len(staged)} examples)")
+          f"(binary: {BIN}, {len(staged)} examples, "
+          f"reference: {'yes' if ref else 'no'})")
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

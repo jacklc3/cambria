@@ -24,7 +24,9 @@ with [$name -> Int] handler {
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} handle (
+} handle
+
+effect !fresh : Unit ~> $name.
 with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
@@ -32,15 +34,15 @@ with [$loc -> $name] handler {
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
-} handle (
-  effect !get : $loc ~> Int.
-  effect !set : $loc * Int ~> Unit.
-  effect !ref : Int ~> $loc.
-  do a <- !ref 2 in
-  do b <- !ref 3 in
-  do _ <- !set (a, !get b) in
-  !get a
-))
+} handle
+
+effect !ref : Int ~> $loc.
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
+do a <- !ref 2 in
+do b <- !ref 3 in
+do _ <- !set (a, !get b) in
+!get a
 -- returns 3
 ```
 
@@ -75,7 +77,9 @@ with [$name -> Int] handler {
   fresh _ k -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f -> f 0
-} handle (
+} handle
+
+effect !fresh : Unit ~> $name.
 with [$p -> $name] handler {
   return x  -> return (inl x),
   goto a _  -> return (inr a),
@@ -84,19 +88,15 @@ with [$p -> $name] handler {
       inl x -> return (inl x),
       inr d -> if !eq (d, c) then k (inr ()) else return (inr d)
     }
-} handle (
-  effect !label : Unit ~> $p + Unit.
-  effect !goto  : $p   ~> Void.
+} handle
 
-  case !label () of {
-    inl a -> case !label () of {
-      inl b -> !goto a; return 1,
-      inr _ -> return 2
-    },
-    inr _ -> return 3
-  }
-)
-)
+effect !label : Unit ~> $p + Unit.
+effect !goto  : $p   ~> Void.
+case !label () of {
+  inl a -> case !label () of {
+    inl b -> !goto a; return 1,
+    inr _ -> return 2 },
+  inr _ -> return 3 }
 -- returns inl 3
 ```
 
