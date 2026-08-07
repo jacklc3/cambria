@@ -19,7 +19,7 @@ with [$loc -> $name] handler {
                    k a (fun b -> if a == b then return x else s b)),
   finally s   -> s (fun _ -> return empty)
 } handle (
-  with handler {
+  with [$graph -> $loc, $node -> $name] handler {
     newgraph z k -> k (!ref empty),
     newnode z k -> k (!fresh ()),
     isedge (g, (a, b)) k ->
@@ -33,6 +33,9 @@ with [$loc -> $name] handler {
         do _ <- !set (g, insert (((a,b),e), m)) in
         k e
   } handle (
+    effect !newgraph : Unit ~> $graph.
+    effect !newnode : $graph ~> $node.
+    effect !isedge : $graph * ($node * $node) ~> Bool.
     do g <- !newgraph () in
     do a <- !newnode g in
     do b <- !newnode g in
