@@ -1,3 +1,5 @@
+-- Nondeterminism resolved by maximizing over both continuations
+-- cf. Handlers of algebraic effects, ESOP 2009
 with handler {
   decide v k -> max (k true, k false)
 } handle (

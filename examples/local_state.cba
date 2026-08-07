@@ -1,3 +1,5 @@
+-- Local state: a name allocator and a store over the names
+-- cf. Completeness for algebraic theories of local state, FoSSaCS 2010
 with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),

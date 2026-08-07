@@ -1,5 +1,6 @@
 -- Real number implementation of Beta/Bernoulli, without state
--- Equivalent to polya_state.cba
+-- Equivalent to prob_polya_state.cba
+-- cf. The Beta-Bernoulli process and algebraic effects, ICALP 2018
 with [$urn -> Double] handler {
   newurn _ k -> k (!uniform ()),
   sample p k -> k (!bernoulli p)

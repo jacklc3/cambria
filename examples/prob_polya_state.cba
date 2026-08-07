@@ -1,5 +1,6 @@
 -- Polyas urn implementation of Beta/Bernoulli, via local state
--- Equivalent to polya_bias.cba
+-- Equivalent to prob_polya_bias.cba
+-- cf. The Beta-Bernoulli process and algebraic effects, ICALP 2018
 with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),

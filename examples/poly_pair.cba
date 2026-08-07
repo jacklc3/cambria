@@ -1,4 +1,5 @@
 -- Polymorphic map_pair
+-- State handlers as in local_state.cba
 with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
