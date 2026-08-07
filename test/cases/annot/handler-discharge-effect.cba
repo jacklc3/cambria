@@ -5,7 +5,6 @@ do h <- return ((handler {
   return x -> return x,
   flip _ k -> k true
 }) : Int!{flip : Unit ~> Bool} => Int!{}) in
-with h handle (
-  do b <- !flip () in
-  if b then return 1 else return 2
-)
+with h handle
+do b <- !flip () in
+if b then return 1 else return 2

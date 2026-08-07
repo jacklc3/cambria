@@ -1,0 +1,3 @@
+-- @expect-type: Bool!{ bernoulli : Double ~> Bool }
+do d <- 1 / 2 in
+!bernoulli d

@@ -5,13 +5,13 @@ with [$graph -> Name, $node -> Bool] handler {
   newnode g k -> k (!flip ()),
   isedge (_, (a, b)) k ->
     if a == b then k true else k false
-} handle (
-  effect !newgraph : Unit ~> $graph.
-  effect !newnode : $graph ~> $node.
-  effect !isedge : $graph * ($node * $node) ~> Bool.
-  -- Make a new graph, pick two nodes, and check an edge between them
-  do g <- !newgraph () in
-  do a <- !newnode g in
-  do b <- !newnode g in
-  !isedge (g, (a,b))
-)
+} handle
+
+effect !newgraph : Unit ~> $graph.
+effect !newnode : $graph ~> $node.
+effect !isedge : $graph * ($node * $node) ~> Bool.
+-- Make a new graph, pick two nodes, and check an edge between them
+do g <- !newgraph () in
+do a <- !newnode g in
+do b <- !newnode g in
+!isedge (g, (a,b))

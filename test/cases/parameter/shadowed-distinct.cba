@@ -1,0 +1,12 @@
+-- @expect-error: Type mismatch: $p#
+with [$p -> Int] handler {
+  return x -> return x,
+  op1 a k -> k 5
+} handle
+do outer <- (effect !op1 : Unit ~> $p. !op1 ()) in
+with [$p -> Bool] handler {
+  return y -> return y,
+  use a k -> k 1
+} handle
+effect !use : $p ~> Int.
+!use outer

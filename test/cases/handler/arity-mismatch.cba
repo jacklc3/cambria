@@ -2,7 +2,6 @@
 with handler {
   return x -> return (x + 1),
   ask v k -> k "hello"
-} handle (
-  do s <- !ask () in
-  return s
-)
+} handle
+do s <- !ask () in
+return s

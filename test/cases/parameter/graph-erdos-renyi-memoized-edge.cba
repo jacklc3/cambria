@@ -5,12 +5,12 @@ with [$name -> Int] handler {
   return x  -> return (fun _ -> return x),
   fresh _ k -> return (fun n -> k n (n+1)),
   finally f -> f 0
-} handle (
+} handle
 with handler {
   return x  -> return (fun _ -> return x),
   flip _ k  -> return (fun b -> k b false),
   finally f -> f true
-} handle (
+} handle
 with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
@@ -18,30 +18,28 @@ with [$loc -> $name] handler {
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if a == b then return x else s b)),
   finally s   -> s (fun _ -> return empty)
-} handle (
-  with [$graph -> $loc, $node -> $name] handler {
-    newgraph _ k -> k (!ref empty),
-    newnode _ k -> k (!fresh ()),
-    isedge (g, (a, b)) k ->
-      do m <- !get g in
-      if member ((a,b), m) then
-        k (lookup ((a,b), m))
-      else if member ((b,a), m) then
-        k (lookup ((b,a), m))
-      else
-        do e <- !flip () in
-        do _ <- !set (g, insert (((a,b),e), m)) in
-        k e
-  } handle (
-    effect !newgraph : Unit ~> $graph.
-    effect !newnode : $graph ~> $node.
-    effect !isedge : $graph * ($node * $node) ~> Bool.
-    do g <- !newgraph () in
-    do a <- !newnode g in
-    do b <- !newnode g in
-    do e1 <- !isedge (g,(a,b)) in
-    do e2 <- !isedge (g,(a,b)) in
-    do e3 <- !isedge (g,(b,a)) in
-    return (e1 == e2, e1 == e3)
-  )
-)))
+} handle
+with [$graph -> $loc, $node -> $name] handler {
+  newgraph _ k -> k (!ref empty),
+  newnode _ k -> k (!fresh ()),
+  isedge (g, (a, b)) k ->
+    do m <- !get g in
+    if member ((a,b), m) then
+      k (lookup ((a,b), m))
+    else if member ((b,a), m) then
+      k (lookup ((b,a), m))
+    else
+      do e <- !flip () in
+      do _ <- !set (g, insert (((a,b),e), m)) in
+      k e
+} handle
+effect !newgraph : Unit ~> $graph.
+effect !newnode : $graph ~> $node.
+effect !isedge : $graph * ($node * $node) ~> Bool.
+do g <- !newgraph () in
+do a <- !newnode g in
+do b <- !newnode g in
+do e1 <- !isedge (g,(a,b)) in
+do e2 <- !isedge (g,(a,b)) in
+do e3 <- !isedge (g,(b,a)) in
+return (e1 == e2, e1 == e3)

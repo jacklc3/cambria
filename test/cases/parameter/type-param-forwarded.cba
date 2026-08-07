@@ -1,0 +1,9 @@
+-- @expect-error: Forwarded operations ["leak"]
+with [$p -> Int] handler {
+  return x -> return x,
+  get a k -> k 5
+} handle
+effect !get : Unit ~> $p.
+effect !leak : $p ~> Unit.
+do x <- !get () in
+!leak x

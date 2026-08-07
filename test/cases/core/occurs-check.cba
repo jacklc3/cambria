@@ -1,0 +1,2 @@
+-- @expect-error: Occurs check fails
+return (fun x -> x x)

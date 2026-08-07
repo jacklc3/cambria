@@ -7,9 +7,8 @@
 with handler {
   return x -> return x,
   get a k -> k 42
-} handle (
-  effect !get : $p ~> Int.
-  effect !ref : Int ~> $p.
-  do a <- !ref 10 in
-  !get a
-)
+} handle
+effect !get : $p ~> Int.
+effect !ref : Int ~> $p.
+do a <- !ref 10 in
+!get a

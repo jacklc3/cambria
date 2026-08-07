@@ -1,0 +1,9 @@
+-- @expect-error: Forwarded operations ["print"]
+with [$loc -> Str] handler {
+  return x  -> return x,
+  ref _ k   -> k "secret representation",
+  finally s -> return s
+} handle
+effect !ref : Unit ~> $loc.
+do a <- !ref () in
+!print a

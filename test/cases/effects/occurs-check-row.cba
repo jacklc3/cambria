@@ -1,0 +1,2 @@
+-- @expect-error: Occurs check fails
+return (rec f x -> !apply f)

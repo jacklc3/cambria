@@ -1,0 +1,14 @@
+-- @expect-error: Forwarded operations ["fresh"]
+with [$name -> Int] handler {
+  return x  -> return (fun _ -> return x),
+  fresh _ k -> return (fun n -> k n (n+1)),
+  finally f -> f 0
+} handle
+effect !fresh : Unit ~> $name.
+with [$loc -> $name] handler {
+  return x  -> return (fun _ -> return x),
+  get a k   -> return (fun s -> k (s a) s),
+  finally s -> s (fun _ -> return 0)
+} handle
+effect !get : $loc ~> Int.
+do n <- !fresh () in !get n

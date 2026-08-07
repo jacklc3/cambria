@@ -6,10 +6,9 @@ with [$p -> Int, $q -> Bool] handler {
   return x -> return x,
   getp a k -> k 1,
   getq a k -> k true
-} handle (
-  effect !getp : Unit ~> $p.
-  effect !getq : Unit ~> $q.
-  do x <- !getp () in
-  do y <- !getq () in
-  return (x, y)
-)
+} handle
+effect !getp : Unit ~> $p.
+effect !getq : Unit ~> $q.
+do x <- !getp () in
+do y <- !getq () in
+return (x, y)

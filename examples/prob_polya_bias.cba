@@ -4,11 +4,11 @@
 with [$urn -> Double] handler {
   newurn _ k -> k (!uniform ()),
   sample p k -> k (!bernoulli p)
-} handle (
-  effect !newurn : Unit ~> $urn.
-  effect !sample : $urn ~> Bool.
-  do urn <- !newurn () in
-  do b1 <- !sample urn in
-  do b2 <- !sample urn in
-  return (b1, b2)
-)
+} handle
+
+effect !newurn : Unit ~> $urn.
+effect !sample : $urn ~> Bool.
+do urn <- !newurn () in
+do b1 <- !sample urn in
+do b2 <- !sample urn in
+return (b1, b2)

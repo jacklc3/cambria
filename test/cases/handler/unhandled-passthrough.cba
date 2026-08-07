@@ -2,7 +2,6 @@
 with handler {
   return x -> return x,
   decide v k -> k true
-} handle (
-  do b <- !decide () in
-  if b then !print "yes" else !print "no"
-)
+} handle
+do b <- !decide () in
+if b then !print "yes" else !print "no"

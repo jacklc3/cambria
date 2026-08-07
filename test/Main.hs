@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Exception (SomeException, evaluate, try)
 import Control.Monad (filterM, unless)
 import Data.Function (on)
 import Data.List (groupBy, intercalate, isInfixOf, sort, stripPrefix)
@@ -13,17 +14,20 @@ import Environment (initialEnv)
 import Runtime (compile)
 import Semantics (eval)
 
-casesDir :: FilePath
-casesDir = "test/cases"
+casesDir, examplesDir :: FilePath
+casesDir    = "test/cases"
+examplesDir = "examples"
 
 -- A test file declares one or more directives in its comments:
 --   -- @expect-type:  <type>      inferred type must match this string exactly
 --   -- @expect-value: <value>     evaluation must produce this result
 --   -- @expect-error: <substring> type checking must fail with this substring
+-- Files under examplesDir need not declare any, but are forced to run regardless.
 data Expectation
   = Type  String
   | Value String
   | Error String
+  | Runs
 
 data Outcome = Pass | Fail String
 
@@ -68,6 +72,8 @@ check (Right (_, v')) (Value v)
   | v == v'                     = Nothing
   | otherwise                   = Just $ mismatch "Expected value" v "Actual" v'
 check (Left err)      (Value v) = Just $ mismatch "Expected value" v "Got error" err
+check (Right (_, v))  Runs      = length v `seq` Nothing
+check (Left err)      Runs      = Just $ "Expected the program to run\n  Got error: " ++ err
 
 mismatch :: String -> String -> String -> String -> String
 mismatch lLabel l rLabel r = lLabel ++ ": " ++ l ++ "\n  " ++ rLabel ++ ": " ++ r
@@ -76,32 +82,41 @@ testName, testGroup :: FilePath -> String
 testName  = dropExtension . makeRelative casesDir
 testGroup = takeDirectory . makeRelative casesDir
 
-renderOutcome :: FilePath -> Outcome -> String
-renderOutcome p Pass       = "PASS: " ++ testName p
-renderOutcome p (Fail msg) = "FAIL: " ++ testName p ++ "\n  " ++ msg
+printOutcome :: FilePath -> Outcome -> String
+printOutcome p Pass       = "PASS: " ++ testName p
+printOutcome p (Fail msg) = "FAIL: " ++ testName p ++ "\n  " ++ msg
 
 printGroup :: [(FilePath, Outcome)] -> IO ()
 printGroup []                = return ()
 printGroup grp@((p, _) : _)  = do
   putStrLn $ "── " ++ testGroup p ++ " ──"
-  mapM_ (putStrLn . uncurry renderOutcome) grp
+  mapM_ (putStrLn . uncurry printOutcome) grp
   putStrLn ""
 
-judge :: String -> Outcome
-judge src = case parseDirectives src of
+judge :: [Expectation] -> String -> Outcome
+judge forced src = case parseDirectives src <> forced of
   []  -> Fail "no expectation directives found"
   exs -> case mapMaybe (check (run src)) exs of
     []    -> Pass
     fails -> Fail (intercalate "\n  " fails)
 
+judgeIO :: [Expectation] -> FilePath -> IO (FilePath, Outcome)
+judgeIO forced path = do
+  src <- readFile path
+  r   <- try (evaluate (judge forced src))
+  return (path, either (\e -> Fail (show (e :: SomeException))) id r)
+
 main :: IO ()
 main = do
-  hasDir <- doesDirectoryExist casesDir
-  unless hasDir $ do
-    putStrLn $ "ERROR: " ++ casesDir ++ " not found."
-    exitFailure
-  files <- findCases casesDir
-  results <- mapM (\f -> (,) f . judge <$> readFile f) files
+  mapM_ (\d -> do
+    hasDir <- doesDirectoryExist d
+    unless hasDir $ do
+      putStrLn $ "ERROR: " ++ d ++ " not found."
+      exitFailure) [casesDir, examplesDir]
+  cases    <- findCases casesDir
+  examples <- findCases examplesDir
+  results  <- (++) <$> mapM (judgeIO []) cases
+                   <*> mapM (judgeIO [Runs]) examples
   mapM_ printGroup (groupBy ((==) `on` testGroup . fst) results)
   let passed = length [() | (_, Pass) <- results]
       total  = length results

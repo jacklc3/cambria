@@ -1,0 +1,7 @@
+-- @expect-error: Parameter witnesses mention bound parameters
+with [$p -> $p] handler {
+  return x -> return x,
+  get a k -> k 5
+} handle
+effect !get : Unit ~> $p.
+!get ()

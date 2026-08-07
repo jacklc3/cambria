@@ -6,7 +6,9 @@ with [$name -> Int] handler {
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} handle (
+} handle
+
+effect !fresh : Unit ~> $name.
 with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
@@ -14,33 +16,31 @@ with [$loc -> $name] handler {
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return false)
-} handle (
-  effect !get : $loc ~> Bool.
-  effect !set : $loc * Bool ~> Unit.
-  effect !ref : Bool ~> $loc.
+} handle
 
-  with [$tid -> Unit -> Unit!{...}] handler {
-    return _ -> return (),
-    act  s k -> !print s ; k (),
-    wait t k -> t () ; k (),
-    stop _ k -> return (),
-    fork _ k ->
-      do hasRun <- !ref false in
-      do thunk <- return (fun _ -> if !get hasRun then return ()
-        else ( !set (hasRun, true) ; k (inr ()) )) in
-      ( k (inl thunk) ; thunk () )
-  } handle (
-    effect !fork : Unit ~> $tid + Unit.
-    effect !wait : $tid ~> Unit.
-    effect !act  : Str ~> Unit.
-    effect !stop : Unit ~> Void.
+effect !get : $loc ~> Bool.
+effect !set : $loc * Bool ~> Unit.
+effect !ref : Bool ~> $loc.
+with [$tid -> Unit -> Unit!{...}] handler {
+  return _ -> return (),
+  act  s k -> !print s ; k (),
+  wait t k -> t () ; k (),
+  stop _ k -> return (),
+  fork _ k ->
+    do hasRun <- !ref false in
+    do thunk <- return (fun _ -> if !get hasRun then return ()
+      else !set (hasRun, true) ; k (inr ())) in
+    k (inl thunk) ; thunk ()
+} handle
 
-    case !fork () of {
-      inl a1 -> case !fork () of {
-        inl a2 -> case !fork () of {
-          inl a3 -> !wait a2 ; !act "Action 4" ; !stop (),
-          inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; !stop () },
-        inr _  -> !act "Action 2" ; !stop () },
-      inr _ -> !act "Action 1" ; !stop () }
-  )
-))
+effect !fork : Unit ~> $tid + Unit.
+effect !wait : $tid ~> Unit.
+effect !act  : Str ~> Unit.
+effect !stop : Unit ~> Void.
+case !fork () of {
+  inl a1 -> case !fork () of {
+    inl a2 -> case !fork () of {
+      inl a3 -> !wait a2 ; !act "Action 4" ; !stop (),
+      inr _  -> !wait a1 ; !wait a2 ; !act "Action 3" ; !stop () },
+    inr _  -> !act "Action 2" ; !stop () },
+  inr _ -> !act "Action 1" ; !stop () }

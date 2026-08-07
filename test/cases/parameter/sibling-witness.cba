@@ -1,0 +1,10 @@
+-- @expect-error: Parameter witnesses mention bound parameters
+with [$p -> Int, $q -> $p] handler {
+  return x -> return x,
+  getp a k -> k 5,
+  getq a k -> k 6
+} handle
+effect !getp : Unit ~> $p.
+effect !getq : Unit ~> $q.
+do x <- !getp () in
+!getq ()

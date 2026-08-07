@@ -8,8 +8,8 @@ return (fun f ->
   with [$p -> Int] handler {
     return x -> return x,
     get a k -> k 5
-  } handle (
-    effect !get : Unit ~> $p.
-    do x <- !get () in
-    f x
-  ))
+  } handle
+  effect !get : Unit ~> $p.
+  do x <- !get () in
+  f x
+  )

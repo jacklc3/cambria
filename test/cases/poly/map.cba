@@ -6,18 +6,16 @@ with [$p -> Name] handler {
   ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
-} handle (
-  effect !get : $p ~> Int.
-  effect !set : $p * Int ~> Unit.
-  effect !ref : Int ~> $p.
-  do map <- return (rec map f xs ->
-    case uncons xs of {
-      inl _       -> return [],
-      inr (x,xs') -> f x :: map f xs'
-    })
-  in
-  do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
-  do vals <- map (fun r -> !get r) refs in
-  do checks <- map (fun n -> return (n == 20)) vals in
-  return (vals, checks)
-)
+} handle
+effect !get : $p ~> Int.
+effect !set : $p * Int ~> Unit.
+effect !ref : Int ~> $p.
+do map <- return (rec map f xs ->
+  case uncons xs of {
+    inl _       -> return [],
+    inr (x,xs') -> f x :: map f xs'
+  }) in
+do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
+do vals <- map (fun r -> !get r) refs in
+do checks <- map (fun n -> return (n == 20)) vals in
+return (vals, checks)

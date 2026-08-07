@@ -8,15 +8,13 @@
 with [$p -> Int] handler {
   return x -> return x,
   op1 a k -> k 5
-} handle (
-  effect !op1 : Unit ~> $p.
-  do outer <- !op1 () in
-  with [$p -> Bool] handler {
-    return y -> return y,
-    op2 a k -> k true
-  } handle (
-    effect !op2 : Unit ~> $p.
-    do inner <- !op2 () in
-    return (outer, inner)
-  )
-)
+} handle
+effect !op1 : Unit ~> $p.
+do outer <- !op1 () in
+with [$p -> Bool] handler {
+  return y -> return y,
+  op2 a k -> k true
+} handle
+effect !op2 : Unit ~> $p.
+do inner <- !op2 () in
+return (outer, inner)

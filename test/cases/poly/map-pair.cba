@@ -6,16 +6,15 @@ with [$p -> Name] handler {
   ref x k -> do a <- !fresh () in return (fun s ->
     k a (insert (((a, x), s)))),
   finally s -> s empty
-} handle (
-  effect !get : $p ~> Int.
-  effect !set : $p * Int ~> Unit.
-  effect !ref : Int ~> $p.
-  do map_pair <- return (fun f (x, y) -> return (f x, f y)) in
-  do (d1, d2) <- map_pair (fun n -> return (n * 2)) (3, 7) in
-  do a <- !ref 100 in
-  do b <- !ref 200 in
-  do (v1, v2) <- map_pair (fun r -> !get r) (a, b) in
-  do sum <- return (v1 + v2) in
-  do (r1, r2) <- map_pair (fun n -> !ref n) (sum, d1 + d2) in
-  return ((d1, d2), (sum, (!get r1, !get r2)))
-)
+} handle
+effect !get : $p ~> Int.
+effect !set : $p * Int ~> Unit.
+effect !ref : Int ~> $p.
+do map_pair <- return (fun f (x, y) -> return (f x, f y)) in
+do (d1, d2) <- map_pair (fun n -> return (n * 2)) (3, 7) in
+do a <- !ref 100 in
+do b <- !ref 200 in
+do (v1, v2) <- map_pair (fun r -> !get r) (a, b) in
+do sum <- return (v1 + v2) in
+do (r1, r2) <- map_pair (fun n -> !ref n) (sum, d1 + d2) in
+return ((d1, d2), (sum, (!get r1, !get r2)))

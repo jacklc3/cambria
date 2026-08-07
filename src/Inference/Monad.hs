@@ -22,11 +22,11 @@ fresh = do
   modify (\st -> st { count = succ n })
   return $ TVar $ "_t" ++ show n
 
-freshParam :: Infer Ident
-freshParam = do
+freshParam :: Ident -> Infer Ident
+freshParam p = do
   n <- gets count
   modify (\st -> st { count = succ n })
-  return $ "_p" ++ show n
+  return $ p ++ "#" ++ show n
 
 freshEffects :: Map.Map Op Arity -> Infer EffectsType
 freshEffects ops = do

@@ -54,7 +54,7 @@ generalizeComp tc = do
 
 freshen :: Map.Map Ident ValueType -> Computation -> Infer (Map.Map Ident ValueType, Computation)
 freshen sigma c = do
-  ren <- traverse (const freshParam) sigma
+  ren <- Map.traverseWithKey (\p _ -> freshParam p) sigma
   let rho = Map.map TParam ren
       ps  = Map.mapKeys (ren Map.!) sigma
   return (ps, apply (Parameter rho) c)
@@ -119,6 +119,8 @@ inferComp = \case
     eOut <- freshEffects mempty
     unify tv (THandler (TComp tInVal eIn) (TComp tOutVal eOut))
     ~(THandler tIn tOut) <- applySubst tv
+    -- Before unifying the body's operations into the row
+    let handled = Map.keysSet (effectOps (effects tIn))
     tc <- inferComp c'
     unify (nullifyEffects (effects tIn)) (effects tOut)
     tIn' <- applySubst tIn
@@ -127,7 +129,15 @@ inferComp = \case
     tOut' <- applySubst tOut
     let escaped = Map.keysSet sig' `Set.intersection` (free PV ctx' <> free PV tOut')
     unless (Set.null escaped) $ throwError
-      $ "Type parameters " ++ show (Set.toList escaped) ++ " escape the handler"
+      $ "Type parameters " ++ unwords (map (show . TParam) (Set.toList escaped))
+        ++ " escape the handler"
+    tc' <- applySubst tc
+    let forwarded = effectOps (effects tc') `Map.withoutKeys` handled
+        leaked = Map.keysSet
+               $ Map.filter (not . Set.disjoint (Map.keysSet sig') . free PV) forwarded
+    unless (Set.null leaked) $ throwError
+      $ "Forwarded operations " ++ show (Set.toList leaked)
+        ++ " mention type parameters bound by this handler"
     return tOut'
   CAnnot c t -> do
     t' <- inferComp c

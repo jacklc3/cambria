@@ -7,12 +7,11 @@ with handler {
       inl x -> return (inl x),
       inr d -> if d == c then k (inr ()) else return (inr d)
     }
-} handle (
-  case !sub () of {
-    inl a -> case !sub () of {
-      inl b -> !var a,
-      inr _ -> return 2
-    },
-    inr _ -> return 3
-  }
-)
+} handle
+case !sub () of {
+  inl a -> case !sub () of {
+    inl b -> !var a,
+    inr _ -> return 2
+  },
+  inr _ -> return 3
+}

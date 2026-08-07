@@ -1,0 +1,3 @@
+-- Nested closed annotations disagreeing on the row.
+-- @expect-error: Effect mismatch
+((!print "hi" : Unit!{ print : Str ~> Unit }) : Unit!{ read : Unit ~> Str })

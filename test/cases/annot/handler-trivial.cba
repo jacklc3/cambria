@@ -4,4 +4,4 @@
 do h <- return ((handler {
   return x -> return x
 }) : Int!{} => Int!{}) in
-with h handle (return 7)
+with h handle return 7
