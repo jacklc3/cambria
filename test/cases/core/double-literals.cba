@@ -1,0 +1,4 @@
+-- Point notation distinguishes the two numeric types: 1 is an Int, 1.0 is a Double.
+-- @expect-type: (Int * Double)!{}
+-- @expect-value: Pure: (1, 1.0)
+return (1, 1.0)

@@ -1,0 +1,4 @@
+-- || binds looser than &&, which binds looser than the comparisons.
+-- @expect-type: (Bool * Bool)!{}
+-- @expect-value: Pure: (True, False)
+return (false && false || 1 < 2, true && 1 == 2)

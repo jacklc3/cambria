@@ -50,7 +50,14 @@ import Control.Monad.Except
   List                       { Token _ _ TokTList }
 
   '()'                       { Token _ _ TokUnit }
+  '&&'                       { Token _ _ TokAnd }
+  '||'                       { Token _ _ TokOr }
   '=='                       { Token _ _ TokEq }
+  '/='                       { Token _ _ TokNEq }
+  '<'                        { Token _ _ TokLT }
+  '>'                        { Token _ _ TokGT }
+  '<='                       { Token _ _ TokLTE }
+  '>='                       { Token _ _ TokGTE }
   '->'                       { Token _ _ TokArrow }
   '<-'                       { Token _ _ TokLeftArrow }
   '+'                        { Token _ _ TokPlus }
@@ -78,6 +85,9 @@ import Control.Monad.Except
   '=>'                       { Token _ _ TokFatArrow }
 
   integer                    { Token _ _ (TokInt $$) }
+  double                     { Token _ _ (TokDouble $$) }
+  negint                     { Token _ _ (TokNegInt $$) }
+  negdouble                  { Token _ _ (TokNegDouble $$) }
   boolean                    { Token _ _ (TokBool $$) }
   string                     { Token _ _ (TokString $$) }
   var                        { Token _ _ (TokIdent $$) }
@@ -86,9 +96,11 @@ import Control.Monad.Except
 
 %right ';'
 %right '::'
-%nonassoc '=='
+%right '||'
+%right '&&'
+%nonassoc '==' '/=' '<' '>' '<=' '>='
 %left '++'
-%left '+' '-'
+%left '+' '-' negint negdouble
 %left '*' '/'
 %nonassoc APP
 
@@ -106,6 +118,8 @@ expr :: { SugaredExpr }
 
 exprInfix :: { SugaredExpr }
   : atom                                  { $1 }
+  | negint                                { SEInt $1 }
+  | negdouble                             { SEDouble $1 }
   | compInfix                             { SEComp $1 }
   | '(' expr ')'                          { $2 }
   | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
@@ -136,6 +150,8 @@ patterns :: { [Pattern] }
 
 value :: { SugaredExpr }
   : atom                                  { $1 }
+  | negint                                { SEInt $1 }
+  | negdouble                             { SEDouble $1 }
   | inl exprAtom                          { SEEither L $2 }
   | inr exprAtom                          { SEEither R $2 }
   | fun patterns '->' comp                { SEFun (reverse $2) $4 }
@@ -147,6 +163,7 @@ atom :: { SugaredExpr }
   | '[]'                                  { SEVar "[]" }
   | boolean                               { SEBool $1 }
   | integer                               { SEInt $1 }
+  | double                                { SEDouble $1 }
   | string                                { SEString $1 }
   | '(' expr ',' expr ')'                 { SEPair $2 $4 }
   | var                                   { SEVar $1 }
@@ -180,10 +197,19 @@ compTerm :: { SugaredComp }
 
 compInfix :: { SugaredComp }
   : exprInfix '::' exprInfix              { SCApp (SEVar "::") (SEPair $1 $3) }
+  | exprInfix '||' exprInfix              { SCApp (SEVar "||") (SEPair $1 $3) }
+  | exprInfix '&&' exprInfix              { SCApp (SEVar "&&") (SEPair $1 $3) }
   | exprInfix '==' exprInfix              { SCApp (SEVar "==") (SEPair $1 $3) }
+  | exprInfix '/=' exprInfix              { SCApp (SEVar "/=") (SEPair $1 $3) }
+  | exprInfix '<'  exprInfix              { SCApp (SEVar "<") (SEPair $1 $3) }
+  | exprInfix '>'  exprInfix              { SCApp (SEVar ">") (SEPair $1 $3) }
+  | exprInfix '<=' exprInfix              { SCApp (SEVar "<=") (SEPair $1 $3) }
+  | exprInfix '>=' exprInfix              { SCApp (SEVar ">=") (SEPair $1 $3) }
   | exprInfix '++' exprInfix              { SCApp (SEVar "++") (SEPair $1 $3) }
   | exprInfix '+'  exprInfix              { SCApp (SEVar "+") (SEPair $1 $3) }
   | exprInfix '-'  exprInfix              { SCApp (SEVar "-") (SEPair $1 $3) }
+  | exprInfix negint                      { SCApp (SEVar "+") (SEPair $1 (SEInt $2)) }
+  | exprInfix negdouble                   { SCApp (SEVar "+") (SEPair $1 (SEDouble $2)) }
   | exprInfix '*'  exprInfix              { SCApp (SEVar "*") (SEPair $1 $3) }
   | exprInfix '/'  exprInfix              { SCApp (SEVar "/") (SEPair $1 $3) }
   | compApp                               { $1 }

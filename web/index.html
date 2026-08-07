@@ -360,15 +360,15 @@ const PANES = (() => {
 const DEFAULT_PROGRAM = `-- Cambria: algebraic effects with parametrized handlers.
 -- Press Cmd/Ctrl-Enter (or Run) to evaluate, or pick an example above.
 
--- a handler that explores both branches and keeps the larger outcome
+-- Nondeterminism resolved by maximizing over both resumptions
+-- cf. Handlers of algebraic effects, ESOP 2009
 with handler {
-  decide _ k -> max (k true, k false)
-} handle (
-  effect !decide : Unit ~> Bool.
-  do x <- if !decide () then return 15 else return 30 in
-  do y <- if !decide () then return 5  else return 10 in
-  return (x - y)
-)
+  decide v k -> max (k true, k false)
+} handle
+
+do x1 <- if !decide () then return 15 else return 30 in
+do x2 <- if !decide () then return 5  else return 10 in
+return (x1 - x2)
 `;
 
 const TIMEOUT_MS = 5000;
@@ -394,6 +394,7 @@ require(["vs/editor/editor.main"], function () {
         [/\b(fun|rec|handler|return|finally|do|in|if|then|else|with|handle|inl|inr|case|of|effect)\b/, "keyword"],
         [/\b(true|false)\b/, "constant"],
         [/\b(Unit|Void|Int|Bool|Double|Str|Name|Map|List)\b/, "type"],
+        [/\b\d+\.\d+\b/, "number"],
         [/\b\d+\b/, "number"],
         [/[a-z][\w']*/, "identifier"],
         [/[+\-*\/<>=&|^@%?~:.;,]+/, "operator"],

@@ -6,7 +6,7 @@ with [$loc -> Name] handler {
   set (a,x) k -> return (fun s -> k () (fun b -> if a == b then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if a == b then return x else s b)),
-  finally s   -> s (fun _ -> return (0 / 1, empty))
+  finally s   -> s (fun _ -> return (0.0, empty))
 } handle
 
 with [$graph -> $loc, $node -> Name] handler {
@@ -35,4 +35,4 @@ do c <- !newnode g in
 do e1 <- !isedge (g,(a,b)) in
 do e2 <- !isedge (g,(b,c)) in
 do e3 <- !isedge (g,(a,c)) in
-if e1 then (if e2 then return e3 else return false) else return false
+return (e1 && e2 && e3)

@@ -19,9 +19,9 @@ with [$loc -> $name] handler {
   finally s   -> s (fun _ -> return (0, 0))
 } handle
 
+effect !ref : Int * Int ~> $loc.
 effect !get : $loc ~> Int * Int.
 effect !set : $loc * (Int * Int) ~> Unit.
-effect !ref : Int * Int ~> $loc.
 with [$urn -> $loc] handler {
   newurn _ k -> k (!ref (1, 1)),
   sample urn k ->

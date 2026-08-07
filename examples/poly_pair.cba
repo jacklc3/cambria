@@ -18,9 +18,9 @@ with [$loc -> $name] handler {
   finally s   -> s (fun _ -> return 0)
 } handle
 
+effect !ref : Int ~> $loc.
 effect !get : $loc ~> Int.
 effect !set : $loc * Int ~> Unit.
-effect !ref : Int ~> $loc.
 do map_pair <- return (fun f (a, b) -> return (f a, f b)) in
 do (d1, d2) <- map_pair (fun n -> return (n * 2)) (3, 7) in
 do a <- !ref 100 in

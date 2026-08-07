@@ -69,6 +69,7 @@ desugarExpr = \case
   SEUnit      -> return (id, VUnit)
   SEBool b    -> return (id, VBool b)
   SEInt i     -> return (id, VInt i)
+  SEDouble n  -> return (id, VDouble n)
   SEString s  -> return (id, VString s)
   SEPair e1 e2 -> do
     (k1, v1) <- desugarExpr e1

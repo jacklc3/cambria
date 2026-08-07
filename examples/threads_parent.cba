@@ -18,9 +18,9 @@ with [$loc -> $name] handler {
   finally s   -> s (fun _ -> return false)
 } handle
 
+effect !ref : Bool ~> $loc.
 effect !get : $loc ~> Bool.
 effect !set : $loc * Bool ~> Unit.
-effect !ref : Bool ~> $loc.
 with [$tid -> Unit -> Unit!{...}] handler {
   return _ -> return (),
   act  s k -> !print s ; k (),

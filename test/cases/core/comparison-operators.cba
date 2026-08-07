@@ -1,0 +1,4 @@
+-- The orderings are on Int; == and /= are structural at any type.
+-- @expect-type: ((Bool * Bool) * (Bool * Bool))!{}
+-- @expect-value: Pure: ((True, False), (True, True))
+return ((1 < 2, 1 > 2), (2 <= 2, "a" /= "b"))

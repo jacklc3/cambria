@@ -36,4 +36,4 @@ do c <- !newnode g in
 do e1 <- !isedge (g,(a,b)) in
 do e2 <- !isedge (g,(b,c)) in
 do e3 <- !isedge (g,(a,c)) in
-if e1 then (if e2 then return e3 else return false) else return false
+return (e1 && e2 && e3)

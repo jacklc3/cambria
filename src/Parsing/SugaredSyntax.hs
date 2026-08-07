@@ -13,6 +13,7 @@ data SugaredExpr
   | SEUnit
   | SEBool Bool
   | SEInt Integer
+  | SEDouble Double
   | SEString String
   | SEPair SugaredExpr SugaredExpr
   | SEEither Side SugaredExpr

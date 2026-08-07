@@ -2,6 +2,9 @@ module Parsing.Token where
 
 data TokenKind
   = TokInt Integer
+  | TokDouble Double
+  | TokNegInt Integer
+  | TokNegDouble Double
   | TokBool Bool
   | TokString String
   | TokIdent String

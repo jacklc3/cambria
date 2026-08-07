@@ -79,7 +79,12 @@ tokens :-
 
   \$$lower[$alpha$digit\_\']* { \p s -> Token p s (TokTypeParam (drop 1 s)) }
 
+  $digit+ \. $digit+         { \p s -> Token p s (TokDouble (read s)) }
   $digit+                    { \p s -> Token p s (TokInt (read s)) }
+
+  \- $digit+ \. $digit+      { \p s -> Token p s (TokNegDouble (read s)) }
+  \- $digit+                 { \p s -> Token p s (TokNegInt (read s)) }
+
   true                       { \p s -> Token p s (TokBool True) }
   false                      { \p s -> Token p s (TokBool False) }
   $lower[$alpha$digit\_\']*  { \p s -> Token p s (TokIdent s) }

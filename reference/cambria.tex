@@ -35,8 +35,8 @@
 % ── Listings: Cambria language ───────────────────────────────────────────────
 \lstdefinelanguage{cambria}{
   morekeywords={fun,rec,handler,return,finally,do,in,if,then,else,with,handle,
-                inl,inr,case,of,effect,Unit,Int,Bool,Double,Str,Name,Map,List,
-                true,false},
+                inl,inr,case,of,effect,Unit,Void,Int,Bool,Double,Str,Name,Map,
+                List,true,false},
   sensitive=true,
   morecomment=[l]{--},
   morestring=[b]",
@@ -47,7 +47,7 @@
     {=>}{{$\Rightarrow$}}2
     {++}{{+\!+}}2
     {::}{{:\!:}}2
-    {!=}{{$\neq$}}1
+    {/=}{{$\neq$}}1
     {==}{{$==$}}2
     {<=}{{$\leq$}}2
     {>=}{{$\geq$}}2
@@ -174,7 +174,7 @@ fine-grained call-by-value discipline.
 \texttt{Unit}   & \cba{()}                    & The unit value \\
 \texttt{Int}    & \texttt{0}, \texttt{42}, \texttt{-3}  & Arbitrary-precision integers \\
 \texttt{Bool}   & \cba{true}, \cba{false}     & Booleans \\
-\texttt{Double} & (produced by \texttt{/} and \cba{!uniform}) & Floating-point numbers \\
+\texttt{Double} & \texttt{1.0}, \texttt{0.5}, \texttt{-0.25} & Floating-point numbers \\
 \texttt{Str}    & \texttt{"hello"}, \texttt{"a\textbackslash nb"} & Strings (with escapes) \\
 \texttt{Name} & (produced by \cba{!fresh}) & Opaque unique identifiers \\
 \bottomrule
@@ -184,6 +184,22 @@ fine-grained call-by-value discipline.
 String escape sequences: \texttt{\textbackslash n}~(newline),
 \texttt{\textbackslash t}~(tab), \texttt{\textbackslash"}~(double quote),
 \texttt{\textbackslash\textbackslash}~(backslash).
+
+\subsubsection*{Numeric Literals}
+
+Point notation separates the two numeric types: \texttt{1} is an \texttt{Int}
+and \texttt{1.0} is a \texttt{Double}.  A \texttt{Double} literal needs digits
+on both sides of the point, so \texttt{1.} and \texttt{.5} are not literals.
+
+A \texttt{-} written directly against the digits belongs to the literal, so
+\texttt{-3} and \texttt{(-3, 4)} and \texttt{3 - -2} all contain a negative
+literal.  Where an operand comes first there is nothing to negate and the
+same text is a subtraction, so \texttt{n-1}, \texttt{n - 1} and \texttt{n -1}
+all subtract.
+
+The one thing to know is that a signed literal cannot be an application
+argument on its own: \cba{f -3} is the subtraction \cba{f - 3}, and applying
+\texttt{f} to \texttt{-3} is written \cba{f (-3)}.
 
 % ── Compound types ───────────────────────────────────────────────────────────
 \subsection{Compound Types}
@@ -217,9 +233,10 @@ insert ((key, val), m)      -- insert into map
 \end{lstlisting}
 
 % ── Type syntax ──────────────────────────────────────────────────────────────
-\subsection{Type Syntax in Declarations}
+\subsection{Type Syntax}
 
-Types are written in \cba{effect} statements using this syntax:
+Types are written in \cba{effect} declarations and in explicit annotations
+(Section~\ref{sec:annotations}), using this syntax:
 
 \begin{center}
 \begin{tabular}{ll}
@@ -227,15 +244,18 @@ Types are written in \cba{effect} statements using this syntax:
 \textbf{Syntax} & \textbf{Meaning} \\
 \midrule
 \texttt{Unit}        & Unit type \\
+\texttt{Void}        & Empty type (no values) \\
 \texttt{Int}         & Integer type \\
 \texttt{Bool}        & Boolean type \\
 \texttt{Double}      & Floating-point type \\
 \texttt{Str}         & String type \\
-\texttt{Name}      & Fresh-name identifier type \\
-\texttt{A * B}      & Pair type (product) \\
+\texttt{Name}        & Fresh-name identifier type \\
+\texttt{A * B}       & Pair type (product) \\
 \texttt{A + B}       & Sum type (either) \\
 \texttt{Map K V}     & Map type \\
 \texttt{List A}      & List type \\
+\texttt{A -> B!\{ops\}} & Function type \\
+\texttt{A!\{ops\} => B!\{ops\}} & Handler type \\
 \texttt{\$p}         & Abstract type parameter \\
 \texttt{(A)}         & Parenthesised type \\
 \bottomrule
@@ -243,7 +263,27 @@ Types are written in \cba{effect} statements using this syntax:
 \end{center}
 
 Precedence: \texttt{+} binds looser than \texttt{*}, so
-\texttt{Int * Bool + Str} means \texttt{(Int * Bool) + Str}.
+\texttt{Int * Bool + Str} means \texttt{(Int * Bool) + Str}.  Neither operator
+associates, so a chain of three or more needs parentheses.
+
+A function type carries the computation type of its result, effects included,
+so an operation can take a callback:
+
+\begin{lstlisting}
+effect !atomically : (Unit -> Int!{ get : Unit ~> Int }) ~> Int.
+\end{lstlisting}
+
+A handler type is written with a fat arrow between two computation types,
+the one it consumes and the one it produces (Section~\ref{sec:handlertypes}).
+
+\begin{lstlisting}
+(handler { return x -> return x } : Int!{} => Int!{})
+\end{lstlisting}
+
+\texttt{Void} has no values and no literal.  It is the sensible result type
+for an operation that never returns, such as a jump or a thread halting
+(\cba{effect !stop : Unit ~> Void.}). The built-in \cba{absurd} turns a
+\texttt{Void} into anything.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Values and Computations}
@@ -419,8 +459,8 @@ functions.
 if condition then computation1 else computation2
 \end{lstlisting}
 
-The condition must be a value expression of type \texttt{Bool}.  Both branches
-are computations:
+The condition is a value of type \texttt{Bool}, and both branches are
+computations:
 
 \begin{lstlisting}
 if x == 0 then return "zero" else return "nonzero"
@@ -474,14 +514,43 @@ Note: \texttt{/} always produces a \texttt{Double}, even for integer operands.
 \toprule
 \textbf{Operator} & \textbf{Types} & \textbf{Result} \\
 \midrule
-\texttt{==} & \texttt{a * a} & \texttt{Bool} \\
+\texttt{==} & \texttt{a * a}     & \texttt{Bool} \\
+\texttt{/=} & \texttt{a * a}     & \texttt{Bool} \\
+\texttt{<}  & \texttt{Int * Int} & \texttt{Bool} \\
+\texttt{>}  & \texttt{Int * Int} & \texttt{Bool} \\
+\texttt{<=} & \texttt{Int * Int} & \texttt{Bool} \\
+\texttt{>=} & \texttt{Int * Int} & \texttt{Bool} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The \texttt{==} operator is polymorphic. It works on any type where
-structural equality is defined (integers, booleans, strings, unique values,
-pairs, lists, maps, sum types).
+The \texttt{==} and \texttt{/=} operators are polymorphic. They work on any
+type where structural equality is defined (integers, doubles, booleans,
+strings, unique values, pairs, lists, maps, sum types).  The four orderings
+are on \texttt{Int}, like the other arithmetic.  All six are
+non-associative, so \texttt{a < b < c} is a parse error.
+
+\subsection{Boolean Connectives}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Operator} & \textbf{Types} & \textbf{Result} \\
+\midrule
+\texttt{\&\&} & \texttt{Bool * Bool} & \texttt{Bool} \\
+\texttt{||}   & \texttt{Bool * Bool} & \texttt{Bool} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{lstlisting}
+if x == 0 || 0 < y && y <= 10 then return true else return false
+\end{lstlisting}
+
+Both are right-associative, and \cba{||} binds looser than \cba{&&}, so the
+condition above reads \cba{(x == 0) || ((0 < y) && (y <= 10))}.  Neither is
+short-circuiting: they are ordinary functions on a pair, so both arguments
+are evaluated.
 
 \subsection{String Concatenation}
 
@@ -518,7 +587,10 @@ pairs, lists, maps, sum types).
 \begin{enumerate}
   \item \texttt{;} (sequencing): right-associative
   \item \texttt{::} (cons): right-associative
-  \item \texttt{==} (equality): non-associative
+  \item \texttt{||} (disjunction): right-associative
+  \item \texttt{\&\&} (conjunction): right-associative
+  \item \texttt{==}, \texttt{/=}, \texttt{<}, \texttt{>}, \texttt{<=},
+        \texttt{>=} (comparison): non-associative
   \item \texttt{++} (string concat): left-associative
   \item \texttt{+}, \texttt{-} (additive): left-associative
   \item \texttt{*}, \texttt{/} (multiplicative): left-associative
@@ -527,6 +599,29 @@ pairs, lists, maps, sum types).
 
 All infix operators desugar into function applications.  For example,
 \texttt{x + y} becomes \texttt{(+) (x, y)}.
+
+The compound computation forms are looser still.  The body of a \cba{do},
+the branches of an \cba{if} and a \cba{case}, the body of a
+\cba{with ... handle}, and the scope of an \cba{effect} declaration all
+extend as far to the right as they can, across \texttt{;} and to the end of
+the enclosing computation.  So
+
+\begin{lstlisting}
+do x <- return 1 in return x ; return x
+\end{lstlisting}
+
+binds \texttt{x} in both computations of the sequence, rather than closing
+the \cba{do} at the semicolon.  This is what lets a handler be written as a
+prefix, with its body simply following it:
+
+\begin{lstlisting}
+with handler { ... } handle
+
+effect !op : Unit ~> Int.
+!op () ; !op ()
+\end{lstlisting}
+
+Parenthesise a computation to end its scope early.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Effects and Operations}
@@ -575,15 +670,20 @@ with [$p -> Type] handler {
   return x -> returnBody,
   opName pattern contName -> opBody,
   finally pattern -> finallyBody
-} handle (
-  computation
-)
+} handle
+
+computation
 \end{lstlisting}
 
 A handler is a value (of handler type) applied to a computation via
 \cba{with ... handle ...}.  The optional \cba{[$p -> Type, ...]} list between
 \cba{with} and the handler instantiates the handler's abstract type
 parameters (Section~\ref{sec:typeparams}); it is omitted when there are none.
+
+The handled computation runs to the end of the enclosing computation
+(Section~\ref{sec:operators}), so a stack of handlers reads as a prefix and
+needs no parentheses.  Wrapping the body in \texttt{(\ldots)} is still
+allowed, and is how a handler is closed off early.
 
 \subsection{Handler Clauses}
 
@@ -655,7 +755,7 @@ do h <- return (handler {
   return x -> return x,
   decide v k -> max (k true, k false)
 }) in
-with h handle (...)
+with h handle ...
 \end{lstlisting}
 
 \subsection{Nested Handlers}
@@ -664,12 +764,10 @@ Handlers can be nested.  The innermost handler for a given operation takes
 priority:
 
 \begin{lstlisting}
-with outerHandler handle (
-  with innerHandler handle (
-    -- innerHandler's operations are checked first
-    ...
-  )
-)
+with outerHandler handle
+with innerHandler handle
+-- innerHandler's operations are checked first
+...
 \end{lstlisting}
 
 If an inner handler does not handle an operation, it propagates to the outer
@@ -708,20 +806,20 @@ Attempting to use a \texttt{\$p} value where a concrete type is expected
 \subsection{Instantiating Type Parameters in Handlers}
 
 A handler application instantiates a type parameter with a
-\texttt{[\$p -> Type]} list placed between the handler and \cba{handle}:
+\texttt{[\$p -> Type]} list placed between \cba{with} and the handler:
 
 \begin{lstlisting}
-with handler {
+with [$p -> Name] handler {
   return x -> ...,
   ref x k -> do a <- !fresh () in k a,
   get a k -> ...,
   set x k -> ...
-} [$p -> Name] handle (
-  effect !ref : Int ~> $p.
-  effect !get : $p ~> Int.
-  effect !set : $p * Int ~> Unit.
-  ...
-)
+} handle
+
+effect !ref : Int ~> $p.
+effect !get : $p ~> Int.
+effect !set : $p * Int ~> Unit.
+...
 \end{lstlisting}
 
 When the handler instantiates \texttt{\$p -> Name}, all occurrences of
@@ -733,7 +831,7 @@ When the handler instantiates \texttt{\$p -> Name}, all occurrences of
 Different parameters can be used for different abstract types:
 
 \begin{lstlisting}
-with handler { ... } [$p -> Name, $q -> Int] handle (...)
+with [$p -> Name, $q -> Int] handler { ... } handle ...
 \end{lstlisting}
 
 \subsection{Nested Parameter Instantiation}
@@ -741,9 +839,9 @@ with handler { ... } [$p -> Name, $q -> Int] handle (...)
 A type parameter can be instantiated to a type involving another parameter:
 
 \begin{lstlisting}
-with handler {
+with [$p1 -> $p2 + Int] handler {
   ...
-} [$p1 -> $p2 + Int] handle (...)
+} handle ...
 \end{lstlisting}
 
 \subsection{Parameter Coverage Checking}
@@ -754,16 +852,40 @@ checker rejects the program:
 
 \begin{lstlisting}
 -- ERROR: handler instantiates $p but does not handle !set
-with handler {
+with [$p -> Name] handler {
   return x -> return x,
   get a k -> k 42,
   ref x k -> k ()
-} [$p -> Name] handle (
-  effect !get : $p ~> Int.
-  effect !set : $p * Int ~> Unit.   -- not handled!
-  effect !ref : Int ~> $p.
-  ...
-)
+} handle
+
+effect !get : $p ~> Int.
+effect !set : $p * Int ~> Unit.   -- not handled!
+effect !ref : Int ~> $p.
+...
+\end{lstlisting}
+
+The operations that would be left over are reported by name:
+\texttt{Forwarded operations ["set"] mention type parameters bound by this
+handler}.  A handler that instantiates \texttt{\$p} is the only place where
+\texttt{\$p} has a meaning, so nothing mentioning it may be passed further
+out.
+
+\subsection{Parameter Escape Checking}
+
+The same reasoning applies to values, not just to operations.  A
+\texttt{\$p}-typed value may not escape the handler that instantiates
+\texttt{\$p}.  The type checker rejects a body that leaks one into the surrounding context:
+
+\begin{lstlisting}
+-- ERROR: $p escapes through f, which comes from outside the handler
+return (fun f ->
+  with [$p -> Int] handler {
+    return x -> return x,
+    get a k -> k 5
+  } handle
+  effect !get : Unit ~> $p.
+  do x <- !get () in
+  f x)
 \end{lstlisting}
 
 % ══════════════════════════════════════════════════════════════════════════════
@@ -830,7 +952,14 @@ These are available in every program without any declaration.
 \texttt{*}   & \texttt{Int * Int -> Int}    & Multiplication \\
 \texttt{/}   & \texttt{Int * Int -> Double} & Division \\
 \texttt{max} & \texttt{Int * Int -> Int}    & Maximum \\
+\texttt{<}   & \texttt{Int * Int -> Bool}   & Less than \\
+\texttt{>}   & \texttt{Int * Int -> Bool}   & Greater than \\
+\texttt{<=}  & \texttt{Int * Int -> Bool}   & Less than or equal \\
+\texttt{>=}  & \texttt{Int * Int -> Bool}   & Greater than or equal \\
+\texttt{\&\&} & \texttt{Bool * Bool -> Bool} & Conjunction \\
+\texttt{||}  & \texttt{Bool * Bool -> Bool} & Disjunction \\
 \texttt{==}  & \texttt{a * a -> Bool}       & Structural equality \\
+\texttt{/=}  & \texttt{a * a -> Bool}       & Structural inequality \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -881,6 +1010,26 @@ These are available in every program without any declaration.
 
 Note: \texttt{lookup} will error at runtime if the key is not found.
 Check with \texttt{member} first if unsure.
+
+\subsection{The Empty Type}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Function} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\texttt{absurd} & \texttt{Void -> a} & Anything follows from \texttt{Void} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+An operation declared to return \texttt{Void} never resumes, so its result
+can be turned into whatever the surrounding code needs:
+
+\begin{lstlisting}
+effect !stop : Unit ~> Void.
+do v <- !stop () in absurd v
+\end{lstlisting}
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Built-in IO Effects}
@@ -946,6 +1095,22 @@ Effect rows can be either \textbf{closed} (a fixed set of operations) or
 \textbf{open} (a set of known operations plus an effect variable representing
 unknown additional effects).  Open effect rows allow polymorphism over effects.
 
+The two print differently.  A closed row is just its operations between
+braces, and an open row adds a bar and the effect variable:
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+\textbf{Printed} & \textbf{Meaning} \\
+\midrule
+\texttt{\{\}}                        & Closed and empty: no effects at all \\
+\texttt{\{ print : Str \(\leadsto\) Unit \}} & Closed: exactly this operation \\
+\texttt{\{\_e1\}}                    & Open and empty: any effects \\
+\texttt{\{ print : Str \(\leadsto\) Unit | \_e1 \}} & Open: this operation and possibly more \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \subsection{Polymorphism}
 
 Functions defined with \cba{do ... <- return (fun ...) in ...} or
@@ -991,6 +1156,7 @@ swap (a, b)              -- at $p (Name, but swap doesn't know)
 \end{lstlisting}
 
 \subsection{Handler Types}
+\label{sec:handlertypes}
 
 Handlers have types of the form:
 
@@ -998,14 +1164,100 @@ Handlers have types of the form:
 \texttt{CompType\textsubscript{in} => CompType\textsubscript{out}}
 \end{center}
 
-Or with parameter substitutions:
+The input computation type includes the effects the handler catches.  The
+output computation type is the type of the result after handling.  Both rows
+are usually open, so the collecting handler of Section~\ref{sec:examples} has
+a type of the shape
 
 \begin{center}
-\texttt{CompType\textsubscript{in} =[p:Type]=> CompType\textsubscript{out}}
+\texttt{(a!\{ print : Str \(\leadsto\) Unit | e \} => (a * Str)!\{e'\})}
 \end{center}
 
-The input computation type includes the effects the handler catches.  The
-output computation type is the type of the result after handling.
+A handler type records no parameter instantiation.  The
+\texttt{[\$p -> Type]} list belongs to the \cba{with ... handle}
+application rather than to the handler value, so it is checked where the
+handler is applied, not where it is written.
+
+Written out in an annotation, the fat arrow separates the two computation
+types.  The handler below catches \cba{!flip} and so discharges it, turning
+an \texttt{Int} computation that may flip into a pure one:
+
+\begin{lstlisting}
+do h <- return ((handler {
+  return x -> return x,
+  flip _ k -> k true
+}) : Int!{flip : Unit ~> Bool} => Int!{}) in
+with h handle
+do b <- !flip () in
+if b then return 1 else return 2
+\end{lstlisting}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Explicit Annotations}
+\label{sec:annotations}
+
+Cambria infers types without help, so annotations are never required except
+for the arity of an operation whose signature mentions a parameter type
+(Section~\ref{sec:effect}).  They are available as a way to pin
+a type or document intent.
+
+An annotation is a parenthesised expression followed by \texttt{:} and a
+type.
+
+\subsection{Value Annotations}
+
+\begin{lstlisting}
+return (5 : Int)
+do x <- return 7 in return (x : Int)
+return ((inl 5) : Int + Bool)
+\end{lstlisting}
+
+The annotation sits on the expression, not on the surrounding computation,
+which is why the second line annotates \texttt{x} inside the \cba{return}
+rather than the \cba{do}-binding.  Annotating a polymorphic expression pins
+its instance. Without the annotation, \cba{inl 5} would leave the right-hand
+summand undetermined.
+
+A value annotation may be a function type, in which case the result is a
+computation type and carries a row:
+
+\begin{lstlisting}
+do f <- return ((fun x -> return x) : Int -> Int!{}) in f 4
+\end{lstlisting}
+
+Annotating that same function \texttt{Int -> Bool!\{\}} is a type error,
+because the body returns its argument.
+
+\subsection{Computation Annotations}
+
+A computation type is a value type, \texttt{!}, and a braced row:
+
+\begin{lstlisting}
+(return 3 : Int!{})
+(return (1, true) : Int * Bool!{})
+(!print "hello" : Unit!{print : Str ~> Unit})
+\end{lstlisting}
+
+The row is checked as well as the value type.  A row that omits an effect the
+body actually performs is rejected, so \texttt{(!print "boom" : Unit!\{\})}
+fails with an effect mismatch, as do two nested annotations that disagree.
+
+\subsection{Open Rows in Annotations}
+
+A row written out in full is \textbf{closed}.  The computation may only perform
+the effects it lists.  Ending the row with \texttt{...} makes it
+\textbf{open}, so other operations are permitted:
+
+\begin{lstlisting}
+(do _ <- !print "hi" in !fresh () : Name!{print : Str ~> Unit, ...})
+\end{lstlisting}
+
+The body also performs \cba{!fresh}, which the closed form would reject; the
+ellipsis lets the row carry it, and the inferred type comes out with both
+operations.
+
+The ellipsis stands for the row variable of Section~\ref{sec:typesystem}, so
+an open annotation constrains the row from below rather than fixing it.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Desugaring}
@@ -1179,14 +1431,13 @@ remaining computation.
 
 \subsection{Finally Clause Evaluation}
 
-The \cba{finally} clause is desugared into a \cba{do}-binding around the
-entire handler:
+The \cba{finally} clause behaves as a \cba{do}-binding around the whole handler application, so
 
 \begin{lstlisting}
 with handler { ..., finally f -> body } handle c
 \end{lstlisting}
 
-becomes:
+evaluates like
 
 \begin{lstlisting}
 do f <- (with handler { ... } handle c) in body
@@ -1241,45 +1492,50 @@ $\mathit{State} \to \mathit{Result}$.  The \cba{finally} clause seeds it with
 \subsection{Local Mutable State}
 
 \begin{lstlisting}
-with handler {
+with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} [$name -> Int] handle (
-with handler {
+} handle
+
+effect !fresh : Unit ~> $name.
+with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
-  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  set (a,x) k -> return (fun s ->
+                   k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
-} [$loc -> $name] handle (
-  effect !get : $loc ~> Int.
-  effect !set : $loc * Int ~> Unit.
-  effect !ref : Int ~> $loc.
-  do a <- !ref 2 in
-  do b <- !ref 3 in
-  do _ <- !set (a, !get b) in
-  !get a
-))
+} handle
+
+effect !ref : Int ~> $loc.
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
+do a <- !ref 2 in
+do b <- !ref 3 in
+do _ <- !set (a, !get b) in
+!get a
 \end{lstlisting}
 
 The state is encoded as a function from locations to values, and a separate
-inner handler supplies the fresh names used as locations.  The program
-allocates two references (holding 2 and 3), copies \texttt{b}'s value into
-\texttt{a}, and reads \texttt{a} back.  Result: \texttt{Pure: 3}.
+outer handler supplies the fresh names used as locations.  Each handler is a
+prefix of the computation it handles, so no parentheses are needed.  The
+program allocates two references (holding 2 and 3), copies \texttt{b}'s value
+into \texttt{a}, and reads \texttt{a} back.  Result: \texttt{Pure: 3}.  This
+is \texttt{examples/local\_state.cba}.
 
 \subsection{Nondeterministic Maximisation}
 
 \begin{lstlisting}
 with handler {
   decide v k -> max (k true, k false)
-} handle (
-  do x1 <- if !decide () then return 15 else return 30 in
-  do x2 <- if !decide () then return 5  else return 10 in
-  return (x1 - x2)
-)
+} handle
+
+do x1 <- if !decide () then return 15 else return 30 in
+do x2 <- if !decide () then return 5  else return 10 in
+return (x1 - x2)
 \end{lstlisting}
 
 The handler explores all branches and returns the maximum.  The \texttt{decide}
@@ -1293,9 +1549,9 @@ with handler {
   return x -> return (x, ""),
   print s k -> do (v, acc) <- k () in
     return (v, s ++ acc)
-} handle (
-  !print "A"; !print "B"; !print "C"
-)
+} handle
+
+!print "A"; !print "B"; !print "C"
 \end{lstlisting}
 
 Instead of printing to stdout, this handler collects all printed strings into
@@ -1304,50 +1560,52 @@ an accumulator.  Result: \texttt{Pure: ((), "ABC")}.
 \subsection{Polymorphic Functions with Abstract Types}
 
 \begin{lstlisting}
-with handler {
+with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} [$name -> Int] handle (
-with handler {
+} handle
+
+effect !fresh : Unit ~> $name.
+with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
-  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  set (a,x) k -> return (fun s ->
+                   k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return 0)
-} [$loc -> $name] handle (
-  effect !ref : Int ~> $loc.
-  effect !get : $loc ~> Int.
-  effect !set : $loc * Int ~> Unit.
+} handle
 
-  -- Polymorphic map: forall a b. (a -> b!S) -> List(a) -> List(b)!S
-  do map <- return (rec map f xs ->
-    case uncons xs of {
-      inl _        -> return [],
-      inr (x, xs') -> f x :: map f xs'
-    })
-  in
+effect !ref : Int ~> $loc.
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
 
-  -- (1) map at (Int -> $loc): allocate a ref for each number
-  do refs <- map (fun n -> !ref n) (10 :: 20 :: 30 :: []) in
+-- Polymorphic map: forall a b. (a -> b!S) -> List a -> List b!S
+do map <- return (rec map f xs ->
+  case uncons xs of {
+    inl _        -> return [],
+    inr (x, xs') -> f x :: map f xs'
+  })
+in
+do vals <- return (10 :: 20 :: 30 :: []) in
 
-  -- (2) map at ($loc -> Int): read all refs in the list
-  do vals <- map (fun r -> !get r) refs in
+-- (1) map at (Int -> $loc): allocate a ref for each number
+do refs <- map (fun n -> !ref n) vals in
 
-  -- (3) map at (Int -> Bool): test each value against 20
-  do checks <- map (fun n -> !get n == 20) refs in
+-- (2) map at ($loc -> Bool): read each ref and test it against 20
+do checks <- map (fun n -> !get n == 20) refs in
 
-  return checks
-))
+return checks
 \end{lstlisting}
 
-The same polymorphic \texttt{map} is used at three different type
-instantiations: \texttt{Int -> \$loc} (allocating a reference per element),
-\texttt{\$loc -> Int} (reading each reference), and \texttt{Int -> Bool}
-(testing each value).  \texttt{map} never inspects what \texttt{\$loc} is.
-Result: \texttt{Pure: [False, True, False]}.
+The same polymorphic \texttt{map} is used at two different type
+instantiations: \texttt{Int -> \$loc}, allocating a reference per element,
+and \texttt{\$loc -> Bool}, reading each reference and comparing it.
+\texttt{map} never inspects what \texttt{\$loc} is.  Result:
+\texttt{Pure: [False, True, False]}.  This is
+\texttt{examples/poly\_map.cba}.
 
 \subsection{Two Implementations of a Probabilistic Urn}
 
@@ -1379,22 +1637,23 @@ urn is just a bias drawn once from the uniform distribution, and each sample is
 an independent Bernoulli trial with that bias:
 
 \begin{lstlisting}
-with handler {
+with [$urn -> Double] handler {
   newurn _ k -> k (!uniform ()),
   sample p k -> k (!bernoulli p)
-} [$urn -> Double] handle (
-  effect !newurn : Unit ~> $urn.
-  effect !sample : $urn ~> Bool.
-  do urn <- !newurn () in
-  do b1 <- !sample urn in
-  do b2 <- !sample urn in
-  return (b1, b2)
-)
+} handle
+
+effect !newurn : Unit ~> $urn.
+effect !sample : $urn ~> Bool.
+do urn <- !newurn () in
+do b1 <- !sample urn in
+do b2 <- !sample urn in
+return (b1, b2)
 \end{lstlisting}
 
 The handler is flat: \texttt{newurn} draws a \texttt{Double} and \texttt{sample}
 passes it directly to \texttt{!bernoulli}.  No state is needed.  Result: a pair
-of booleans, e.g.\ \texttt{Pure: (False, True)}.
+of booleans, e.g.\ \texttt{Pure: (False, True)}.  This is
+\texttt{examples/prob\_polya\_bias.cba}.
 
 \subsubsection*{Implementation 2: P\'{o}lya urn via local state (\texttt{\$urn -> \$loc})}
 
@@ -1403,40 +1662,46 @@ The P\'{o}lya urn implementation instantiates \texttt{\$urn} to a location
 blue).  Each sample draws a colour with probability proportional to the counts
 and then adds a ball of that colour, so the urn is biased towards the colour
 already drawn (``rich get richer'').  It reuses the function-encoded local
-state from above, with its fresh-name handler underneath:
+state from above, with its fresh-name handler outside that in turn:
 
 \begin{lstlisting}
-with handler {
+with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
   eq (a,b) k -> k (a == b),
   finally f  -> f 0
-} [$name -> Int] handle (
-with handler {
+} handle
+
+effect !fresh : Unit ~> $name.
+with [$loc -> $name] handler {
   return x    -> return (fun _ -> return x),
   get a k     -> return (fun s -> k (s a) s),
-  set (a,x) k -> return (fun s -> k () (fun b -> if !eq (a, b) then return x else s b)),
+  set (a,x) k -> return (fun s ->
+                   k () (fun b -> if !eq (a, b) then return x else s b)),
   ref x k     -> do a <- !fresh () in return (fun s ->
                    k a (fun b -> if !eq (a, b) then return x else s b)),
   finally s   -> s (fun _ -> return (0, 0))
-} [$loc -> $name] handle (
-  with handler {
-    newurn _ k -> k (!ref (1, 1)),
-    sample urn k ->
-      do (red, blue) <- !get urn in
-      do isRed <- !bernoulli (red / (red + blue)) in
-      do _ <- if isRed then !set (urn, (red + 1, blue))
-                       else !set (urn, (red, blue + 1)) in
-      k isRed
-  } [$urn -> $loc] handle (
-    effect !newurn : Unit ~> $urn.
-    effect !sample : $urn ~> Bool.
-    do urn <- !newurn () in
-    do b1 <- !sample urn in
-    do b2 <- !sample urn in
-    return (b1, b2)
-  )
-))
+} handle
+
+effect !ref : Int * Int ~> $loc.
+effect !get : $loc ~> Int * Int.
+effect !set : $loc * (Int * Int) ~> Unit.
+with [$urn -> $loc] handler {
+  newurn _ k -> k (!ref (1, 1)),
+  sample urn k ->
+    do (red, blue) <- !get urn in
+    do isRed <- !bernoulli (red / (red + blue)) in
+    do _ <- if isRed then !set (urn, (red + 1, blue))
+                     else !set (urn, (red, blue + 1)) in
+    k isRed
+} handle
+
+effect !newurn : Unit ~> $urn.
+effect !sample : $urn ~> Bool.
+do urn <- !newurn () in
+do b1 <- !sample urn in
+do b2 <- !sample urn in
+return (b1, b2)
 \end{lstlisting}
 
 Several things to note:
@@ -1447,14 +1712,16 @@ Several things to note:
         \texttt{(1, 1)}, and \texttt{sample} reads the counts, draws a biased
         coin, updates the counts, and returns the result.
   \item It instantiates \texttt{\$urn -> \$loc}: the urn parameter becomes a
-        location of the \emph{outer} local-state handler, itself an abstract
-        parameter.
+        location of the \emph{enclosing} local-state handler, itself an
+        abstract parameter.
   \item The \textbf{middle handler} provides the function-encoded local state
-        (\texttt{\$loc -> \$name}), and the \textbf{outer handler} supplies the
-        fresh location names (\texttt{\$name -> Int}).
+        (\texttt{\$loc -> \$name}), and the \textbf{outermost handler} supplies
+        the fresh location names (\texttt{\$name -> Int}).
   \item The \textbf{body code is identical} to Implementation~1.  Only the
         handler stack changes.
 \end{itemize}
+
+This is \texttt{examples/prob\_polya\_state.cba}.
 
 Both handlers induce the same distribution on the returned pair (P\'{o}lya's
 identity), so by parametricity the body cannot tell them apart.
@@ -1473,8 +1740,22 @@ value   := atom
          | rec name patterns -> computation
          | handler { clauses }
 
-atom    := () | [] | integer | boolean
-         | string | (expr, expr) | name
+atom    := () | [] | integer | double
+         | boolean | string
+         | (expr, expr) | name
+
+integer := digit+
+double  := digit+ . digit+
+
+-- A '-' glued to the digits is part of the
+-- literal wherever an expression may start,
+-- and a subtraction after an operand.  An
+-- application argument takes parentheses:
+-- f (-3), since f -3 is the subtraction f - 3.
+
+-- Explicit annotations
+expr    := ( expr : type )
+comp    := ( comp : compType )
 
 -- Computations
 comp    := comp ; comp
@@ -1483,11 +1764,18 @@ comp    := comp ; comp
          | if expr then comp else comp
          | case expr of { inl p -> comp,
                           inr p -> comp }
-         | with expr paramInsts handle comp
+         | with paramInsts expr handle comp
          | effect !op : type ~> type . comp
          | expr expr
          | !op expr
          | expr BINOP expr
+
+BINOP   := :: | || | && | == | /= | < | >
+         | <= | >= | ++ | + | - | * | /
+
+-- The trailing comp of do, if, case, with and effect
+-- extends as far to the right as it can, across ';'.
+-- Parenthesise a comp to end its scope early.
 
 -- Patterns
 pattern := name | _ | (pattern, pattern)
@@ -1497,20 +1785,31 @@ clause  := return pattern -> comp
          | opName pattern contName -> comp
          | finally pattern -> comp
 
--- Parameter instantiations (optional, between handler and handle)
+-- Parameter instantiations (optional, between with and the handler)
 paramInsts := [ paramList ]
 paramList  := $param -> type
             | $param -> type , paramList
 
--- Types (in declarations)
-type     := typeAtom
+-- Types (in declarations and annotations)
+type     := typeSum
+          | typeSum -> compType
+          | compType => compType
+typeSum  := typeProd
+          | typeProd + typeProd
+typeProd := typeAtom
           | typeAtom * typeAtom
-          | typeAtom + typeAtom
 typeAtom := Unit | Int | Bool | Double
           | Str | Name | Void
           | Map typeAtom typeAtom
           | List typeAtom
           | $param | (type)
+
+compType := type ! { effList }
+effList  := empty | ...
+          | opSig | opSig , effList
+opSig    := opName : type ~> type
+
+-- A trailing ... makes the row open.
 \end{lstlisting}
 
 % ══════════════════════════════════════════════════════════════════════════════
