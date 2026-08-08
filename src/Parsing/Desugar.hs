@@ -9,27 +9,27 @@ import Parsing.SugaredSyntax
 
 import qualified Data.Map as Map
 import Control.Monad (foldM, when)
-import Control.Monad.State (StateT, evalStateT, get, gets, lift, modify)
+import Control.Monad.State (StateT, evalStateT, gets, lift, modify)
 
-type FixEnv = Map.Map String (Assoc, Int, OpTarget)
+type FixEnv = Map.Map String Fixity
 
--- levels 0 to 9, loosest to tightest; 0, 8 and 9 are left for declarations
+-- levels 0 to 9, loosest to tightest; 0, 8 and 9 are left for bindings
 builtinFixities :: FixEnv
 builtinFixities = Map.fromList
-  [ ("::", (ARight, 1, TargetVar "::"))
-  , ("||", (ARight, 2, TargetVar "||"))
-  , ("&&", (ARight, 3, TargetVar "&&"))
-  , ("==", (ANone,  4, TargetVar "=="))
-  , ("/=", (ANone,  4, TargetVar "/="))
-  , ("<",  (ANone,  4, TargetVar "<"))
-  , (">",  (ANone,  4, TargetVar ">"))
-  , ("<=", (ANone,  4, TargetVar "<="))
-  , (">=", (ANone,  4, TargetVar ">="))
-  , ("++", (ALeft,  5, TargetVar "++"))
-  , ("+",  (ALeft,  6, TargetVar "+"))
-  , ("-",  (ALeft,  6, TargetVar "-"))
-  , ("*",  (ALeft,  7, TargetVar "*"))
-  , ("/",  (ALeft,  7, TargetVar "/"))
+  [ ("::", Fixity ARight 1)
+  , ("||", Fixity ARight 2)
+  , ("&&", Fixity ARight 3)
+  , ("==", Fixity ANone  4)
+  , ("/=", Fixity ANone  4)
+  , ("<",  Fixity ANone  4)
+  , (">",  Fixity ANone  4)
+  , ("<=", Fixity ANone  4)
+  , (">=", Fixity ANone  4)
+  , ("++", Fixity ALeft  5)
+  , ("+",  Fixity ALeft  6)
+  , ("-",  Fixity ALeft  6)
+  , ("*",  Fixity ALeft  7)
+  , ("/",  Fixity ALeft  7)
   ]
 
 data DState = DState { counter :: Integer, fixities :: FixEnv }
@@ -104,18 +104,17 @@ desugarComp = \case
     ct' <- desugarCompType ct
     return $ CAnnot c ct'
   SCLetRec defs body -> desugarLetRec defs body
-  SCFixity assoc prec name target rest -> do
-    when (Map.member name builtinFixities) $
-      err ("Cannot redeclare built-in operator " ++ name)
+  SCFixity fx@(Fixity _ prec) name rest -> do
     when (prec < 0 || prec > 9) $
       err ("Operator precedence must be between 0 and 9: " ++ name)
-    modify (\st -> st { fixities = Map.insert name (assoc, prec, target) (fixities st) })
-    desugarComp rest
+    saved <- gets fixities
+    modify (\st -> st { fixities = Map.insert name fx (fixities st) })
+    c <- desugarComp rest
+    modify (\st -> st { fixities = saved })
+    return c
   SCOpChain e0 rest -> do
-    (e, leftover) <- climb 0 e0 rest
-    case leftover of
-      [] -> desugarComp (exprToComp e)
-      _  -> err "Internal error: unconsumed operator chain"
+    (e, _) <- climb 0 e0 rest
+    desugarComp (exprToComp e)
 
 desugarExpr :: SugaredExpr -> Desugar (Computation -> Computation, Value)
 desugarExpr = \case
@@ -154,16 +153,12 @@ desugarExpr = \case
     t' <- desugarValueType t
     return (k, VAnnot v t')
 
-exprToComp :: SugaredExpr -> SugaredComp
-exprToComp (SEComp c) = c
-exprToComp e          = SCReturn e
-
 -- precedence climbing over the flat chains from the parser
 climb :: Int -> SugaredExpr -> [(String, SugaredExpr)]
       -> Desugar (SugaredExpr, [(String, SugaredExpr)])
 climb _ lhs [] = return (lhs, [])
 climb minPrec lhs rest@((opName, rhs0) : more) = do
-  (assoc, prec, target) <- lookupFixity opName
+  Fixity assoc prec <- lookupFixity opName
   if prec < minPrec then return (lhs, rest)
   else do
     let nextMin = case assoc of
@@ -172,22 +167,18 @@ climb minPrec lhs rest@((opName, rhs0) : more) = do
     (rhs, rest') <- climb nextMin rhs0 more
     case (assoc, rest') of
       (ANone, (op2, _) : _) -> do
-        (_, prec2, _) <- lookupFixity op2
+        Fixity _ prec2 <- lookupFixity op2
         when (prec2 == prec) $
           err ("Non-associative operators cannot be chained: " ++ opName ++ ", " ++ op2)
       _ -> return ()
-    climb minPrec (SEComp (applyTarget target lhs rhs)) rest'
+    climb minPrec (SEComp (SCApp (SEVar opName) (SEPair lhs rhs))) rest'
 
-lookupFixity :: String -> Desugar (Assoc, Int, OpTarget)
+lookupFixity :: String -> Desugar Fixity
 lookupFixity opName = do
   fe <- gets fixities
   case Map.lookup opName fe of
     Just f  -> return f
-    Nothing -> err ("Operator " ++ opName ++ " has no fixity declaration")
-
-applyTarget :: OpTarget -> SugaredExpr -> SugaredExpr -> SugaredComp
-applyTarget (TargetVar f) l r = SCApp (SEVar f) (SEPair l r)
-applyTarget (TargetOp op) l r = SCOp op (SEPair l r)
+    Nothing -> err ("Operator " ++ opName ++ " has no fixity in scope")
 
 irrefutable :: Pattern -> Bool
 irrefutable (PVar _)      = True
@@ -217,6 +208,7 @@ matchPat s (PVar x) succ_ _ = return $ CDo x (CReturn (VVar s)) succ_
 matchPat _ PWild    succ_ _ = return succ_
 matchPat s PUnit       succ_ failC = eqTest s VUnit succ_ failC
 matchPat s (PInt i)    succ_ failC = eqTest s (VInt i) succ_ failC
+matchPat s (PDouble d) succ_ failC = eqTest s (VDouble d) succ_ failC
 matchPat s (PBool b)   succ_ failC = eqTest s (VBool b) succ_ failC
 matchPat s (PString t) succ_ failC = eqTest s (VString t) succ_ failC
 matchPat s (PPair p1 p2) succ_ failC = do

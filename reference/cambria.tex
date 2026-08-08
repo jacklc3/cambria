@@ -381,6 +381,14 @@ This desugars to a single recursive function over a tagged sum (one summand
 per definition), together with a wrapper binding for each name; the
 definitions must therefore agree on their result type.
 
+A \cba{let} may also bind an infix operator by carrying a fixity, which is
+the only way to introduce one (Section~\ref{sec:fixity}):
+
+\begin{lstlisting}
+let infixl 8 xs <+ x = return (x :: xs) in
+[] <+ 1 <+ 2
+\end{lstlisting}
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Functions}
 \label{sec:functions}
@@ -462,7 +470,9 @@ fail to match (Section~\ref{sec:control}):
 \begin{itemize}
   \item Sum patterns \cba{inl} \emph{p} and \cba{inr} \emph{p}
   \item List patterns \cba{[]} and \emph{p1} \cba{::} \emph{p2}
-  \item Literal patterns: integers, booleans, and strings
+  \item Literal patterns: integers, doubles, booleans, and strings.  Numeric
+        literals may be signed, so \cba{-1} and \cba{-0.25} are patterns; a
+        literal pattern is tested with \texttt{==}
 \end{itemize}
 
 All of these nest freely, e.g.\ \cba{inl (x :: (1, _) :: rest)}.
@@ -664,7 +674,7 @@ are evaluated.
 
 Every infix operator sits at one of ten numbered levels, 0 (loosest) to 9
 (tightest).  The built-in operators occupy seven of them, and levels 0, 8 and
-9 are left free for fixity declarations
+9 are left free for operator bindings
 (Section~\ref{sec:fixity}):
 
 \begin{center}
@@ -694,9 +704,9 @@ All infix operators desugar into function applications.  For example,
 
 The compound computation forms are looser still.  The body of a \cba{do} or a
 \cba{let}, the branches of an \cba{if} and a \cba{case}, the body of a
-\cba{with ... handle}, and the scope of an \cba{effect} or fixity declaration
-all extend as far to the right as they can, across \texttt{;} and to the end
-of the enclosing computation.  So
+\cba{with ... handle}, and the scope of an \cba{effect} declaration all extend
+as far to the right as they can, across \texttt{;} and to the end of the
+enclosing computation.  So
 
 \begin{lstlisting}
 do x <- return 1 in return x ; return x
@@ -715,43 +725,75 @@ effect !op : Unit ~> Int.
 
 Parenthesise a computation to end its scope early.
 
-\subsection{User-Defined Operators (Fixity Declarations)}
+\subsection{User-Defined Operators}
 \label{sec:fixity}
 
-A fixity declaration introduces an infix operator and says what it elaborates
-to; like \cba{effect} declarations, it is terminated by a dot and scopes over
-the rest of the program:
+An operator is not a separate kind of thing: it is an ordinary variable whose
+name happens to be symbolic, and the built-in operators are exactly that
+already (\texttt{+} names the primitive that adds a pair).  So an operator is
+introduced by a \cba{let} carrying a fixity, and the two spellings below bind
+the same thing:
 
 \begin{lstlisting}
-infixr 0 => = !mkImpl.    -- effect operation as infix
-infixl 8 <+ = snoc.       -- ordinary function as infix
+let infixr 0 a => b = !mkImpl (a, b) in    -- operands named
+let infixl 8 (<+) = snoc in                -- an existing function
 \end{lstlisting}
 
-\cba{infixl}, \cba{infixr} and \cba{infix} declare a left-, right- and
+The first names the operands and takes the body directly.  The second gives
+the operator a function, which must accept a \emph{pair}, since \cba{a OP b}
+always elaborates to \cba{(OP) (a, b)} with the operands evaluated left to
+right.  Writing a curried function there is a type error rather than a
+special case.  Both forms are available under \cba{let rec}, where the
+operator is in scope in its own body, and inside an \cba{and} group, where
+every operator in the group is in scope in every body.
+
+\cba{infixl}, \cba{infixr} and \cba{infix} give a left-, right- and
 non-associative operator respectively, at the given precedence level, on the
 same 0 to 9 scale as the built-in operators above.  Levels 0, 8 and 9 are
-unoccupied, so a declaration there is either looser or tighter than
-everything built in; the remaining levels tie with the built-in group listed
-against them.  The right-hand side is either an operation name \texttt{!op}
-or a function name; \texttt{a OP b} then elaborates to \texttt{!op (a, b)} or
-\texttt{f (a, b)}, with operands evaluated left to right.
+unoccupied, so a binding there is either looser or tighter than everything
+built in; the remaining levels tie with the built-in group listed against
+them.
+
+Because the fixity belongs to the binding, it has exactly the binding's
+scope.  An operator may shadow a built-in one, and both its meaning and its
+associativity revert at the end of the enclosing computation:
+
+\begin{lstlisting}
+let inner =
+  let infixr 2 a - b = return 0 in
+  1 - 2 - 3          -- 0, using the shadowing definition
+in
+return (1 - 2 - 3)   -- -4, subtraction again, left-associative
+\end{lstlisting}
 
 Operator names are sequences of the symbol characters
-\verb!+ - * / < > = & | ^ @ % ? ~!, excluding the reserved symbols
-(\texttt{->}, \texttt{<-}, \texttt{=}, \texttt{==}, \texttt{::}, \ldots).
-\texttt{=>} is reserved for handler types but unused as an operator, so it
-too may be declared.  Built-in operators cannot be redeclared, using an
-undeclared operator is an error, and non-associative operators cannot be
-chained.
+\verb!+ - * / < > = & | ^ @ % ? ~!.  Exactly four spellings are unavailable,
+because the grammar needs them elsewhere: \texttt{->}, \texttt{<-},
+\texttt{\textasciitilde>} and \texttt{=}.  Everything else in that alphabet is
+free, including every built-in operator and \texttt{=>}, which a binding
+shadows in the ordinary way.  Note that \texttt{:} is not in the alphabet, so
+\texttt{::} and type ascription stay unambiguous.
 
-For example, with the \texttt{=>} declaration above, Peirce's law is written
+Using an operator with no fixity in scope is an error, and non-associative
+operators cannot be chained.
+
+Parenthesising an operator gives back the plain variable, so operators can be
+applied prefix and passed as arguments:
+
+\begin{lstlisting}
+(+) (3, 4)                            -- 7
+fold ((+), (0, 1 :: 2 :: 3 :: []))    -- 6
+\end{lstlisting}
+
+With the \texttt{=>} binding above, Peirce's law is written
 
 \begin{lstlisting}
 ((p => q) => p) => p
 \end{lstlisting}
 
 which elaborates to
-\cba{!mkImpl (!mkImpl (!mkImpl (p, q), p), p)}.
+\cba{(=>) ((=>) ((=>) (p, q), p), p)}, and so to three calls of
+\cba{!mkImpl}.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Effects and Operations}
@@ -1453,6 +1495,7 @@ desugars to a function on a fresh variable, with projections extracted via
 \begin{lstlisting}
 let x = e in body
 let f p q = c in body
+let infixl 8 p <+ q = c in body
 \end{lstlisting}
 
 desugar to:
@@ -1460,10 +1503,13 @@ desugar to:
 \begin{lstlisting}
 do x <- return e in body
 do f <- return (fun p q -> c) in body
+do (<+) <- return (fun (p, q) -> c) in body
 \end{lstlisting}
 
 with \cba{return e} dropped when \texttt{e} is already a computation, and
-\cba{fun} replaced by \cba{rec f} under \cba{let rec}.
+\cba{fun} replaced by \cba{rec f} under \cba{let rec}.  An operator binding is
+the same \cba{do}, binding the symbol as a variable that takes a pair; the
+fixity is consumed while desugaring and never reaches the core.
 
 \subsection{Mutual Recursion}
 
@@ -1529,12 +1575,13 @@ All infix operators desugar to function applications on pairs:
 \end{tabular}
 \end{center}
 
-The parser does not resolve precedence itself: it collects a run of infix
-operators into a flat chain and the desugarer reassociates it by precedence
-climbing against the fixity table, which is why a fixity declaration can
-introduce a new operator without changing the grammar.  A declared operator
-elaborates to an application of its target, \texttt{f (x, y)} for a function
-and \cba{!op (x, y)} for an operation.
+Declared operators are no different: \texttt{x <+ y} becomes
+\texttt{(<+) (x, y)}, a reference to the variable the binding introduced.
+
+The parser does not resolve precedence itself.  It collects a run of infix
+operators into a flat chain, and the desugarer reassociates the chain by
+precedence climbing against the fixities in scope, which is why a new
+operator needs no change to the grammar.
 
 \subsection{Semicolons}
 

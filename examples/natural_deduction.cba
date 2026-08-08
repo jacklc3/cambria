@@ -21,8 +21,8 @@
 -- On this heap  uni  is textbook first-order unification with union-find and
 -- an occurs check;  showT  reifies a term back to a string (unbound variables
 -- print as _<id>).  The parameter signature is the SML's  cons : string *
--- param list -> param, exposed as the effect  !cons; the infix declaration
--- infixr 0 => = impl  lets formulas be written as  p => q.
+-- param list -> param, exposed as the effect  !cons; the infix binding
+-- let infixr 0 a => b  lets formulas be written as  p => q.
 --
 -- The prover follows the SML verbatim, with three inference rules chosen
 -- nondeterministically by  !or, and a fuel argument bounding the search depth
@@ -195,8 +195,7 @@ let solveAll q = with [$p -> Name] engineAll handle (q ()) in
 -- ---- the proof searcher (SML prototype, Appendix A.4) ----
 
 let atom s = !cons (s, []) in
-let impl (a, b) = !cons ("=>", a :: b :: []) in
-infixr 0 => = impl.
+let infixr 0 a => b = !cons ("=>", a :: b :: []) in
 
 let rec member (ps, p) = case ps of {
   []       -> !bottom () ; return (),

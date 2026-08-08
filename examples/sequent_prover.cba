@@ -33,8 +33,9 @@
 -- variables.  The domain of discourse is observed through structural effects
 -- (!isImpl, !ante, !concl, !same); disjunction !or drives the nondeterministic
 -- choice of rule and principal formula, and !bottom prunes dead branches.  The
--- handler keeps the first successful proof.  The infix declaration
--- infixr 0 => = !mkImpl lets goals be written as  ((p => q) => p) => p.
+-- handler keeps the first successful proof.  The infix binding
+-- let infixr 0 a => b = !mkImpl (a, b)  lets goals be written as
+-- ((p => q) => p) => p.
 --
 -- Note the last two queries: p->q is not a theorem and Peirce's law
 -- ((p->q)->p)->p is classically valid but NOT intuitionistically provable.
@@ -57,7 +58,7 @@ effect !same   : $p * $p  ~> Bool. -- structural equality of formulas
 effect !bottom : Unit     ~> Void. -- fail (prune this branch)
 effect !or     : Unit     ~> Bool. -- choose
 
-infixr 0 => = !mkImpl.
+let infixr 0 a => b = !mkImpl (a, b) in
 
 let rec mapC (f, xs) = case xs of {
   []       -> return [],
