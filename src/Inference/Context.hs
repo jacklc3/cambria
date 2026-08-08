@@ -41,8 +41,13 @@ primitives =
   , ("null",   mkPrimScheme ["a"] (TList (TVar "a")) TBool)
   , ("uncons", mkPrimScheme ["a"] (TList (TVar "a")) (TEither TUnit (TPair (TVar "a") (TList (TVar "a")))))
   , ("absurd", mkPrimScheme ["a"] TVoid (TVar "a"))
-  , ("matchfail", mkPrimScheme ["a"] TUnit (TVar "a"))
+  , ("_matchfail", mkPrimScheme ["a"] TUnit (TVar "a"))
   ]
+
+-- the desugarer emits these; a leading underscore is unbindable in the surface
+internalAliases :: [(String, String)]
+internalAliases =
+  [ ("_fst", "fst"), ("_snd", "snd"), ("_uncons", "uncons"), ("_eq", "==") ]
 
 constants :: [(String, Scheme)]
 constants =
@@ -61,4 +66,5 @@ inbuiltOps =
   ]
 
 initialCtx :: Context
-initialCtx = Map.fromList (primitives ++ constants)
+initialCtx = Map.fromList (primitives ++ aliases ++ constants)
+  where aliases = [(a, s) | (a, n) <- internalAliases, Just s <- [lookup n primitives]]

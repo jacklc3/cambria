@@ -188,7 +188,7 @@ irrefutable (PPair p1 p2) = irrefutable p1 && irrefutable p2
 irrefutable _             = False
 
 matchFail :: Computation
-matchFail = CApp (VVar "matchfail") VUnit
+matchFail = CApp (VVar "_matchfail") VUnit
 
 -- clauses tried top to bottom; each fall-through is a join point
 compileClauses :: Ident -> [(Pattern, SugaredComp)] -> Desugar Computation
@@ -216,8 +216,8 @@ matchPat s (PPair p1 p2) succ_ failC = do
   b <- fresh
   inner2 <- matchPat b p2 succ_ failC
   inner1 <- matchPat a p1 inner2 failC
-  return $ CDo a (CApp (VVar "fst") (VVar s)) $
-           CDo b (CApp (VVar "snd") (VVar s)) inner1
+  return $ CDo a (CApp (VVar "_fst") (VVar s)) $
+           CDo b (CApp (VVar "_snd") (VVar s)) inner1
 matchPat s (PEither side p) succ_ failC = do
   x <- fresh
   inner <- matchPat x p succ_ failC
@@ -226,7 +226,7 @@ matchPat s (PEither side p) succ_ failC = do
     R -> CCase (VVar s) "_" failC x inner
 matchPat s PNil succ_ failC = do
   u <- fresh
-  return $ CDo u (CApp (VVar "uncons") (VVar s)) $
+  return $ CDo u (CApp (VVar "_uncons") (VVar s)) $
            CCase (VVar u) "_" succ_ "_" failC
 matchPat s (PCons p1 p2) succ_ failC = do
   u  <- fresh
@@ -235,15 +235,15 @@ matchPat s (PCons p1 p2) succ_ failC = do
   t  <- fresh
   inner2 <- matchPat t p2 succ_ failC
   inner1 <- matchPat h p1 inner2 failC
-  return $ CDo u (CApp (VVar "uncons") (VVar s)) $
+  return $ CDo u (CApp (VVar "_uncons") (VVar s)) $
            CCase (VVar u) "_" failC pr
-             (CDo h (CApp (VVar "fst") (VVar pr)) $
-              CDo t (CApp (VVar "snd") (VVar pr)) inner1)
+             (CDo h (CApp (VVar "_fst") (VVar pr)) $
+              CDo t (CApp (VVar "_snd") (VVar pr)) inner1)
 
 eqTest :: Ident -> Value -> Computation -> Computation -> Desugar Computation
 eqTest s lit succ_ failC = do
   b <- fresh
-  return $ CDo b (CApp (VVar "==") (VPair (VVar s) lit)) (CIf (VVar b) succ_ failC)
+  return $ CDo b (CApp (VVar "_eq") (VPair (VVar s) lit)) (CIf (VVar b) succ_ failC)
 
 -- mutual recursion as a single rec over a tagged sum (Bekic)
 desugarLetRec :: [(Ident, [Pattern], SugaredComp)] -> SugaredComp -> Desugar Computation
@@ -313,8 +313,8 @@ desugarPattern (PPair p1 p2) c = do
   tmp <- fresh
   (x2, c1) <- desugarPattern p2 c
   (x1, c2) <- desugarPattern p1 c1
-  return (tmp, CDo x1 (CApp (VVar "fst") (VVar tmp)) $
-    CDo x2 (CApp (VVar "snd") (VVar tmp)) c2)
+  return (tmp, CDo x1 (CApp (VVar "_fst") (VVar tmp)) $
+    CDo x2 (CApp (VVar "_snd") (VVar tmp)) c2)
 desugarPattern _ _ = err "Refutable pattern in binding position"
 
 desugarArguments :: [Pattern] -> Computation -> Desugar Computation
