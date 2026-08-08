@@ -1,4 +1,5 @@
--- Forward-mode automatic differentiation, as a handler for a smooth theory
+-- Forward-mode automatic differentiation, as a handler for a smooth theory.
+-- cf. Automatic differentiation via effects and handlers, PhD Thesis, Jesse Sigal
 --
 -- The theory {const, neg, plus, mult} over a carrier parameter is interpreted at
 -- several carriers at once providing dual numbers at different levels, with the
@@ -32,45 +33,44 @@ with [$r -> Int] handler {
   neg p k       -> k (0 - p),
   plus (a, b) k -> k (a + b),
   mult (a, b) k -> k (a * b)
-} handle (
-  effect !const : Int ~> $r.
-  effect !neg   : $r ~> $r.
-  effect !plus  : $r * $r ~> $r.
-  effect !mult  : $r * $r ~> $r.
+} handle
 
-  do x <- !const 2 in
-  do y <- !const 4 in
+effect !const : Int ~> $r.
+effect !neg   : $r ~> $r.
+effect !plus  : $r * $r ~> $r.
+effect !mult  : $r * $r ~> $r.
+do x <- !const 2 in
+do y <- !const 4 in
 
-  -- x seeded at $d, y at $e, giving both first partials and the mixed partial
-  do ((v, dx), (dy, dxy)) <- with [$d -> $r * $r] forward handle (
-    effect !lift : $r ~> $d.
-    effect !seed : $r ~> $d.
-    do xd <- !seed x in
-    do yd <- !lift y in
-    with [$e -> $d * $d] forward handle (
-      effect !lift : $d ~> $e.
-      effect !seed : $d ~> $e.
-      do xe <- !lift xd in
-      do ye <- !seed yd in
-      f (xe, ye)
-    )
-  ) in
+-- x seeded at $d, y at $e, giving both first partials and the mixed partial
+do ((v, dx), (dy, dxy)) <- with [$d -> $r * $r] forward handle
+  effect !lift : $r ~> $d.
+  effect !seed : $r ~> $d.
+  do xd <- !seed x in
+  do yd <- !lift y in
+  with [$e -> $d * $d] forward handle
 
-  -- x seeded at both carriers, giving second x partial
-  do (_, (_, dxx)) <- with [$d -> $r * $r] forward handle (
-    effect !lift : $r ~> $d.
-    effect !seed : $r ~> $d.
-    do xd <- !seed x in
-    do yd <- !lift y in
-    with [$e -> $d * $d] forward handle (
-      effect !lift : $d ~> $e.
-      effect !seed : $d ~> $e.
-      do xe <- !seed xd in
-      do ye <- !lift yd in
-      f (xe, ye)
-    )
-  ) in
+  effect !lift : $d ~> $e.
+  effect !seed : $d ~> $e.
+  do xe <- !lift xd in
+  do ye <- !seed yd in
+  f (xe, ye)
+in
 
-  -- f, df/dx, df/dy, d2f/dx2, d2f/dxdy at (2, 4)
-  return (v :: dx :: dy :: dxx :: dxy :: [])
-)
+-- x seeded at both carriers, giving second x partial
+do (_, (_, dxx)) <- with [$d -> $r * $r] forward handle
+  effect !lift : $r ~> $d.
+  effect !seed : $r ~> $d.
+  do xd <- !seed x in
+  do yd <- !lift y in
+  with [$e -> $d * $d] forward handle
+
+  effect !lift : $d ~> $e.
+  effect !seed : $d ~> $e.
+  do xe <- !seed xd in
+  do ye <- !lift yd in
+  f (xe, ye)
+in
+
+-- f, df/dx, df/dy, d2f/dx2, d2f/dxdy at (2, 4)
+return (v :: dx :: dy :: dxx :: dxy :: [])
