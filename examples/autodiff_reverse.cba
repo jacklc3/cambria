@@ -1,0 +1,93 @@
+-- Reverse-mode automatic differentiation via tapes as a handler
+-- cf. Automatic differentiation via effects and handlers, PhD Thesis, Jesse Sigal
+--
+-- The theory {const, neg, plus, mult} over a carrier parameter is interpreted
+-- at several carriers at once, so a tower of handlers differentiates
+-- repeatedly, with the outer handler resolving to Int.
+--
+-- Each value carries a cell holding its adjoint, and !lift takes the whole
+-- input vector, so a handled computation gives the value and its gradient.
+
+-- f (x, y) = 1 + x^3 + (- y^2)
+do f <- return (fun (x, y) ->
+  do x3  <- !mult (!mult (x, x), x) in
+  do y2  <- !mult (y, y) in
+  do one <- !const 1 in
+  !plus (!plus (one, x3), !neg y2)
+) in
+
+do state <- return (handler {
+  return x     -> return (fun _ -> return x),
+  ref x k      -> do a <- !fresh () in
+                  return (fun s -> k a (insert ((a, x), s))),
+  get a k      -> return (fun s -> k (lookup (a, s)) s),
+  set (a, x) k -> return (fun s -> k () (insert ((a, x), s))),
+  finally st   -> st empty
+}) in
+
+do reverse <- return (handler {
+  return (p, a) ->
+    do _ <- !set (a, !const 1) in
+    do z <- !const 0 in return (p, (z, z)),
+  const c k ->
+    do a <- !ref (!const 0) in k (!const c, a),
+  neg (px, ax) k ->
+    do a <- !ref (!const 0) in
+    do r <- k (!neg px, a) in
+    do _ <- !set (ax, !plus (!get ax, !neg (!get a))) in
+    return r,
+  plus ((px, ax), (py, ay)) k ->
+    do a <- !ref (!const 0) in
+    do r <- k (!plus (px, py), a) in
+    do _ <- !set (ax, !plus (!get ax, !get a)) in
+    do _ <- !set (ay, !plus (!get ay, !get a)) in
+    return r,
+  mult ((px, ax), (py, ay)) k ->
+    do a <- !ref (!const 0) in
+    do r <- k (!mult (px, py), a) in
+    do _ <- !set (ax, !plus (!get ax, !mult (!get a, py))) in
+    do _ <- !set (ay, !plus (!get ay, !mult (!get a, px))) in
+    return r,
+  lift (u, v) k  ->
+    do au <- !ref (!const 0) in
+    do av <- !ref (!const 0) in
+    do (p, _) <- k ((u, au), (v, av)) in
+    return (p, (!get au, !get av))
+}) in
+
+with [$r -> Int] handler {
+  return v      -> return v,
+  const c k     -> k c,
+  neg p k       -> k (0 - p),
+  plus (a, b) k -> k (a + b),
+  mult (a, b) k -> k (a * b)
+} handle
+
+effect !const : Int ~> $r.
+effect !neg   : $r ~> $r.
+effect !plus  : $r * $r ~> $r.
+effect !mult  : $r * $r ~> $r.
+do x <- !const 2 in
+do y <- !const 4 in
+
+-- one sweep at $d gives the value and the whole gradient
+do (v, (dx, dy)) <- with state handle with [$d -> $r * Name] reverse handle
+  effect !lift : $r * $r ~> $d * $d.
+  do (xd, yd) <- !lift (x, y) in
+  f (xd, yd)
+in
+
+-- df/dx is computed at $e and differentiated again at $d, so the second sweep
+-- gives a row of the Hessian
+do (_, (dxx, dxy)) <- with state handle with [$d -> $r * Name] reverse handle
+  effect !lift : $r * $r ~> $d * $d.
+  do (xd, yd) <- !lift (x, y) in
+  do (_, (gx, _)) <- (with state handle with [$e -> $d * Name] reverse handle
+    effect !lift : $d * $d ~> $e * $e.
+    do (xe, ye) <- !lift (xd, yd) in
+    f (xe, ye)) in
+  return gx
+in
+
+-- f, df/dx, df/dy, d2f/dx2, d2f/dxdy at (2, 4)
+return (v :: dx :: dy :: dxx :: dxy :: [])

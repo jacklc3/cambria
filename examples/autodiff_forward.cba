@@ -1,0 +1,76 @@
+-- Forward-mode automatic differentiation, as a handler for a smooth theory.
+-- cf. Automatic differentiation via effects and handlers, PhD Thesis, Jesse Sigal
+--
+-- The theory {const, neg, plus, mult} over a carrier parameter is interpreted at
+-- several carriers at once providing dual numbers at different levels, with the
+-- outer handler resolving to Int.
+--
+-- Two operations cross a carrier boundary: !lift interprets the value
+-- with tangent 0 and !seed with tangent 1.
+
+-- f (x, y) = 1 + x^3 + (- y^2)
+do f <- return (fun (x, y) ->
+  do x3  <- !mult (!mult (x, x), x) in
+  do y2  <- !mult (y, y) in
+  do one <- !const 1 in
+  !plus (!plus (one, x3), !neg y2)
+) in
+
+do forward <- return (handler {
+  return v      -> return v,
+  const c k     -> k (!const c, !const 0),
+  neg (p, t) k  -> k (!neg p, !neg t),
+  plus ((px, tx), (py, ty)) k -> k (!plus (px, py), !plus (tx, ty)),
+  mult ((px, tx), (py, ty)) k ->
+    k (!mult (px, py), !plus (!mult (tx, py), !mult (px, ty))),
+  lift v k      -> k (v, !const 0),
+  seed v k      -> k (v, !const 1)
+}) in
+
+with [$r -> Int] handler {
+  return v      -> return v,
+  const c k     -> k c,
+  neg p k       -> k (0 - p),
+  plus (a, b) k -> k (a + b),
+  mult (a, b) k -> k (a * b)
+} handle
+
+effect !const : Int ~> $r.
+effect !neg   : $r ~> $r.
+effect !plus  : $r * $r ~> $r.
+effect !mult  : $r * $r ~> $r.
+do x <- !const 2 in
+do y <- !const 4 in
+
+-- x seeded at $d, y at $e, giving both first partials and the mixed partial
+do ((v, dx), (dy, dxy)) <- with [$d -> $r * $r] forward handle
+  effect !lift : $r ~> $d.
+  effect !seed : $r ~> $d.
+  do xd <- !seed x in
+  do yd <- !lift y in
+  with [$e -> $d * $d] forward handle
+
+  effect !lift : $d ~> $e.
+  effect !seed : $d ~> $e.
+  do xe <- !lift xd in
+  do ye <- !seed yd in
+  f (xe, ye)
+in
+
+-- x seeded at both carriers, giving second x partial
+do (_, (_, dxx)) <- with [$d -> $r * $r] forward handle
+  effect !lift : $r ~> $d.
+  effect !seed : $r ~> $d.
+  do xd <- !seed x in
+  do yd <- !lift y in
+  with [$e -> $d * $d] forward handle
+
+  effect !lift : $d ~> $e.
+  effect !seed : $d ~> $e.
+  do xe <- !seed xd in
+  do ye <- !lift yd in
+  f (xe, ye)
+in
+
+-- f, df/dx, df/dy, d2f/dx2, d2f/dxdy at (2, 4)
+return (v :: dx :: dy :: dxx :: dxy :: [])
