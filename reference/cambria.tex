@@ -512,8 +512,8 @@ fun ((a, b), c) -> return (a + b + c)
 set (ref, val) k -> ...
 \end{lstlisting}
 
-Pair patterns desugar into calls to the built-in \cba{fst} and \cba{snd}
-functions.
+Pair patterns desugar into pair projections
+(Section~\ref{sec:desugaring}).
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Control Flow}
@@ -568,9 +568,9 @@ case v of {
 }
 \end{lstlisting}
 
-Matching compiles down to the kernel's binary sum \cba{case}, the built-in
-\cba{uncons}, and equality tests; a two-clause \cba{inl}/\cba{inr} match maps
-directly onto the kernel construct.  If no clause matches at runtime the
+Matching compiles down to the kernel's binary sum \cba{case}, list
+destructuring and equality tests (Section~\ref{sec:desugaring}); a two-clause
+\cba{inl}/\cba{inr} match maps directly onto the kernel construct.  If no clause matches at runtime the
 program aborts with a pattern-match failure, so end with an irrefutable
 clause when the earlier clauses are not exhaustive.
 
@@ -1476,8 +1476,8 @@ desugars to:
 
 \begin{lstlisting}
 do _tmp <- comp in
-do x <- fst _tmp in
-do y <- snd _tmp in
+do x <- _fst _tmp in
+do y <- _snd _tmp in
 body
 \end{lstlisting}
 
@@ -1488,7 +1488,7 @@ fun ((a, b), c) -> body
 \end{lstlisting}
 
 desugars to a function on a fresh variable, with projections extracted via
-\cba{fst} and \cba{snd}.
+\cba{_fst} and \cba{_snd}.
 
 \subsection{\texttt{let} Bindings}
 
@@ -1550,17 +1550,24 @@ desugars to:
 
 \begin{lstlisting}
 do _rest <- return (fun _ -> {- clause 2 -}) in
-do _tmp <- uncons xs in
+do _tmp <- _uncons xs in
 case _tmp of {
   inl _ -> c1,
   inr _ -> _rest ()
 }
 \end{lstlisting}
 
-List patterns go through the built-in \cba{uncons}, pair patterns through
-\cba{fst} and \cba{snd}, and literal patterns through \cba{==} followed by an
-\cba{if}.  When every clause fails the tree ends in the built-in
-\cba{matchfail}, which aborts.
+List patterns go through \cba{_uncons}, pair patterns through \cba{_fst} and
+\cba{_snd}, and literal patterns through \cba{_eq} followed by an \cba{if}.
+When every clause fails the tree ends in \cba{_matchfail}, which aborts.
+
+These are internal aliases for the corresponding primitives, with
+\cba{_matchfail} existing only for this purpose.  Desugaring goes through them
+rather than through \cba{uncons}, \cba{fst}, \cba{snd} and \cba{==} so that
+shadowing a primitive cannot change what a pattern means.  A leading
+underscore is not a legal identifier in the surface, so no program can bind or
+even mention one, which is also why the generated \cba{_rest} and \cba{_tmp}
+above cannot collide with a variable of the user's.
 
 \subsection{Infix Operators}
 
