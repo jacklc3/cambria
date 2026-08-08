@@ -13,12 +13,13 @@ data Pattern
   | PNil
   | PCons Pattern Pattern
   | PInt Integer
+  | PDouble Double
   | PBool Bool
   | PString String
 
 data Assoc = ALeft | ARight | ANone
 
-data OpTarget = TargetVar Ident | TargetOp Op
+data Fixity = Fixity Assoc Int
 
 data SugaredExpr
   = SEVar Ident
@@ -46,10 +47,14 @@ data SugaredComp
   | SCEffect Op Arity SugaredComp
   | SCAnnot SugaredComp CompType
   | SCLetRec [(Ident, [Pattern], SugaredComp)] SugaredComp
-  | SCFixity Assoc Int String OpTarget SugaredComp
+  | SCFixity Fixity String SugaredComp
   | SCOpChain SugaredExpr [(String, SugaredExpr)]
 
 data HandlerClause
   = RC Pattern SugaredComp
   | OC Op Pattern Ident SugaredComp
   | FC Pattern SugaredComp
+
+exprToComp :: SugaredExpr -> SugaredComp
+exprToComp (SEComp c) = c
+exprToComp e          = SCReturn e
