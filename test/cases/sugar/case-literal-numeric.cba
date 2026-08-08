@@ -1,0 +1,18 @@
+-- Signed and Double literal patterns, nested and under a cons.
+-- @expect-type: ((Str * Str) * (Str * Str))!{}
+-- @expect-value: Pure: (("neg head", "neg pair"), ("other pair", "half"))
+let ints v = case v of {
+  inl (-1 :: _)   -> return "neg head",
+  inl _           -> return "other list",
+  inr (-2, -0.25) -> return "neg pair",
+  inr _           -> return "other pair"
+} in
+let doubles xs = case xs of {
+  0.5 :: _ -> return "half",
+  _        -> return "not half"
+} in
+do a <- ints (inl ((-1) :: [])) in
+do b <- ints (inr (-2, -0.25)) in
+do c <- ints (inr (3, 1.5)) in
+do d <- doubles (0.5 :: []) in
+return ((a, b), (c, d))

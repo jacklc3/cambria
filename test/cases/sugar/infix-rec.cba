@@ -1,0 +1,12 @@
+-- An operator may recurse, and an and-group puts both fixities in scope in
+-- both bodies: <| is defined in terms of <++>.
+-- @expect-type: (List Int * List Int)!{}
+-- @expect-value: Pure: ([1, 2, 3], [1, 2, 3, 0])
+let rec infixl 8 xs <++> ys = case xs of {
+  []        -> return ys,
+  x :: rest -> do r <- rest <++> ys in return (x :: r)
+}
+and infixr 9 x <| xs = xs <++> (x :: []) in
+do a <- (1 :: []) <++> (2 :: 3 :: []) in
+do b <- 0 <| a in
+return (a, b)

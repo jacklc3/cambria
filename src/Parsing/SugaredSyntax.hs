@@ -3,10 +3,23 @@ module Parsing.SugaredSyntax where
 import Types (Ident, Op, Arity, ValueType, CompType)
 import Syntax (Side(..))
 
+-- case clauses take any pattern; binding positions only the irrefutable subset
 data Pattern
   = PVar Ident
   | PWild
+  | PUnit
   | PPair Pattern Pattern
+  | PEither Side Pattern
+  | PNil
+  | PCons Pattern Pattern
+  | PInt Integer
+  | PDouble Double
+  | PBool Bool
+  | PString String
+
+data Assoc = ALeft | ARight | ANone
+
+data Fixity = Fixity Assoc Int
 
 data SugaredExpr
   = SEVar Ident
@@ -28,13 +41,20 @@ data SugaredComp
   | SCOp Op SugaredExpr
   | SCDo Pattern SugaredComp SugaredComp
   | SCIf SugaredExpr SugaredComp SugaredComp
-  | SCCase SugaredExpr (Pattern, SugaredComp) (Pattern, SugaredComp)
+  | SCMatch SugaredExpr [(Pattern, SugaredComp)]
   | SCApp SugaredExpr SugaredExpr
   | SCWith SugaredExpr [(String, ValueType)] SugaredComp
   | SCEffect Op Arity SugaredComp
   | SCAnnot SugaredComp CompType
+  | SCLetRec [(Ident, [Pattern], SugaredComp)] SugaredComp
+  | SCFixity Fixity String SugaredComp
+  | SCOpChain SugaredExpr [(String, SugaredExpr)]
 
 data HandlerClause
   = RC Pattern SugaredComp
   | OC Op Pattern Ident SugaredComp
   | FC Pattern SugaredComp
+
+exprToComp :: SugaredExpr -> SugaredComp
+exprToComp (SEComp c) = c
+exprToComp e          = SCReturn e

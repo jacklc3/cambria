@@ -1,0 +1,8 @@
+-- let rec defines a recursive function.
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 120
+let rec fact n =
+  if n == 0 then return 1
+  else do r <- fact (n - 1) in return (n * r)
+in
+fact 5

@@ -9,9 +9,15 @@ data TokenKind
   | TokString String
   | TokIdent String
   | TokOp String
+  | TokSymOp String
   -- Keywords
   | TokFun
   | TokRec
+  | TokLet
+  | TokKwAnd
+  | TokInfixl
+  | TokInfixr
+  | TokInfix
   | TokHandler
   | TokReturn
   | TokFinally
@@ -38,21 +44,11 @@ data TokenKind
   | TokTList
   -- Symbols
   | TokUnit
-  | TokAnd
-  | TokOr
-  | TokEq
-  | TokNEq
-  | TokLTE
-  | TokGTE
-  | TokLT
-  | TokGT
   | TokArrow
   | TokLeftArrow
   | TokEquals
   | TokPlus
-  | TokMinus
   | TokAsterisk
-  | TokSlash
   | TokLParen
   | TokRParen
   | TokLBrace
@@ -63,7 +59,6 @@ data TokenKind
   | TokExclam
   | TokUnderscore
   | TokSemiColon
-  | TokConcat
   | TokEffect
   | TokSquigglyArrow
   | TokColon

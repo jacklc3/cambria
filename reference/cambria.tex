@@ -34,9 +34,9 @@
 
 % ── Listings: Cambria language ───────────────────────────────────────────────
 \lstdefinelanguage{cambria}{
-  morekeywords={fun,rec,handler,return,finally,do,in,if,then,else,with,handle,
-                inl,inr,case,of,effect,Unit,Void,Int,Bool,Double,Str,Name,Map,
-                List,true,false},
+  morekeywords={fun,rec,let,and,infixl,infixr,infix,handler,return,finally,do,
+                in,if,then,else,with,handle,inl,inr,case,of,effect,Unit,Void,
+                Int,Bool,Double,Str,Name,Map,List,true,false},
   sensitive=true,
   morecomment=[l]{--},
   morestring=[b]",
@@ -340,6 +340,55 @@ do _ <- !print "world" in
 return ()
 \end{lstlisting}
 
+\subsection{\texttt{let} Bindings}
+
+\cba{let} binds the result of an expression or computation to a pattern:
+
+\begin{lstlisting}
+let x = 5 in
+let (a, b) = (1, 2) in
+let y = !get r in       -- the right-hand side may perform effects
+return (x + a + b + y)
+\end{lstlisting}
+
+\cba{let x = e in c} is shorthand for \cba{do x <- return e in c} (or
+\cba{do x <- e in c} when \texttt{e} is a computation).
+
+With argument patterns, \cba{let} defines a function, and \cba{let rec} a
+recursive function:
+
+\begin{lstlisting}
+let double x = x + x in
+let addPair (x, y) = x + y in
+let rec fact n =
+  if n == 0 then return 1
+  else do r <- fact (n - 1) in return (n * r)
+in fact 5
+\end{lstlisting}
+
+These are shorthand for binding a \cba{fun} or \cba{rec} value:
+\cba{let f x = c in ...} desugars to \cba{do f <- return (fun x -> c) in ...}.
+
+Mutually recursive functions are joined with \cba{and}:
+
+\begin{lstlisting}
+let rec even n = if n == 0 then return true  else odd (n - 1)
+and     odd  n = if n == 0 then return false else even (n - 1)
+in even 10
+\end{lstlisting}
+
+This desugars to a single recursive function over a tagged sum (one summand
+per definition), together with a wrapper binding for each name; the
+definitions must therefore agree on their result type.
+
+A \cba{let} may also bind an infix operator by carrying a fixity, which is
+the only way to introduce one (Section~\ref{sec:fixity}):
+
+\begin{lstlisting}
+let infixl 8 xs <+ x = return (x :: xs) in
+[] <+ 1 <+ 2
+\end{lstlisting}
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Functions}
 \label{sec:functions}
@@ -402,14 +451,31 @@ closure.
 \label{sec:patterns}
 
 Patterns appear in \cba{do}-bindings, function arguments, \cba{rec} arguments,
-handler clauses, and \cba{case} branches.  A pattern is one of:
+\cba{let} bindings, handler clauses, and \cba{case} branches.
+
+Binding positions (\cba{do}, \cba{fun}, \cba{rec}, \cba{let}, handler
+clauses) accept only \emph{irrefutable} patterns, which always match:
 
 \begin{itemize}
   \item A variable name (e.g.\ \texttt{x}): binds the matched value
   \item A wildcard \cba{_}: matches anything, discards the value
+  \item The unit pattern \cba{()}
   \item A pair pattern \texttt{(\emph{p1}, \emph{p2})}: destructs a pair,
         matching each component with a sub-pattern
 \end{itemize}
+
+\cba{case} branches additionally accept \emph{refutable} patterns, which can
+fail to match (Section~\ref{sec:control}):
+
+\begin{itemize}
+  \item Sum patterns \cba{inl} \emph{p} and \cba{inr} \emph{p}
+  \item List patterns \cba{[]} and \emph{p1} \cba{::} \emph{p2}
+  \item Literal patterns: integers, doubles, booleans, and strings.  Numeric
+        literals may be signed, so \cba{-1} and \cba{-0.25} are patterns; a
+        literal pattern is tested with \texttt{==}
+\end{itemize}
+
+All of these nest freely, e.g.\ \cba{inl (x :: (1, _) :: rest)}.
 
 \subsection{Wildcards}
 
@@ -446,8 +512,8 @@ fun ((a, b), c) -> return (a + b + c)
 set (ref, val) k -> ...
 \end{lstlisting}
 
-Pair patterns desugar into calls to the built-in \cba{fst} and \cba{snd}
-functions.
+Pair patterns desugar into pair projections
+(Section~\ref{sec:desugaring}).
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Control Flow}
@@ -466,25 +532,47 @@ computations:
 if x == 0 then return "zero" else return "nonzero"
 \end{lstlisting}
 
-\subsection{Case Expressions (Sum Types)}
+\subsection{Case Expressions}
 
-Pattern match on sum types (\cba{inl}/\cba{inr}):
+\cba{case} matches a value against a sequence of clauses:
 
 \begin{lstlisting}
 case expr of {
-  inl x -> computation1,
-  inr y -> computation2
+  pattern1 -> computation1,
+  pattern2 -> computation2,
+  ...
 }
 \end{lstlisting}
 
-The two branches can appear in either order:
+The scrutinee may be a computation; it is evaluated once, before matching.
+Clauses are tried top to bottom and the first matching clause wins, so an
+earlier clause may overlap a later one:
 
 \begin{lstlisting}
+case xs of {
+  []        -> return 0,
+  x :: rest -> return x
+}
+
+case n of {
+  0 -> return "zero",
+  1 -> return "one",
+  _ -> return "many"
+}
+
 case v of {
-  inr y -> return y,
-  inl x -> return x
+  inl (x :: _)   -> return x,
+  inl []         -> return 0,
+  inr (true, y)  -> return y,
+  inr (false, _) -> return 99
 }
 \end{lstlisting}
+
+Matching compiles down to the kernel's binary sum \cba{case}, list
+destructuring and equality tests (Section~\ref{sec:desugaring}); a two-clause
+\cba{inl}/\cba{inr} match maps directly onto the kernel construct.  If no clause matches at runtime the
+program aborts with a pattern-match failure, so end with an irrefutable
+clause when the earlier clauses are not exhaustive.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Operators}
@@ -584,27 +672,41 @@ are evaluated.
 
 \subsection{Operator Precedence (Low to High)}
 
-\begin{enumerate}
-  \item \texttt{;} (sequencing): right-associative
-  \item \texttt{::} (cons): right-associative
-  \item \texttt{||} (disjunction): right-associative
-  \item \texttt{\&\&} (conjunction): right-associative
-  \item \texttt{==}, \texttt{/=}, \texttt{<}, \texttt{>}, \texttt{<=},
-        \texttt{>=} (comparison): non-associative
-  \item \texttt{++} (string concat): left-associative
-  \item \texttt{+}, \texttt{-} (additive): left-associative
-  \item \texttt{*}, \texttt{/} (multiplicative): left-associative
-  \item Function application
-\end{enumerate}
+Every infix operator sits at one of ten numbered levels, 0 (loosest) to 9
+(tightest).  The built-in operators occupy seven of them, and levels 0, 8 and
+9 are left free for operator bindings
+(Section~\ref{sec:fixity}):
+
+\begin{center}
+\begin{tabular}{cll}
+\toprule
+\textbf{Level} & \textbf{Operators} & \textbf{Associativity} \\
+\midrule
+0 & \emph{(free)}   & \\
+1 & \texttt{::} (cons) & right \\
+2 & \texttt{||} (disjunction) & right \\
+3 & \texttt{\&\&} (conjunction) & right \\
+4 & \texttt{==} \texttt{/=} \texttt{<} \texttt{>} \texttt{<=} \texttt{>=}
+    (comparison) & none \\
+5 & \texttt{++} (string concat) & left \\
+6 & \texttt{+} \texttt{-} (additive) & left \\
+7 & \texttt{*} \texttt{/} (multiplicative) & left \\
+8, 9 & \emph{(free)} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Sequencing with \texttt{;} is looser than every level, and function
+application binds tighter than every level.
 
 All infix operators desugar into function applications.  For example,
 \texttt{x + y} becomes \texttt{(+) (x, y)}.
 
-The compound computation forms are looser still.  The body of a \cba{do},
-the branches of an \cba{if} and a \cba{case}, the body of a
-\cba{with ... handle}, and the scope of an \cba{effect} declaration all
-extend as far to the right as they can, across \texttt{;} and to the end of
-the enclosing computation.  So
+The compound computation forms are looser still.  The body of a \cba{do} or a
+\cba{let}, the branches of an \cba{if} and a \cba{case}, the body of a
+\cba{with ... handle}, and the scope of an \cba{effect} declaration all extend
+as far to the right as they can, across \texttt{;} and to the end of the
+enclosing computation.  So
 
 \begin{lstlisting}
 do x <- return 1 in return x ; return x
@@ -622,6 +724,76 @@ effect !op : Unit ~> Int.
 \end{lstlisting}
 
 Parenthesise a computation to end its scope early.
+
+\subsection{User-Defined Operators}
+\label{sec:fixity}
+
+An operator is not a separate kind of thing: it is an ordinary variable whose
+name happens to be symbolic, and the built-in operators are exactly that
+already (\texttt{+} names the primitive that adds a pair).  So an operator is
+introduced by a \cba{let} carrying a fixity, and the two spellings below bind
+the same thing:
+
+\begin{lstlisting}
+let infixr 0 a => b = !mkImpl (a, b) in    -- operands named
+let infixl 8 (<+) = snoc in                -- an existing function
+\end{lstlisting}
+
+The first names the operands and takes the body directly.  The second gives
+the operator a function, which must accept a \emph{pair}, since \cba{a OP b}
+always elaborates to \cba{(OP) (a, b)} with the operands evaluated left to
+right.  Writing a curried function there is a type error rather than a
+special case.  Both forms are available under \cba{let rec}, where the
+operator is in scope in its own body, and inside an \cba{and} group, where
+every operator in the group is in scope in every body.
+
+\cba{infixl}, \cba{infixr} and \cba{infix} give a left-, right- and
+non-associative operator respectively, at the given precedence level, on the
+same 0 to 9 scale as the built-in operators above.  Levels 0, 8 and 9 are
+unoccupied, so a binding there is either looser or tighter than everything
+built in; the remaining levels tie with the built-in group listed against
+them.
+
+Because the fixity belongs to the binding, it has exactly the binding's
+scope.  An operator may shadow a built-in one, and both its meaning and its
+associativity revert at the end of the enclosing computation:
+
+\begin{lstlisting}
+let inner =
+  let infixr 2 a - b = return 0 in
+  1 - 2 - 3          -- 0, using the shadowing definition
+in
+return (1 - 2 - 3)   -- -4, subtraction again, left-associative
+\end{lstlisting}
+
+Operator names are sequences of the symbol characters
+\verb!+ - * / < > = & | ^ @ % ? ~!.  Exactly four spellings are unavailable,
+because the grammar needs them elsewhere: \texttt{->}, \texttt{<-},
+\texttt{\textasciitilde>} and \texttt{=}.  Everything else in that alphabet is
+free, including every built-in operator and \texttt{=>}, which a binding
+shadows in the ordinary way.  Note that \texttt{:} is not in the alphabet, so
+\texttt{::} and type ascription stay unambiguous.
+
+Using an operator with no fixity in scope is an error, and non-associative
+operators cannot be chained.
+
+Parenthesising an operator gives back the plain variable, so operators can be
+applied prefix and passed as arguments:
+
+\begin{lstlisting}
+(+) (3, 4)                            -- 7
+fold ((+), (0, 1 :: 2 :: 3 :: []))    -- 6
+\end{lstlisting}
+
+With the \texttt{=>} binding above, Peirce's law is written
+
+\begin{lstlisting}
+((p => q) => p) => p
+\end{lstlisting}
+
+which elaborates to
+\cba{(=>) ((=>) ((=>) (p, q), p), p)}, and so to three calls of
+\cba{!mkImpl}.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Effects and Operations}
@@ -1304,8 +1476,8 @@ desugars to:
 
 \begin{lstlisting}
 do _tmp <- comp in
-do x <- fst _tmp in
-do y <- snd _tmp in
+do x <- _fst _tmp in
+do y <- _snd _tmp in
 body
 \end{lstlisting}
 
@@ -1316,7 +1488,86 @@ fun ((a, b), c) -> body
 \end{lstlisting}
 
 desugars to a function on a fresh variable, with projections extracted via
-\cba{fst} and \cba{snd}.
+\cba{_fst} and \cba{_snd}.
+
+\subsection{\texttt{let} Bindings}
+
+\begin{lstlisting}
+let x = e in body
+let f p q = c in body
+let infixl 8 p <+ q = c in body
+\end{lstlisting}
+
+desugar to:
+
+\begin{lstlisting}
+do x <- return e in body
+do f <- return (fun p q -> c) in body
+do (<+) <- return (fun (p, q) -> c) in body
+\end{lstlisting}
+
+with \cba{return e} dropped when \texttt{e} is already a computation, and
+\cba{fun} replaced by \cba{rec f} under \cba{let rec}.  An operator binding is
+the same \cba{do}, binding the symbol as a variable that takes a pair; the
+fixity is consumed while desugaring and never reaches the core.
+
+\subsection{Mutual Recursion}
+
+\begin{lstlisting}
+let rec f x = c1 and g y = c2 in body
+\end{lstlisting}
+
+desugars to a single recursive function over a tagged sum, one summand per
+definition, plus a wrapper binding for each name that injects its arguments
+and calls it (Bekic's construction):
+
+\begin{lstlisting}
+do h <- return (rec h a -> case a of {
+     inl x -> c1,
+     inr y -> c2
+   }) in
+do f <- return (fun x -> h (inl x)) in
+do g <- return (fun y -> h (inr y)) in
+body
+\end{lstlisting}
+
+The wrappers are also in scope inside the body of \texttt{h}, which is what
+lets \texttt{c1} call \texttt{g} and \texttt{c2} call \texttt{f}.  Because the
+definitions share one function, they must agree on their result type.
+
+\subsection{Multi-Clause \texttt{case}}
+
+A two-clause \cba{inl}/\cba{inr} match on irrefutable sub-patterns is the
+kernel \cba{case} construct directly.  Anything else compiles to a decision
+tree: each clause becomes a test that either enters the body or calls a
+fall-through thunk holding the remaining clauses.
+
+\begin{lstlisting}
+case xs of { [] -> c1, y :: ys -> c2 }
+\end{lstlisting}
+
+desugars to:
+
+\begin{lstlisting}
+do _rest <- return (fun _ -> {- clause 2 -}) in
+do _tmp <- _uncons xs in
+case _tmp of {
+  inl _ -> c1,
+  inr _ -> _rest ()
+}
+\end{lstlisting}
+
+List patterns go through \cba{_uncons}, pair patterns through \cba{_fst} and
+\cba{_snd}, and literal patterns through \cba{_eq} followed by an \cba{if}.
+When every clause fails the tree ends in \cba{_matchfail}, which aborts.
+
+These are internal aliases for the corresponding primitives, with
+\cba{_matchfail} existing only for this purpose.  Desugaring goes through them
+rather than through \cba{uncons}, \cba{fst}, \cba{snd} and \cba{==} so that
+shadowing a primitive cannot change what a pattern means.  A leading
+underscore is not a legal identifier in the surface, so no program can bind or
+even mention one, which is also why the generated \cba{_rest} and \cba{_tmp}
+above cannot collide with a variable of the user's.
 
 \subsection{Infix Operators}
 
@@ -1330,6 +1581,14 @@ All infix operators desugar to function applications on pairs:
 \texttt{x :: y} & $\longrightarrow$ & \texttt{(::) (x, y)} \\
 \end{tabular}
 \end{center}
+
+Declared operators are no different: \texttt{x <+ y} becomes
+\texttt{(<+) (x, y)}, a reference to the variable the binding introduced.
+
+The parser does not resolve precedence itself.  It collects a run of infix
+operators into a flat chain, and the desugarer reassociates the chain by
+precedence climbing against the fixities in scope, which is why a new
+operator needs no change to the grammar.
 
 \subsection{Semicolons}
 

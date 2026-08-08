@@ -1,0 +1,3 @@
+-- A symbolic operator needs a binding that gives it a fixity.
+-- @expect-error: no fixity in scope
+return (1 <+> 2)

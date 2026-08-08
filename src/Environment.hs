@@ -45,7 +45,13 @@ primitives =
       []     -> VEither L VUnit
       (x:xs) -> VEither R (VPair x (VList xs)))
   , ("absurd", \_ -> error "absurd: applied to a value of type Void")
+  , ("_matchfail", \_ -> error "Pattern match failure: no clause matched")
   ]
+
+-- the desugarer emits these; a leading underscore is unbindable in the surface
+internalAliases :: [(Ident, Ident)]
+internalAliases =
+  [ ("_fst", "fst"), ("_snd", "snd"), ("_uncons", "uncons"), ("_eq", "==") ]
 
 constants :: [(Ident, Value)]
 constants =
@@ -54,5 +60,7 @@ constants =
   ]
 
 initialEnv :: Env
-initialEnv = Env (Map.fromList (map liftPrim primitives ++ constants))
-  where liftPrim (name, f) = (name, VPrimitive (CReturn . f))
+initialEnv = Env (Map.fromList (map liftPrim (primitives ++ aliases) ++ constants))
+  where
+    liftPrim (name, f) = (name, VPrimitive (CReturn . f))
+    aliases = [(a, f) | (a, n) <- internalAliases, Just f <- [Prelude.lookup n primitives]]

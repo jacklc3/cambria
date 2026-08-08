@@ -17,6 +17,11 @@ tokens :-
 
   fun                        { \p s -> Token p s TokFun }
   rec                        { \p s -> Token p s TokRec }
+  let                        { \p s -> Token p s TokLet }
+  and                        { \p s -> Token p s TokKwAnd }
+  infixl                     { \p s -> Token p s TokInfixl }
+  infixr                     { \p s -> Token p s TokInfixr }
+  infix                      { \p s -> Token p s TokInfix }
   handler                    { \p s -> Token p s TokHandler }
   return                     { \p s -> Token p s TokReturn }
   finally                    { \p s -> Token p s TokFinally }
@@ -43,22 +48,12 @@ tokens :-
   List                       { \p s -> Token p s TokTList }
 
   "()"                       { \p s -> Token p (quotes s) TokUnit }
-  "&&"                       { \p s -> Token p (quotes s) TokAnd }
-  "||"                       { \p s -> Token p (quotes s) TokOr }
-  "=="                       { \p s -> Token p (quotes s) TokEq }
-  "/="                       { \p s -> Token p (quotes s) TokNEq }
-  "<="                       { \p s -> Token p (quotes s) TokLTE }
-  ">="                       { \p s -> Token p (quotes s) TokGTE }
-  "<"                        { \p s -> Token p (quotes s) TokLT }
-  ">"                        { \p s -> Token p (quotes s) TokGT }
   "->"                       { \p s -> Token p (quotes s) TokArrow }
   "<-"                       { \p s -> Token p (quotes s) TokLeftArrow }
   "=>"                       { \p s -> Token p (quotes s) TokFatArrow }
   "="                        { \p s -> Token p (quotes s) TokEquals }
   "+"                        { \p s -> Token p (quotes s) TokPlus }
-  "-"                        { \p s -> Token p (quotes s) TokMinus }
   "*"                        { \p s -> Token p (quotes s) TokAsterisk }
-  "/"                        { \p s -> Token p (quotes s) TokSlash }
   "("                        { \p s -> Token p (quotes s) TokLParen }
   ")"                        { \p s -> Token p (quotes s) TokRParen }
   "{"                        { \p s -> Token p (quotes s) TokLBrace }
@@ -69,7 +64,6 @@ tokens :-
   "!"                        { \p s -> Token p (quotes s) TokExclam }
   "_"                        { \p s -> Token p (quotes s) TokUnderscore }
   ";"                        { \p s -> Token p (quotes s) TokSemiColon }
-  "++"                       { \p s -> Token p (quotes s) TokConcat }
   "~>"                       { \p s -> Token p (quotes s) TokSquigglyArrow }
   "::"                       { \p s -> Token p (quotes s) TokCons }
   "[]"                       { \p s -> Token p (quotes s) TokNil }
@@ -90,6 +84,9 @@ tokens :-
   $lower[$alpha$digit\_\']*  { \p s -> Token p s (TokIdent s) }
   \"(\\.|[^\"])*\"           { \p s -> Token p s (TokString (unescape (init (drop 1 s)))) }
   !$alpha[$alpha$digit\_\']* { \p s -> Token p s (TokOp (drop 1 s)) }
+
+  -- user-declarable operators; the reserved symbols above win ties
+  [\+\-\*\/\<\>\=\&\|\^\@\%\?\~]+ { \p s -> Token p (quotes s) (TokSymOp s) }
 
 {
 

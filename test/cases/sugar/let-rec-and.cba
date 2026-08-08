@@ -1,0 +1,10 @@
+-- Mutual recursion: let rec ... and ... desugars to a single recursive
+-- function over a tagged sum (Bekic), with wrapper bindings for each name.
+-- @expect-type: (Bool * Bool)!{}
+-- @expect-value: Pure: (True, True)
+let rec even n = if n == 0 then return true  else odd (n - 1)
+and     odd  n = if n == 0 then return false else even (n - 1)
+in
+do e <- even 10 in
+do o <- odd 7 in
+return (e, o)

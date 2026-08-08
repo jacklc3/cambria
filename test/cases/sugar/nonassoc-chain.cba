@@ -1,0 +1,3 @@
+-- == is non-associative and cannot be chained.
+-- @expect-error: Non-associative
+return (1 == 2 == 3)
