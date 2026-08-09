@@ -1,4 +1,4 @@
--- Reverse-mode automatic differentiation via tapes as a handler
+-- Reverse-mode automatic differentiation as a handler
 -- cf. Automatic differentiation via effects and handlers, PhD Thesis, Jesse Sigal
 --
 -- The theory {const, neg, plus, mult} over a carrier parameter is interpreted
