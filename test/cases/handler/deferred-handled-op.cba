@@ -1,0 +1,15 @@
+-- @expect-value: Pure: True
+with handler {
+  return x -> return x,
+  ask s k  -> k (s == "yes!")
+} handle
+do f <- (
+  with handler {
+    return x -> return x,
+    ask n k  -> k (n > 0)
+  } handle
+  effect !ask : Int ~> Bool.
+  do x <- !ask 1 in
+  return (fun s -> !ask (s ++ "!"))
+) in
+f "yes"

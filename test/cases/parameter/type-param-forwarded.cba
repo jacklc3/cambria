@@ -1,4 +1,4 @@
--- @expect-error: Forwarded operations ["leak"]
+-- @expect-error: Escaped operations ["leak"]
 with [$p -> Int] handler {
   return x -> return x,
   get a k -> k 5

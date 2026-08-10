@@ -1,0 +1,10 @@
+-- @expect-error: Escaped operations ["peek"]
+with [$p -> Int] handler {
+  return x -> return x,
+  new _ k  -> k 5,
+  peek a k -> k 1
+} handle
+effect !new : Unit ~> $p.
+effect !peek : $p ~> Int.
+do a <- !new () in
+return (fun n -> !peek (n + 1), fun u -> !peek a)

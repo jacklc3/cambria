@@ -1,4 +1,4 @@
--- @expect-error: Forwarded operations ["print"]
+-- @expect-error: Escaped operations ["print"]
 with [$loc -> Str] handler {
   return x  -> return x,
   ref _ k   -> k "secret representation",

@@ -1,0 +1,10 @@
+-- @expect-value: Pure: <closure>
+with [$p -> Int] handler {
+  return x -> return x,
+  new _ k  -> k 5,
+  tick _ k -> k ()
+} handle
+effect !new : Unit ~> $p.
+effect !tick : Unit ~> Unit.
+do a <- !new () in
+return (fun u -> !tick ())

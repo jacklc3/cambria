@@ -1,0 +1,12 @@
+-- @expect-error: Escaped operations ["isedge"]
+with [$graph -> Name, $node -> Bool] handler {
+  newgraph _ k -> k (!fresh ()),
+  newnode _ k -> k (!flip ()),
+  isedge (_, (a, b)) k -> k (a == b)
+} handle
+effect !newgraph : Unit ~> $graph.
+effect !newnode : $graph ~> $node.
+effect !isedge : $graph * ($node * $node) ~> Bool.
+do g <- !newgraph () in
+do a <- !newnode g in
+return (fun b -> !isedge (g, (a, b)))

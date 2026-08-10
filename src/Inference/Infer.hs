@@ -133,11 +133,11 @@ inferComp = \case
         ++ " escape the handler"
     tc' <- applySubst tc
     let forwarded = effectOps (effects tc') `Map.withoutKeys` handled
-        leaked = Map.keysSet
-               $ Map.filter (not . Set.disjoint (Map.keysSet sig') . free PV) forwarded
-    unless (Set.null leaked) $ throwError
-      $ "Forwarded operations " ++ show (Set.toList leaked)
-        ++ " mention type parameters bound by this handler"
+        escaped   = mentionsEffects (Map.keysSet sig') forwarded
+                  <> mentionsValue (Map.keysSet sig') (value tc')
+    unless (Set.null escaped) $ throwError
+      $ "Escaped operations " ++ show (Set.toList escaped)
+        ++ " mention parameters bound by this handler"
     return tOut'
   CAnnot c t -> do
     t' <- inferComp c
@@ -212,3 +212,19 @@ checkValue :: Value -> ValueType -> Infer ()
 checkValue v t = do
   t' <- inferValue v
   unify t' t
+
+mentionsEffects :: Set.Set Ident -> Map.Map Op Arity -> Set.Set Op
+mentionsEffects ps = Map.keysSet . Map.filter (not . Set.disjoint ps . free PV)
+
+mentionsComp :: Set.Set Ident -> CompType -> Set.Set Op
+mentionsComp ps (TComp t e) = mentionsValue ps t <> mentionsEffects ps (effectOps e)
+
+mentionsValue :: Set.Set Ident -> ValueType -> Set.Set Op
+mentionsValue ps = \case
+  TPair t1 t2    -> mentionsValue ps t1 <> mentionsValue ps t2
+  TEither t1 t2  -> mentionsValue ps t1 <> mentionsValue ps t2
+  TMap t1 t2     -> mentionsValue ps t1 <> mentionsValue ps t2
+  TList t        -> mentionsValue ps t
+  TFun t1 t2     -> mentionsValue ps t1 <> mentionsComp ps t2
+  THandler t1 t2 -> mentionsComp ps t1 <> mentionsComp ps t2
+  _              -> mempty

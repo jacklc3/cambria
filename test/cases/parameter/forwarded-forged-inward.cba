@@ -1,4 +1,4 @@
--- @expect-error: Forwarded operations ["fresh"]
+-- @expect-error: Escaped operations ["fresh"]
 with [$name -> Int] handler {
   return x  -> return (fun _ -> return x),
   fresh _ k -> return (fun n -> k n (n+1)),
