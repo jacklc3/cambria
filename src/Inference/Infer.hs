@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 import Syntax
 import Inference.Monad
 import Inference.Unify (unify)
-import Inference.Context
+import Primitives (inbuiltOps, initialCtx)
 import Inference.Effects
 import Inference.Substitutable
 

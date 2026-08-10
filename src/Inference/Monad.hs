@@ -5,8 +5,7 @@ import Control.Monad.State
 import Control.Monad.Reader
 import qualified Data.Map as Map
 
-import Types (Ident, Op, Arity, ValueType(TVar), EffectsType(Open))
-import Inference.Context (Context)
+import Types (Context, Ident, Op, Arity, ValueType(TVar), EffectsType(Open))
 
 data InferState = InferState {
   count       :: Int,

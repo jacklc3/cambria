@@ -1,0 +1,7 @@
+-- A two-case inl/inr match compiles to the kernel construct, and still
+-- checks the unit pattern inside it.
+-- @expect-error: Int vs Unit
+case inl 5 of {
+  inl () -> return "unit was not checked",
+  inr x  -> return x
+}

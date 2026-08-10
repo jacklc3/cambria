@@ -1,0 +1,10 @@
+-- let binds several names at once, separated by commas; each right-hand side
+-- sees the ones before it.
+-- @expect-type: (Int * Int)!{}
+-- @expect-value: Pure: (3, 9)
+let x = 1,
+    y = x + 2,
+    double z = z * 2,
+    w = double y
+in
+return (y, w + x + 2)

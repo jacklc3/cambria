@@ -4,7 +4,7 @@
 -- The paper's Standard ML prototype (Appendix A.4) closes with "a slightly
 -- more elaborate demonstration": a proof searcher for the implicational
 -- fragment of propositional logic, written as a logic program over the four
--- generic effects of disjunctive predicate logic --  or (choose), bottom
+-- generic effects of disjunctive predicate logic: or (choose), bottom
 -- (fail), eq (unify) and free (a fresh logic variable).  This file
 -- reproduces it, including the toplevel transcript in Appendix A.5.
 --
@@ -51,7 +51,7 @@
 --          ("p->q, q->r |- p->r", [["=>(p, r)"]]),
 --          ("|- p->q  (unprovable)", []),
 --          ("?a. a |- p->q", [["=>(p, q)"]]),
---          ("?a. a |- p->q (many)", [["=>(p, q)", "q", "=>(=>(_267, _267), =>(p, q))"]])]
+--          ("?a. a |- p->q (many)", [["=>(p, q)", "q", "=>(=>(_n, _n), =>(p, q))"]])]
 --          : List (Str * List List Str)!{ fresh : Unit ~> Name }
 
 effect !cons   : Str * List $p ~> $p.   -- constructor: label + sub-term list
@@ -140,22 +140,21 @@ let rec uni (pairs, h) = case pairs of {
 } in
 -- reify a term name, or a list of argument names, back to a string
 let rec showT (n, h) =
-  do rn <- walk (n, h) in
-  case lookup (rn, h) of {
-    inl _  -> return ("_" ++ hash rn),
-    inr la -> case snd la of {
-      []     -> return (fst la),
-      _ :: _ -> do s <- showArgs (snd la, h) in return (fst la ++ "(" ++ s ++ ")")
-    }
-  }
-and showArgs (xs, h) = case xs of {
-  []       -> return "",
-  x :: xs' -> do sx <- showT (x, h) in
-              case xs' of {
-                []     -> return sx,
-                _ :: _ -> do sr <- showArgs (xs', h) in return (sx ++ ", " ++ sr)
-              }
-} in
+          do rn <- walk (n, h) in
+          case lookup (rn, h) of {
+            inl _  -> return ("_" ++ hash rn),
+            inr la -> case snd la of {
+              []     -> return (fst la),
+              _ :: _ -> do s <- showArgs (snd la, h) in
+                        return (fst la ++ "(" ++ s ++ ")") } },
+        showArgs (xs, h) = case xs of {
+          []       -> return "",
+          x :: xs' -> do sx <- showT (x, h) in
+                      case xs' of {
+                        []     -> return sx,
+                        _ :: _ -> do sr <- showArgs (xs', h) in
+                                  return (sx ++ ", " ++ sr) } }
+in
 
 -- ---- two free-model handlers over the heap ----
 

@@ -1,0 +1,5 @@
+-- The unit pattern constrains its scrutinee in binding position, not only in
+-- a case.
+-- @expect-error: Int vs Unit
+let () = return 5 in
+return "unit was not checked"

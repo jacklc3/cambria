@@ -1,4 +1,4 @@
--- Literal patterns; clauses are tried top to bottom, first match wins.
+-- Literal patterns; cases are tried top to bottom, first match wins.
 -- @expect-type: (Str * Str)!{}
 -- @expect-value: Pure: ("one", "many")
 let describe n = case n of {

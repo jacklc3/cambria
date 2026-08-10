@@ -3,7 +3,16 @@
 module Semantics where
 
 import Syntax
-import Environment (def, find)
+import qualified Data.Map as Map
+
+find :: Ident -> Env -> Value
+find x (Env env) =
+  case Map.lookup x env of
+    Just v  -> v
+    Nothing -> error $ "Unbound variable: " ++ x
+
+def :: Ident -> Value -> Env -> Env
+def x v (Env env) = Env (Map.insert x v env)
 
 data Result
   = Pure Value

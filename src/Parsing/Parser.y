@@ -25,7 +25,6 @@ import Control.Monad.Except
   fun                        { Token _ _ TokFun }
   rec                        { Token _ _ TokRec }
   let                        { Token _ _ TokLet }
-  and                        { Token _ _ TokKwAnd }
   infixl                     { Token _ _ TokInfixl }
   infixr                     { Token _ _ TokInfixr }
   infix                      { Token _ _ TokInfix }
@@ -112,37 +111,31 @@ exprApp :: { SugaredExpr }
   | '(' chainOp ')'                       { SEVar $2 }
 
 exprAtom :: { SugaredExpr }
-  : atom                                  { $1 }
+  : valueAtom                             { $1 }
   | '(' expr ')'                          { $2 }
   | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
-wildvar :: { Ident }
+wildVar :: { Ident }
   : var                                   { $1 }
   | '_'                                   { "_" }
 
--- irrefutable, for binding positions
-bpattern :: { Pattern }
-  : var                                   { PVar $1 }
-  | '_'                                   { PWild }
-  | '()'                                  { PUnit }
-  | '(' bpattern ',' bpattern ')'         { PPair $2 $4 }
-  | '(' bpattern ')'                      { $2 }
+binder :: { Pattern }
+  : patternAtom                           { $1 }
 
-bpatterns :: { [Pattern] }
-  : bpatterns bpattern                    { $2 : $1 }
-  | bpattern                              { [$1] }
+binders :: { [Pattern] }
+  : binders binder                        { $2 : $1 }
+  | binder                                { [$1] }
 
--- full patterns, for case clauses
 pattern :: { Pattern }
-  : patApp '::' pattern                   { PCons $1 $3 }
-  | patApp                                { $1 }
+  : patternApp '::' pattern               { PCons $1 $3 }
+  | patternApp                            { $1 }
 
-patApp :: { Pattern }
-  : inl patAtom                           { PEither L $2 }
-  | inr patAtom                           { PEither R $2 }
-  | patAtom                               { $1 }
+patternApp :: { Pattern }
+  : inl patternAtom                       { PEither L $2 }
+  | inr patternAtom                       { PEither R $2 }
+  | patternAtom                           { $1 }
 
-patAtom :: { Pattern }
+patternAtom :: { Pattern }
   : var                                   { PVar $1 }
   | '_'                                   { PWild }
   | '()'                                  { PUnit }
@@ -157,16 +150,16 @@ patAtom :: { Pattern }
   | '(' pattern ')'                       { $2 }
 
 value :: { SugaredExpr }
-  : atom                                  { $1 }
+  : valueAtom                             { $1 }
   | negint                                { SEInt $1 }
   | negdouble                             { SEDouble $1 }
   | inl exprAtom                          { SEEither L $2 }
   | inr exprAtom                          { SEEither R $2 }
-  | fun bpatterns '->' comp               { SEFun (reverse $2) $4 }
-  | rec wildvar bpatterns '->' comp       { SERec $2 (reverse $3) $5 }
+  | fun binders '->' comp                 { SEFun (reverse $2) $4 }
+  | rec wildVar binders '->' comp         { SERec $2 (reverse $3) $5 }
   | handler '{' handlerClauses '}'        { SEHandler $3 }
 
-atom :: { SugaredExpr }
+valueAtom :: { SugaredExpr }
   : '()'                                  { SEUnit }
   | '[]'                                  { SEVar "[]" }
   | boolean                               { SEBool $1 }
@@ -183,34 +176,41 @@ handlerClauses :: { [HandlerClause] }
   | {- empty -}                           { [] }
 
 handlerClause :: { HandlerClause }
-  : return bpattern '->' comp             { RC $2 $4 }
-  | var bpattern wildvar '->' comp        { OC $1 $2 $3 $5 }
-  | finally bpattern '->' comp            { FC $2 $4 }
+  : return binder '->' comp               { RC $2 $4 }
+  | var binder wildVar '->' comp          { OC $1 $2 $3 $5 }
+  | finally binder '->' comp              { FC $2 $4 }
 
-pSubs :: { [(String, ValueType)] }
+paramSubs :: { [(String, ValueType)] }
   : {- empty -}                           { [] }
-  | '[' pSubsList ']'                     { $2 }
+  | '[' paramSubList ']'                  { $2 }
 
-pSubsList :: { [(String, ValueType)] }
+paramSubList :: { [(String, ValueType)] }
   : typeparam '->' type                   { [($1, $3)] }
-  | typeparam '->' type ',' pSubsList     { ($1, $3) : $5 }
+  | typeparam '->' type ',' paramSubList  { ($1, $3) : $5 }
 
 compTerm :: { SugaredComp }
   : return expr                           { SCReturn $2 }
-  | do bpattern '<-' comp in comp         { SCDo $2 $4 $6 }
-  | let letBinding in comp                { $2 $4 }
+  | do binder '<-' comp in comp           { SCDo $2 $4 $6 }
+  | let letBindings in comp               { $2 $4 }
   | let rec recBindings in comp           { mkLetRec (reverse $3) $5 }
   | if expr then comp else comp           { SCIf $2 $4 $6 }
-  | case expr of '{' matchClauses '}'     { SCMatch $2 (reverse $5) }
-  | with pSubs expr handle comp           { SCWith $3 $2 $5 }
+  | case expr of '{' matchCases '}'       { SCMatch $2 (reverse $5) }
+  | with paramSubs expr handle comp       { SCWith $3 $2 $5 }
   | effect op ':' type '~>' type '.' comp { SCEffect $2 (Arity $4 $6) $8 }
   | compInfix                             { $1 }
 
+letBindings :: { SugaredComp -> SugaredComp }
+  : letBindings ',' letBinding            { $1 . $3 }
+  | letBinding                            { $1 }
+
 letBinding :: { SugaredComp -> SugaredComp }
-  : bpattern '=' expr                     { SCDo $1 (exprToComp $3) }
-  | var bpatterns '=' expr                { SCDo (PVar $1) (SCReturn (SEFun (reverse $2) (exprToComp $4))) }
-  | fixity bpattern chainOp bpattern '=' expr { SCFixity $1 $3 . SCDo (PVar $3) (SCReturn (SEFun [PPair $2 $4] (exprToComp $6))) }
-  | fixity '(' chainOp ')' '=' expr       { SCFixity $1 $3 . SCDo (PVar $3) (exprToComp $6) }
+  : binder '=' expr                       { SCDo $1 (SCReturn $3) }
+  | fixity '(' chainOp ')' '=' expr       { SCFixity $1 $3 . SCDo (PVar $3) (SCReturn $6) }
+  | funBinding                            { mkLet $1 }
+
+funBinding :: { (Maybe Fixity, Ident, [Pattern], SugaredComp) }
+  : var binders '=' expr                  { (Nothing, $1, reverse $2, SCReturn $4) }
+  | fixity binder chainOp binder '=' expr { (Just $1, $3, [PPair $2 $4], SCReturn $6) }
 
 fixity :: { Fixity }
   : infixl integer                        { Fixity ALeft  (fromInteger $2) }
@@ -218,35 +218,29 @@ fixity :: { Fixity }
   | infix integer                         { Fixity ANone  (fromInteger $2) }
 
 recBindings :: { [(Maybe Fixity, Ident, [Pattern], SugaredComp)] }
-  : recBindings and recBinding            { $3 : $1 }
-  | recBinding                            { [$1] }
+  : recBindings ',' funBinding            { $3 : $1 }
+  | funBinding                            { [$1] }
 
-recBinding :: { (Maybe Fixity, Ident, [Pattern], SugaredComp) }
-  : var bpatterns '=' expr                { (Nothing, $1, reverse $2, exprToComp $4) }
-  | fixity bpattern chainOp bpattern '=' expr { (Just $1, $3, [PPair $2 $4], exprToComp $6) }
+matchCases :: { [(Pattern, SugaredComp)] }
+  : matchCases ',' matchCase              { $3 : $1 }
+  | matchCase                             { [$1] }
 
-matchClauses :: { [(Pattern, SugaredComp)] }
-  : matchClauses ',' matchClause          { $3 : $1 }
-  | matchClause                           { [$1] }
-
-matchClause :: { (Pattern, SugaredComp) }
+matchCase :: { (Pattern, SugaredComp) }
   : pattern '->' comp                     { ($1, $3) }
 
 compInfix :: { SugaredComp }
   : compApp                               { $1 }
-  | opchain                               { SCOpChain (fst $1) (reverse (snd $1)) }
+  | opChain                               { SCOpChain (fst $1) (reverse (snd $1)) }
 
--- a signed literal after an operand is an addition: n-1 and n -1 both subtract
-opchain :: { (SugaredExpr, [(String, SugaredExpr)]) }
+opChain :: { (SugaredExpr, [(String, SugaredExpr)]) }
   : chainOperand chainOp chainOperand     { ($1, [($2, $3)]) }
   | chainOperand negint                   { ($1, [("+", SEInt $2)]) }
   | chainOperand negdouble                { ($1, [("+", SEDouble $2)]) }
-  | opchain chainOp chainOperand          { (fst $1, ($2, $3) : snd $1) }
-  | opchain negint                        { (fst $1, ("+", SEInt $2) : snd $1) }
-  | opchain negdouble                     { (fst $1, ("+", SEDouble $2) : snd $1) }
+  | opChain chainOp chainOperand          { (fst $1, ($2, $3) : snd $1) }
+  | opChain negint                        { (fst $1, ("+", SEInt $2) : snd $1) }
+  | opChain negdouble                     { (fst $1, ("+", SEDouble $2) : snd $1) }
 
--- the reserved four are needed by other productions; the rest lex as symop
-chainOp :: { String }
+chainOp :: { Ident }
   : '::'                                  { "::" }
   | '=>'                                  { "=>" }
   | '+'                                   { "+" }
@@ -254,7 +248,7 @@ chainOp :: { String }
   | symop                                 { $1 }
 
 chainOperand :: { SugaredExpr }
-  : atom                                  { $1 }
+  : valueAtom                             { $1 }
   | negint                                { SEInt $1 }
   | negdouble                             { SEDouble $1 }
   | compApp                               { SEComp $1 }
@@ -312,14 +306,17 @@ mkEffects (ops, isOpen)
   | isOpen    = Open (Map.fromList ops) ""
   | otherwise = Closed (Map.fromList ops)
 
+mkLet :: (Maybe Fixity, Ident, [Pattern], SugaredComp)
+      -> SugaredComp -> SugaredComp
+mkLet (fx, f, ps, c) body =
+  maybe id (\g -> SCFixity g f) fx (SCDo (PVar f) (SCReturn (SEFun ps c)) body)
+
 mkLetRec :: [(Maybe Fixity, Ident, [Pattern], SugaredComp)]
          -> SugaredComp -> SugaredComp
-mkLetRec defs body = foldr (uncurry SCFixity) core [(fx, f) | (Just fx, f, _, _) <- defs]
-  where
-    plain = [(f, ps, c) | (_, f, ps, c) <- defs]
-    core  = case plain of
-      [(f, ps, c)] -> SCDo (PVar f) (SCReturn (SERec f ps c)) body
-      _            -> SCLetRec plain body
+mkLetRec defs body =
+  foldr (uncurry SCFixity)
+        (SCLetRec [(f, ps, c) | (_, f, ps, c) <- defs] body)
+        [(fx, f) | (Just fx, f, _, _) <- defs]
 
 parseError :: [Token] -> [String] -> Except String a
 parseError (Token (AlexPn _ line col) s _:_) expected =

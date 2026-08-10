@@ -14,7 +14,6 @@ data TokenKind
   | TokFun
   | TokRec
   | TokLet
-  | TokKwAnd
   | TokInfixl
   | TokInfixr
   | TokInfix

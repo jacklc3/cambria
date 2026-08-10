@@ -1,4 +1,4 @@
-module Runtime (OpTable, runIO, inbuiltOps, compile) where
+module Runtime (OpTable, runIO, opHandlers, compile) where
 
 import Control.Exception (evaluate)
 import Data.Unique (newUnique)
@@ -7,22 +7,23 @@ import System.Random (randomIO)
 import Semantics (Result(..), eval)
 import Syntax
 
-import Environment (initialEnv)
+import Primitives (initialEnv, inbuiltOps)
 import Inference.Infer (infer)
 import Parsing.Parser (parse)
 import Parsing.Desugar (desugar)
 
 type OpTable = [(Op, Value -> Value -> IO Computation)]
 
-inbuiltOps :: OpTable
-inbuiltOps =
-  [ ("fresh",     \_           k -> CApp k . VName         <$> newUnique)
-  , ("print",     \(VString s) k -> CApp k . const VUnit   <$> putStrLn s)
-  , ("read",      \_           k -> CApp k . VString       <$> getLine)
-  , ("flip",      \_           k -> CApp k . VBool         <$> randomIO)
-  , ("bernoulli", \(VDouble n) k -> CApp k . VBool . (< n) <$> randomIO)
-  , ("uniform",   \_           k -> CApp k . VDouble       <$> randomIO)
-  ]
+opHandlers :: OpTable
+opHandlers = [ (op, handler op) | (op, _) <- inbuiltOps ]
+  where
+    handler "fresh"     = \_           k -> CApp k . VName         <$> newUnique
+    handler "print"     = \(VString s) k -> CApp k . const VUnit   <$> putStrLn s
+    handler "read"      = \_           k -> CApp k . VString       <$> getLine
+    handler "flip"      = \_           k -> CApp k . VBool         <$> randomIO
+    handler "bernoulli" = \(VDouble n) k -> CApp k . VBool . (< n) <$> randomIO
+    handler "uniform"   = \_           k -> CApp k . VDouble       <$> randomIO
+    handler op          = error $ "Runtime: no handler for !" ++ op
 
 -- Parses, desugars and infers
 compile :: String -> Either String (Computation, CompType)

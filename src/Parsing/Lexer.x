@@ -18,7 +18,6 @@ tokens :-
   fun                        { \p s -> Token p s TokFun }
   rec                        { \p s -> Token p s TokRec }
   let                        { \p s -> Token p s TokLet }
-  and                        { \p s -> Token p s TokKwAnd }
   infixl                     { \p s -> Token p s TokInfixl }
   infixr                     { \p s -> Token p s TokInfixr }
   infix                      { \p s -> Token p s TokInfix }
@@ -85,7 +84,6 @@ tokens :-
   \"(\\.|[^\"])*\"           { \p s -> Token p s (TokString (unescape (init (drop 1 s)))) }
   !$alpha[$alpha$digit\_\']* { \p s -> Token p s (TokOp (drop 1 s)) }
 
-  -- user-declarable operators; the reserved symbols above win ties
   [\+\-\*\/\<\>\=\&\|\^\@\%\?\~]+ { \p s -> Token p (quotes s) (TokSymOp s) }
 
 {

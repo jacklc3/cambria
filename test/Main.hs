@@ -10,7 +10,7 @@ import System.Exit (exitFailure, exitSuccess)
 import System.FilePath
   ((</>), dropExtension, makeRelative, takeDirectory, takeExtension)
 
-import Environment (initialEnv)
+import Primitives (initialEnv)
 import Runtime (compile)
 import Semantics (eval)
 

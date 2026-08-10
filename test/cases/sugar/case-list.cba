@@ -1,4 +1,4 @@
--- List patterns in case clauses.
+-- List patterns in cases.
 -- @expect-type: Int!{}
 -- @expect-value: Pure: 6
 let rec sum xs = case xs of {

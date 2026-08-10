@@ -8,7 +8,6 @@ import Types
 import Syntax
   ( Value(..), Computation(..), Handler(..)
   , RetClause(..), OpClause(..), FinClause(..) )
-import Inference.Context (Scheme(..))
 import Inference.Monad
 
 data VariableKind = TV | PV | EV
