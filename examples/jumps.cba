@@ -22,7 +22,7 @@ effect !label : Unit ~> $p + Unit.
 effect !goto  : $p   ~> Void.
 case !label () of {
   inl a -> case !label () of {
-    inl b -> !goto a; return 1,
+    inl b -> !goto a ; return 1,
     inr _ -> return 2
   },
   inr _ -> return 3

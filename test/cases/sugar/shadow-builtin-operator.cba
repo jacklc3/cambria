@@ -1,0 +1,11 @@
+-- An operator is an ordinary variable, so a binding shadows a built-in one
+-- for both its value and its fixity, and both revert outside its scope.
+-- @expect-type: ((Int * Int) * Int)!{}
+-- @expect-value: Pure: ((0, 7), -4)
+let inner =
+  let infixr 2 a - b = return 0 in
+  1 - 2 - 3
+in
+do sum <- return (3 + 4) in
+do diff <- return (1 - 2 - 3) in
+return ((inner, sum), diff)

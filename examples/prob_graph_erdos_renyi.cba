@@ -21,7 +21,7 @@ with [$graph -> $loc, $node -> Name] handler {
       k (lookup ((b,a), m))
     else
       do e <- !flip () in
-      do _ <- !set (g, insert (((a,b),e), m)) in
+      !set (g, insert (((a,b),e), m)) ;
       k e
 } handle
 

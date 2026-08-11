@@ -10,13 +10,8 @@ with [$p -> Name] handler {
 effect !get : $p ~> Int.
 effect !set : $p * Int ~> Unit.
 effect !ref : Int ~> $p.
-do incr <- return (fun r ->
-  do v <- !get r in
-  !set (r, v + 1)
-) in
+let incr r = do v <- !get r in !set (r, v + 1) in
 do a <- !ref 10 in
 do b <- !ref 20 in
-do _ <- incr a in
-do _ <- incr b in
-do _ <- incr a in
+incr a ; incr b ; incr a ;
 return (!get a + !get b)

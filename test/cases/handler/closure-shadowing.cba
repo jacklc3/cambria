@@ -1,0 +1,9 @@
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 1
+let x = 1 in
+let h = handler {
+  return v -> return v,
+  ask _ k  -> k x
+} in
+let x = 2 in
+with h handle !ask ()

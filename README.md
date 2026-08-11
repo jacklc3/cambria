@@ -44,8 +44,7 @@ effect !get : $loc ~> Int.
 effect !set : $loc * Int ~> Unit.
 do a <- !ref 2 in
 do b <- !ref 3 in
-do _ <- !set (a, !get b) in
-!get a
+!set (a, !get b) ; !get a
 ```
 
 ### Polymorphic Map over Abstract References
@@ -78,13 +77,11 @@ with [$loc -> $name] handler {
 effect !ref : Int ~> $loc.
 effect !get : $loc ~> Int.
 effect !set : $loc * Int ~> Unit.
-do map <- return (rec map f xs ->
-  case uncons xs of {
-    inl _        -> return [],
-    inr (x, xs') -> f x :: map f xs'
-  })
-in
-do vals <- return (10 :: 20 :: 30 :: []) in
+let rec map f xs = case xs of {
+  []       -> return [],
+  x :: xs' -> f x :: map f xs'
+} in
+do vals <- 10 :: 20 :: 30 :: [] in
 do refs <- map (fun n -> !ref n) vals in
 do checks <- map (fun n -> !get n == 20) refs in
 return checks
@@ -120,7 +117,7 @@ effect !label : Unit ~> $p + Unit.
 effect !goto  : $p   ~> Void.
 case !label () of {
   inl a -> case !label () of {
-    inl b -> !goto a; return 1,
+    inl b -> !goto a ; return 1,
     inr _ -> return 2
   },
   inr _ -> return 3

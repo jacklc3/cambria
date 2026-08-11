@@ -1,0 +1,11 @@
+-- A computation on the right of a let runs once, where the let stands, even
+-- when the bound name is never used.
+-- @expect-type: (Int * Int)!{}
+-- @expect-value: Pure: (99, 1)
+effect !inc : Unit ~> Int.
+with handler {
+  return v  -> return (fun n -> return (v, n)),
+  inc _ k   -> return (fun n -> k n (n + 1)),
+  finally f -> f 0
+} handle
+let y = !inc () in return 99

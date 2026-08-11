@@ -1,0 +1,6 @@
+-- An irrefutable pattern always matches, so no later case could ever run.
+-- @expect-error: Unreachable
+case 1 of {
+  _ -> return 1,
+  0 -> return 0
+}

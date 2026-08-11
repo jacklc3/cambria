@@ -1,6 +1,6 @@
 -- @expect-type: Int!{ print : Str ~> Unit }
 with handler {
   return x -> return x,
-  decide v k -> do _ <- !print "deciding" in k true
+  decide v k -> !print "deciding" ; k true
 } handle
 if !decide () then return 1 else return 2

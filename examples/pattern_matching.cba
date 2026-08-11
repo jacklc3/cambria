@@ -1,6 +1,7 @@
 -- Pattern matching on pairs
-do swap <- return (fun (x, y) -> return (y, x)) in
+let swap (x, y) = (y, x) in
 do result <- swap (1, 2) in
-do ((a, b), (c, d)) <- return ((10, 20), (30, 40)) in
-do (first, _) <- return (100, 200) in
+let ((a, b), (c, d)) = ((10, 20), (30, 40)),
+    (first, _) = (100, 200)
+in
 return (result, (((a, b), (c, d)), first))

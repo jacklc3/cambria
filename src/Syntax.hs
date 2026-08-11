@@ -30,6 +30,7 @@ data Value
     -- Runtime-only values
   | VPrimitive (Value -> Computation)
   | VClosure Ident Computation Env
+  | VHandlerClosure Handler Env
 
 instance Show Value where
   show (VInt i)         = show i
@@ -49,6 +50,7 @@ instance Show Value where
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VPrimitive _)   = "<primitive>"
   show (VClosure _ _ _) = "<closure>"
+  show (VHandlerClosure h _) = show h
   show (VAnnot v t)     = "(" ++ show v ++ " : " ++ show t ++ ")"
 
 instance Eq Value where
@@ -86,10 +88,10 @@ instance Show Computation where
     "case " ++ show v ++ " of { inl " ++ show x1 ++ " -> " ++ show c1 ++ ", inr "
     ++ show x2 ++ " -> " ++ show c2 ++ " }"
   show (CApp v1 v2)   = show v1 ++ " " ++ show v2
-  show (CHandle h sig c) = "with " ++ showInsts sig ++ show h ++ " handle " ++ show c
+  show (CHandle h sig c) = "with " ++ showParams sig ++ show h ++ " handle " ++ show c
     where
-      showInsts [] = ""
-      showInsts ts = "[" ++ intercalate ", " (map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) ts) ++ "] "
+      showParams [] = ""
+      showParams ts = "[" ++ intercalate ", " (map (\(p, t) -> "$" ++ p ++ " -> " ++ show t) ts) ++ "] "
   show (CEffect op ar c) = "effect !" ++ op ++ " : " ++ show ar ++ ". " ++ show c
   show (CAnnot c t)   = "(" ++ show c ++ " : " ++ show t ++ ")"
 

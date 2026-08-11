@@ -1,9 +1,9 @@
 -- @expect-type: (Int * Bool)!{}
 -- @expect-value: Pure: (7, True)
-do h <- return (handler {
+let h = handler {
   return x -> return x,
   cell a k -> k a
-}) in
+} in
 do i <- with [$p -> Int] h handle (
   effect !cell : Int ~> $p.
   !cell 7

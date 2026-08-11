@@ -23,5 +23,4 @@ effect !get : $loc ~> Int.
 effect !set : $loc * Int ~> Unit.
 do a <- !ref 2 in
 do b <- !ref 3 in
-do _ <- !set (a, !get b) in
-!get a
+!set (a, !get b) ; !get a

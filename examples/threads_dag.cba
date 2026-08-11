@@ -1,15 +1,13 @@
 -- Graphviz DAG of the action dependencies; same client program as threads_child.cba
 -- cf. An equational axiomatization of dynamic threads via algebraic effects, POPL 2026
-do map <- return (rec map g xs ->
-  case uncons xs of {
-    inl _        -> return [],
-    inr (x, xs') -> (g x :: map g xs')
-  }) in
-do concat <- return (rec concat xs ys ->
-  case uncons xs of {
-    inl _        -> return ys,
-    inr (x, xs') -> return (x :: concat xs' ys)
-  }) in
+let rec map g xs = case xs of {
+  []       -> return [],
+  x :: xs' -> g x :: map g xs'
+} in
+let rec concat xs ys = case xs of {
+  []       -> return ys,
+  x :: xs' -> x :: concat xs' ys
+} in
 
 with [$node -> Name] handler {
   return _ -> return (fun _ -> return ()),

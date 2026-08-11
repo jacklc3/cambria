@@ -19,7 +19,7 @@ common interpreter
   other-modules:
     Types
     Syntax
-    Environment
+    Primitives
     Semantics
     Runtime
     Parsing.Token
@@ -29,7 +29,6 @@ common interpreter
     Parsing.Desugar
     Inference.Monad
     Inference.Infer
-    Inference.Context
     Inference.Substitutable
     Inference.Unify
     Inference.Effects

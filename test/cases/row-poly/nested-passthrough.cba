@@ -7,4 +7,4 @@ with handler {
   return x -> return (x, []),
   emit v k -> do (r, acc) <- k () in return (r, v :: acc)
 } handle
-!tick (); !emit 1; !tick (); !emit 2; !tick (); return 42
+!tick () ; !emit 1 ; !tick () ; !emit 2 ; !tick () ; return 42

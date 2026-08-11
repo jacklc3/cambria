@@ -28,8 +28,8 @@ with [$tid -> Unit -> Unit!{...}] handler {
   stop _ k -> return (),
   fork _ k ->
     do hasRun <- !ref false in
-    do thunk <- return (fun _ -> if !get hasRun then return ()
-      else !set (hasRun, true) ; k (inr ())) in
+    let thunk _ = if !get hasRun then return ()
+                  else !set (hasRun, true) ; k (inr ()) in
     k (inl thunk) ; thunk ()
 } handle
 

@@ -1,0 +1,13 @@
+-- A parenthesised operator is an ordinary variable reference, so built-in and
+-- declared operators alike can be passed and applied prefix.
+-- @expect-type: ((Int * Str) * List Int)!{}
+-- @expect-value: Pure: ((6, "ab"), [3, 2, 1])
+let rec fold (f, (acc, xs)) = case xs of {
+  []        -> return acc,
+  y :: rest -> do a <- f (acc, y) in fold (f, (a, rest))
+} in
+let infixl 0 xs <+ x = return (x :: xs) in
+do s <- fold ((+), (0, 1 :: 2 :: 3 :: [])) in
+do t <- fold ((++), ("", "a" :: "b" :: [])) in
+do u <- fold ((<+), ([], 1 :: 2 :: 3 :: [])) in
+return ((s, t), u)

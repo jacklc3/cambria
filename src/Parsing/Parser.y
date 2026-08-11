@@ -24,6 +24,10 @@ import Control.Monad.Except
 %token
   fun                        { Token _ _ TokFun }
   rec                        { Token _ _ TokRec }
+  let                        { Token _ _ TokLet }
+  infixl                     { Token _ _ TokInfixl }
+  infixr                     { Token _ _ TokInfixr }
+  infix                      { Token _ _ TokInfix }
   handler                    { Token _ _ TokHandler }
   return                     { Token _ _ TokReturn }
   finally                    { Token _ _ TokFinally }
@@ -50,20 +54,10 @@ import Control.Monad.Except
   List                       { Token _ _ TokTList }
 
   '()'                       { Token _ _ TokUnit }
-  '&&'                       { Token _ _ TokAnd }
-  '||'                       { Token _ _ TokOr }
-  '=='                       { Token _ _ TokEq }
-  '/='                       { Token _ _ TokNEq }
-  '<'                        { Token _ _ TokLT }
-  '>'                        { Token _ _ TokGT }
-  '<='                       { Token _ _ TokLTE }
-  '>='                       { Token _ _ TokGTE }
   '->'                       { Token _ _ TokArrow }
   '<-'                       { Token _ _ TokLeftArrow }
   '+'                        { Token _ _ TokPlus }
-  '-'                        { Token _ _ TokMinus }
   '*'                        { Token _ _ TokAsterisk }
-  '/'                        { Token _ _ TokSlash }
   '('                        { Token _ _ TokLParen }
   ')'                        { Token _ _ TokRParen }
   '{'                        { Token _ _ TokLBrace }
@@ -73,7 +67,6 @@ import Control.Monad.Except
   ','                        { Token _ _ TokComma }
   '_'                        { Token _ _ TokUnderscore }
   ';'                        { Token _ _ TokSemiColon }
-  '++'                       { Token _ _ TokConcat }
   '~>'                       { Token _ _ TokSquigglyArrow }
   ':'                        { Token _ _ TokColon }
   '::'                       { Token _ _ TokCons }
@@ -92,16 +85,10 @@ import Control.Monad.Except
   string                     { Token _ _ (TokString $$) }
   var                        { Token _ _ (TokIdent $$) }
   op                         { Token _ _ (TokOp $$) }
+  symop                      { Token _ _ (TokSymOp $$) }
   typeparam                  { Token _ _ (TokTypeParam $$) }
 
 %right ';'
-%right '::'
-%right '||'
-%right '&&'
-%nonassoc '==' '/=' '<' '>' '<=' '>='
-%left '++'
-%left '+' '-' negint negdouble
-%left '*' '/'
 %nonassoc APP
 
 %%
@@ -116,49 +103,63 @@ expr :: { SugaredExpr }
   | '(' expr ')'                          { $2 }
   | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
-exprInfix :: { SugaredExpr }
-  : atom                                  { $1 }
-  | negint                                { SEInt $1 }
-  | negdouble                             { SEDouble $1 }
-  | compInfix                             { SEComp $1 }
-  | '(' expr ')'                          { $2 }
-  | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
-
 exprApp :: { SugaredExpr }
   : var                                   { SEVar $1 }
   | compApp                               { SEComp $1 }
   | '(' expr ')'                          { $2 }
   | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
+  | '(' chainOp ')'                       { SEVar $2 }
 
 exprAtom :: { SugaredExpr }
-  : atom                                  { $1 }
+  : valueAtom                             { $1 }
   | '(' expr ')'                          { $2 }
   | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
-wildvar :: { Ident }
+wildVar :: { Ident }
   : var                                   { $1 }
   | '_'                                   { "_" }
 
+binder :: { Pattern }
+  : patternAtom                           { $1 }
+
+binders :: { [Pattern] }
+  : binders binder                        { $2 : $1 }
+  | binder                                { [$1] }
+
 pattern :: { Pattern }
+  : patternApp '::' pattern               { PCons $1 $3 }
+  | patternApp                            { $1 }
+
+patternApp :: { Pattern }
+  : inl patternAtom                       { PEither L $2 }
+  | inr patternAtom                       { PEither R $2 }
+  | patternAtom                           { $1 }
+
+patternAtom :: { Pattern }
   : var                                   { PVar $1 }
   | '_'                                   { PWild }
+  | '()'                                  { PUnit }
+  | '[]'                                  { PNil }
+  | integer                               { PInt $1 }
+  | negint                                { PInt $1 }
+  | double                                { PDouble $1 }
+  | negdouble                             { PDouble $1 }
+  | boolean                               { PBool $1 }
+  | string                                { PString $1 }
   | '(' pattern ',' pattern ')'           { PPair $2 $4 }
-
-patterns :: { [Pattern] }
-  : patterns pattern                      { $2 : $1 }
-  | pattern                               { [$1] }
+  | '(' pattern ')'                       { $2 }
 
 value :: { SugaredExpr }
-  : atom                                  { $1 }
+  : valueAtom                             { $1 }
   | negint                                { SEInt $1 }
   | negdouble                             { SEDouble $1 }
   | inl exprAtom                          { SEEither L $2 }
   | inr exprAtom                          { SEEither R $2 }
-  | fun patterns '->' comp                { SEFun (reverse $2) $4 }
-  | rec wildvar patterns '->' comp        { SERec $2 (reverse $3) $5 }
+  | fun binders '->' comp                 { SEFun (reverse $2) $4 }
+  | rec wildVar binders '->' comp         { SERec $2 (reverse $3) $5 }
   | handler '{' handlerClauses '}'        { SEHandler $3 }
 
-atom :: { SugaredExpr }
+valueAtom :: { SugaredExpr }
   : '()'                                  { SEUnit }
   | '[]'                                  { SEVar "[]" }
   | boolean                               { SEBool $1 }
@@ -167,6 +168,7 @@ atom :: { SugaredExpr }
   | string                                { SEString $1 }
   | '(' expr ',' expr ')'                 { SEPair $2 $4 }
   | var                                   { SEVar $1 }
+  | '(' chainOp ')'                       { SEVar $2 }
 
 handlerClauses :: { [HandlerClause] }
   : handlerClauses ',' handlerClause      { $3 : $1 }
@@ -174,61 +176,90 @@ handlerClauses :: { [HandlerClause] }
   | {- empty -}                           { [] }
 
 handlerClause :: { HandlerClause }
-  : return pattern '->' comp              { RC $2 $4 }
-  | var pattern wildvar '->' comp         { OC $1 $2 $3 $5 }
-  | finally pattern '->' comp             { FC $2 $4 }
+  : return binder '->' comp               { RC $2 $4 }
+  | var binder wildVar '->' comp          { OC $1 $2 $3 $5 }
+  | finally binder '->' comp              { FC $2 $4 }
 
-pSubs :: { [(String, ValueType)] }
+paramSubs :: { [(String, ValueType)] }
   : {- empty -}                           { [] }
-  | '[' pSubsList ']'                     { $2 }
+  | '[' paramSubList ']'                  { $2 }
 
-pSubsList :: { [(String, ValueType)] }
+paramSubList :: { [(String, ValueType)] }
   : typeparam '->' type                   { [($1, $3)] }
-  | typeparam '->' type ',' pSubsList     { ($1, $3) : $5 }
+  | typeparam '->' type ',' paramSubList  { ($1, $3) : $5 }
 
 compTerm :: { SugaredComp }
   : return expr                           { SCReturn $2 }
-  | do pattern '<-' comp in comp          { SCDo $2 $4 $6 }
+  | do binder '<-' comp in comp           { SCDo $2 $4 $6 }
+  | let letBindings in comp               { $2 $4 }
+  | let rec recBindings in comp           { mkLetRec (reverse $3) $5 }
   | if expr then comp else comp           { SCIf $2 $4 $6 }
-  | case expr of '{' eitherMatch '}'      { SCCase $2 (fst $5) (snd $5) }
-  | with pSubs expr handle comp           { SCWith $3 $2 $5 }
+  | case expr of '{' matchCases '}'       { SCMatch $2 (reverse $5) }
+  | with paramSubs expr handle comp       { SCWith $3 $2 $5 }
   | effect op ':' type '~>' type '.' comp { SCEffect $2 (Arity $4 $6) $8 }
   | compInfix                             { $1 }
 
+letBindings :: { SugaredComp -> SugaredComp }
+  : letBindings ',' letBinding            { $1 . $3 }
+  | letBinding                            { $1 }
+
+letBinding :: { SugaredComp -> SugaredComp }
+  : binder '=' expr                       { SCDo $1 (SCReturn $3) }
+  | fixity '(' chainOp ')' '=' expr       { SCFixity $1 $3 . SCDo (PVar $3) (SCReturn $6) }
+  | funBinding                            { mkLet $1 }
+
+funBinding :: { (Maybe Fixity, Ident, [Pattern], SugaredComp) }
+  : var binders '=' expr                  { (Nothing, $1, reverse $2, SCReturn $4) }
+  | fixity binder chainOp binder '=' expr { (Just $1, $3, [PPair $2 $4], SCReturn $6) }
+
+fixity :: { Fixity }
+  : infixl integer                        { Fixity ALeft  (fromInteger $2) }
+  | infixr integer                        { Fixity ARight (fromInteger $2) }
+  | infix integer                         { Fixity ANone  (fromInteger $2) }
+
+recBindings :: { [(Maybe Fixity, Ident, [Pattern], SugaredComp)] }
+  : recBindings ',' funBinding            { $3 : $1 }
+  | funBinding                            { [$1] }
+
+matchCases :: { [(Pattern, SugaredComp)] }
+  : matchCases ',' matchCase              { $3 : $1 }
+  | matchCase                             { [$1] }
+
+matchCase :: { (Pattern, SugaredComp) }
+  : pattern '->' comp                     { ($1, $3) }
+
 compInfix :: { SugaredComp }
-  : exprInfix '::' exprInfix              { SCApp (SEVar "::") (SEPair $1 $3) }
-  | exprInfix '||' exprInfix              { SCApp (SEVar "||") (SEPair $1 $3) }
-  | exprInfix '&&' exprInfix              { SCApp (SEVar "&&") (SEPair $1 $3) }
-  | exprInfix '==' exprInfix              { SCApp (SEVar "==") (SEPair $1 $3) }
-  | exprInfix '/=' exprInfix              { SCApp (SEVar "/=") (SEPair $1 $3) }
-  | exprInfix '<'  exprInfix              { SCApp (SEVar "<") (SEPair $1 $3) }
-  | exprInfix '>'  exprInfix              { SCApp (SEVar ">") (SEPair $1 $3) }
-  | exprInfix '<=' exprInfix              { SCApp (SEVar "<=") (SEPair $1 $3) }
-  | exprInfix '>=' exprInfix              { SCApp (SEVar ">=") (SEPair $1 $3) }
-  | exprInfix '++' exprInfix              { SCApp (SEVar "++") (SEPair $1 $3) }
-  | exprInfix '+'  exprInfix              { SCApp (SEVar "+") (SEPair $1 $3) }
-  | exprInfix '-'  exprInfix              { SCApp (SEVar "-") (SEPair $1 $3) }
-  | exprInfix negint                      { SCApp (SEVar "+") (SEPair $1 (SEInt $2)) }
-  | exprInfix negdouble                   { SCApp (SEVar "+") (SEPair $1 (SEDouble $2)) }
-  | exprInfix '*'  exprInfix              { SCApp (SEVar "*") (SEPair $1 $3) }
-  | exprInfix '/'  exprInfix              { SCApp (SEVar "/") (SEPair $1 $3) }
-  | compApp                               { $1 }
+  : compApp                               { $1 }
+  | opChain                               { SCOpChain (fst $1) (reverse (snd $1)) }
+
+opChain :: { (SugaredExpr, [(String, SugaredExpr)]) }
+  : chainOperand chainOp chainOperand     { ($1, [($2, $3)]) }
+  | chainOperand negint                   { ($1, [("+", SEInt $2)]) }
+  | chainOperand negdouble                { ($1, [("+", SEDouble $2)]) }
+  | opChain chainOp chainOperand          { (fst $1, ($2, $3) : snd $1) }
+  | opChain negint                        { (fst $1, ("+", SEInt $2) : snd $1) }
+  | opChain negdouble                     { (fst $1, ("+", SEDouble $2) : snd $1) }
+
+chainOp :: { Ident }
+  : '::'                                  { "::" }
+  | '=>'                                  { "=>" }
+  | '+'                                   { "+" }
+  | '*'                                   { "*" }
+  | symop                                 { $1 }
+
+chainOperand :: { SugaredExpr }
+  : valueAtom                             { $1 }
+  | negint                                { SEInt $1 }
+  | negdouble                             { SEDouble $1 }
+  | compApp                               { SEComp $1 }
+  | '(' expr ')'                          { $2 }
+  | '(' expr ':' type ')'                 { SEAnnot $2 $4 }
 
 compApp :: { SugaredComp }
   : exprApp exprAtom %prec APP            { SCApp $1 $2 }
   | op exprAtom %prec APP                 { SCOp $1 $2 }
   | '(' comp ')'                          { $2 }
   | '(' comp ':' compType ')'             { SCAnnot $2 $4 }
-
-eitherMatch :: { ((Pattern, SugaredComp), (Pattern, SugaredComp)) }
-  : inlMatch ',' inrMatch                 { ($1, $3) }
-  | inrMatch ',' inlMatch                 { ($3, $1) }
-
-inlMatch :: { (Pattern, SugaredComp) }
-  : inl pattern '->' comp                 { ($2, $4) }
-
-inrMatch :: { (Pattern, SugaredComp) }
-  : inr pattern '->' comp                 { ($2, $4) }
 
 type :: { ValueType }
   : typeSum                               { $1 }
@@ -274,6 +305,18 @@ mkEffects :: ([(Op, Arity)], Bool) -> EffectsType
 mkEffects (ops, isOpen)
   | isOpen    = Open (Map.fromList ops) ""
   | otherwise = Closed (Map.fromList ops)
+
+mkLet :: (Maybe Fixity, Ident, [Pattern], SugaredComp)
+      -> SugaredComp -> SugaredComp
+mkLet (fx, f, ps, c) body =
+  maybe id (\g -> SCFixity g f) fx (SCDo (PVar f) (SCReturn (SEFun ps c)) body)
+
+mkLetRec :: [(Maybe Fixity, Ident, [Pattern], SugaredComp)]
+         -> SugaredComp -> SugaredComp
+mkLetRec defs body =
+  foldr (uncurry SCFixity)
+        (SCLetRec [(f, ps, c) | (_, f, ps, c) <- defs] body)
+        [(fx, f) | (Just fx, f, _, _) <- defs]
 
 parseError :: [Token] -> [String] -> Except String a
 parseError (Token (AlexPn _ line col) s _:_) expected =

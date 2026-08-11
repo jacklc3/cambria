@@ -2,6 +2,7 @@ module Types where
 
 import Data.List (intercalate)
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 type Ident = String
 type Op    = String
@@ -38,6 +39,11 @@ data Arity = Arity {
   arg :: ValueType,
   ret :: ValueType
 } deriving (Eq)
+
+data Scheme = Forall (Set.Set Ident) (Set.Set Ident) ValueType
+  deriving (Eq, Show)
+
+type Context = Map.Map Ident Scheme
 
 instance Show ValueType where
   show = showType 0

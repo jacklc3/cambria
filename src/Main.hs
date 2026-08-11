@@ -3,7 +3,7 @@ module Main where
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 
-import Runtime (runIO, inbuiltOps)
+import Runtime (runIO, opHandlers)
 
 main :: IO ()
 main = do
@@ -11,7 +11,7 @@ main = do
   case args of
     [filename] -> do
       content <- readFile filename
-      result  <- runIO inbuiltOps content
+      result  <- runIO opHandlers content
       case result of
         Left err  -> putStrLn err >> exitFailure
         Right out -> putStrLn out

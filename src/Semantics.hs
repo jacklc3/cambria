@@ -3,7 +3,16 @@
 module Semantics where
 
 import Syntax
-import Environment (def, find)
+import qualified Data.Map as Map
+
+find :: Ident -> Env -> Value
+find x (Env env) =
+  case Map.lookup x env of
+    Just v  -> v
+    Nothing -> error $ "Unbound variable: " ++ x
+
+def :: Ident -> Value -> Env -> Env
+def x v (Env env) = Env (Map.insert x v env)
 
 data Result
   = Pure Value
@@ -47,24 +56,25 @@ eval env = \case
     Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
   CHandle hv _ c ->
     case evalValue env hv of
-      VHandler h -> case finClause h of
+      VHandlerClosure h henv -> case finClause h of
         -- Encode finally clause in a do action if it exists
         Just (FinClause x c') ->
-          eval env (CDo x (CHandle (VHandler h{ finClause = Nothing }) [] c) c')
+          eval env (CDo x (CHandle (VHandlerClosure h{ finClause = Nothing } henv) [] c)
+                          (CApp (VClosure x c' henv) (VVar x)))
         Nothing ->
           case eval env c of
             Pure v ->
               let RetClause x cr = retClause h
-              in  eval (def x v env) cr
+              in  eval (def x v henv) cr
             Impure op v f ->
               case lookup op (opClauses h) of
                 Just (OpClause x k cop) ->
-                  let newEnv = def x v $ def k (deepHandle f) env
+                  let newEnv = def x v $ def k (deepHandle f) henv
                   in  eval newEnv cop
                 Nothing -> Impure op v (deepHandle f)
               where
-                deepHandle (VClosure y c env) = VClosure y (CHandle (VHandler h) [] c) env
-                deepHandle v                  = error $ "Non-closure in impure continuation: " ++ show v
+                deepHandle (VClosure y c' cenv) = VClosure y (CHandle (VHandlerClosure h henv) [] c') cenv
+                deepHandle v                     = error $ "Non-closure in impure continuation: " ++ show v
       v -> error $ "Non-handler in handle statement: " ++ show v
 
 evalValue :: Env -> Value -> Value
@@ -74,5 +84,6 @@ evalValue env = \case
   VEither s v -> VEither s (evalValue env v)
   VFun x c    -> VClosure x c env
   VRec f x c  -> let env' = def f (VClosure x c env') env in VClosure x c env'
+  VHandler h  -> VHandlerClosure h env
   VAnnot v _  -> evalValue env v
   v           -> v

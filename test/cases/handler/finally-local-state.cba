@@ -9,4 +9,4 @@ with handler {
 } handle
 do a <- !ref 2 in
 do b <- !ref 3 in
-!set (a, !get b + !get a); !get a
+!set (a, !get b + !get a) ; !get a

@@ -1,0 +1,16 @@
+-- An operator may wrap an effect operation, which keeps its own name for the
+-- clause head and the row.  Operands elaborate left to right; => is right-
+-- associative, and its wrapper is defined outside the handler that binds $p.
+-- @expect-type: Str!{}
+-- @expect-value: Pure: "(((p=>q)=>p)=>p)"
+effect !mkAtom : Str ~> $p.
+effect !mkImpl : $p * $p ~> $p.
+let infixr 0 a => b = !mkImpl (a, b) in
+with [$p -> Str] handler {
+  mkAtom s k      -> k s,
+  mkImpl (a, b) k -> k ("(" ++ a ++ "=>" ++ b ++ ")")
+} handle (
+  let p = !mkAtom "p" in
+  let q = !mkAtom "q" in
+  ((p => q) => p) => p
+)
