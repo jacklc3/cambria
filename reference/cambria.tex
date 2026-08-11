@@ -595,6 +595,10 @@ destructuring and equality tests (Section~\ref{sec:desugaring}); a two-case
 program aborts with a pattern-match failure, so end with an irrefutable
 case when the earlier cases are not exhaustive.
 
+An irrefutable case must be the last one written.  Since it always
+matches, any case placed after it could never run, and such a match is
+rejected at compile time.
+
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Operators}
 \label{sec:operators}

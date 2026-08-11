@@ -1,0 +1,7 @@
+-- @expect-type: Int!{}
+-- @expect-value: Pure: 100
+let mk base = handler {
+  return v -> return v,
+  finally f -> return base
+} in
+with (mk 100) handle return ()

@@ -30,6 +30,7 @@ data Value
     -- Runtime-only values
   | VPrimitive (Value -> Computation)
   | VClosure Ident Computation Env
+  | VHandlerClosure Handler Env
 
 instance Show Value where
   show (VInt i)         = show i
@@ -49,6 +50,7 @@ instance Show Value where
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VPrimitive _)   = "<primitive>"
   show (VClosure _ _ _) = "<closure>"
+  show (VHandlerClosure h _) = show h
   show (VAnnot v t)     = "(" ++ show v ++ " : " ++ show t ++ ")"
 
 instance Eq Value where

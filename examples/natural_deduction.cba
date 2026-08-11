@@ -24,17 +24,17 @@ effect !or     : Unit    ~> Bool.       -- choose
 
 let rec append (xs, ys) = case xs of {
   []       -> return ys,
-  x :: xs' -> do r <- append (xs', ys) in return (x :: r)
+  x :: xs' -> x :: append (xs', ys)
 } in
 let rec mapC (f, xs) = case xs of {
   []       -> return [],
-  x :: xs' -> do y <- f x in do ys <- mapC (f, xs') in return (y :: ys)
+  x :: xs' -> f x :: mapC (f, xs')
 } in
 let rec take (n, xs) =
   if n == 0 then return []
   else case xs of {
     []       -> return [],
-    x :: xs' -> do r <- take (n - 1, xs') in return (x :: r)
+    x :: xs' -> x :: take (n - 1, xs')
   } in
 let rec elem (x, ys) = case ys of {
   []       -> return false,
@@ -42,17 +42,19 @@ let rec elem (x, ys) = case ys of {
 } in
 let rec dedup (seen, xs) = case xs of {
   []       -> return [],
-  x :: xs' -> do seen' <- elem (x, seen) in
-              if seen' then dedup (seen, xs')
-              else do r <- dedup (x :: seen, xs') in return (x :: r)
+  x :: xs' -> if elem (x, seen) then dedup (seen, xs')
+              else x :: dedup (x :: seen, xs')
+} in
+let rec flat xs = case xs of {
+  []       -> return [],
+  x :: xs' -> append (x, flat xs')
 } in
 
 -- ---- the heap: general first-order unification ----
 
 let rec walk (n, h) = case lookup (n, h) of {
-  inl (inl _) -> return n,
   inl (inr w) -> walk (w, h),
-  inr _       -> return n
+  _           -> return n
 } in
 let rec occurs v todo h = case todo of {
   []        -> return false,
@@ -61,13 +63,12 @@ let rec occurs v todo h = case todo of {
     if rn == v then return true
     else case lookup (rn, h) of {
       inl _  -> occurs v rest h,
-      inr la -> do more <- append (snd la, rest) in occurs v more h
+      inr la -> occurs v (append (snd la, rest)) h
     }
 } in
 let rec zipPairs (xs, ys) = case (xs, ys) of {
   ([], [])             -> return (inr []),
-  (x :: xs', y :: ys') -> do r <- zipPairs (xs', ys') in
-                          case r of {
+  (x :: xs', y :: ys') -> case zipPairs (xs', ys') of {
                             inl _  -> return (inl ()),
                             inr ps -> return (inr ((x, y) :: ps))
                           },
@@ -75,57 +76,49 @@ let rec zipPairs (xs, ys) = case (xs, ys) of {
 } in
 -- uni: unify a worklist of Name pairs.  Returns inl () on clash, inr h' on success.
 let rec uni (pairs, h) = case pairs of {
-  [] -> return (inr h),
-  (a, b) :: rest ->
-    do ra <- walk (a, h) in do rb <- walk (b, h) in
-    if ra == rb then uni (rest, h)
-    else case lookup (ra, h) of {
-      inl _  -> do occ <- occurs ra (rb :: []) h in
-                if occ then return (inl ())
-                else uni (rest, insert ((ra, inl (inr rb)), h)),
-      inr la -> case lookup (rb, h) of {
-        inl _  -> do occ <- occurs rb (ra :: []) h in
-                  if occ then return (inl ())
-                  else uni (rest, insert ((rb, inl (inr ra)), h)),
-        inr lb ->
-          if fst la == fst lb then
-            do zr <- zipPairs (snd la, snd lb) in
-            case zr of {
-              inl _  -> return (inl ()),
-              inr ps -> do np <- append (ps, rest) in uni (np, h)
+          [] -> return (inr h),
+          (a, b) :: rest ->
+            do ra <- walk (a, h) in do rb <- walk (b, h) in
+            if ra == rb then uni (rest, h)
+            else case lookup (ra, h) of {
+              inl _  -> bindVar ra rb rest h,
+              inr la -> case lookup (rb, h) of {
+                inl _  -> bindVar rb ra rest h,
+                inr lb ->
+                  if fst la == fst lb then
+                    case zipPairs (snd la, snd lb) of {
+                      inl _  -> return (inl ()),
+                      inr ps -> uni (append (ps, rest), h)
+                    }
+                  else return (inl ())
+              }
             }
-          else return (inl ())
-      }
-    }
-} in
+        },
+        bindVar v t rest h =
+          if occurs v (t :: []) h then return (inl ())
+          else uni (rest, insert ((v, inl (inr t)), h))
+in
 -- reify a term name, or a list of argument names, back to a string
 let rec showT (n, h) =
           do rn <- walk (n, h) in
           case lookup (rn, h) of {
             inl _  -> return ("_" ++ hash rn),
             inr la -> case snd la of {
-              []     -> return (fst la),
-              _ :: _ -> do s <- showArgs (snd la, h) in
-                        return (fst la ++ "(" ++ s ++ ")") } },
+              [] -> return (fst la),
+              _  -> fst la ++ "(" ++ showArgs (snd la, h) ++ ")" } },
         showArgs (xs, h) = case xs of {
           []       -> return "",
-          x :: xs' -> do sx <- showT (x, h) in
-                      case xs' of {
-                        []     -> return sx,
-                        _ :: _ -> do sr <- showArgs (xs', h) in
-                                  return (sx ++ ", " ++ sr) } }
+          x :: []  -> showT (x, h),
+          x :: xs' -> showT (x, h) ++ ", " ++ showArgs (xs', h) }
 in
 
--- ---- two free-model handlers over the heap ----
+-- ---- the free-model handler over the heap, parameterized by !or's strategy ----
 
--- angelic search: keep the first branch that yields a solution.
-let engine = handler {
-  return xs   -> return (fun h ->
-                  do sol <- mapC ((fun n -> showT (n, h)), xs) in return (sol :: [])),
+let mkEngine or' = handler {
+  return xs   -> return (fun h -> mapC ((fun n -> showT (n, h)), xs) :: []),
   bottom _ k  -> return (fun h -> return []),
-  or _ k      -> return (fun h -> do r1 <- k true h in
-                  case r1 of { [] -> k false h, _ :: _ -> return r1 }),
-  eq (a, b) k -> return (fun h -> do r <- uni ((a, b) :: [], h) in case r of {
+  or _ k      -> or' k,
+  eq (a, b) k -> return (fun h -> case uni ((a, b) :: [], h) of {
                    inl _  -> return [],
                    inr h' -> k () h'
                  }),
@@ -133,23 +126,14 @@ let engine = handler {
   cons (l, args) k -> return (fun h -> do c <- !fresh () in k c (insert ((c, inr (l, args)), h))),
   finally f   -> f empty
 } in
-let solve q = with [$p -> Name] engine handle (q ()) in
 
--- collect every solution (finite because the search is depth-bounded).
-let engineAll = handler {
-  return xs   -> return (fun h ->
-                  do sol <- mapC ((fun n -> showT (n, h)), xs) in return (sol :: [])),
-  bottom _ k  -> return (fun h -> return []),
-  or _ k      -> return (fun h -> do r1 <- k true h in do r2 <- k false h in append (r1, r2)),
-  eq (a, b) k -> return (fun h -> do r <- uni ((a, b) :: [], h) in case r of {
-                   inl _  -> return [],
-                   inr h' -> k () h'
-                 }),
-  free _ k    -> return (fun h -> do v <- !fresh () in k v (insert ((v, inl (inl ())), h))),
-  cons (l, args) k -> return (fun h -> do c <- !fresh () in k c (insert ((c, inr (l, args)), h))),
-  finally f   -> f empty
-} in
-let solveAll q = with [$p -> Name] engineAll handle (q ()) in
+-- angelic: keep the first branch that yields a solution
+let angelic k h    = case k true h of { [] -> k false h, r1 -> return r1 } in
+-- exhaustive: collect every solution (finite because the search is depth-bounded)
+let exhaustive k h = append (k true h, k false h) in
+
+let solve q    = with [$p -> Name] (mkEngine angelic)    handle (q ()) in
+let solveAll q = with [$p -> Name] (mkEngine exhaustive) handle (q ()) in
 
 -- ---- the proof searcher (SML prototype, Appendix A.4) ----
 
@@ -160,54 +144,48 @@ let rec member (ps, p) = case ps of {
   []       -> !bottom () ; return (),
   x :: xs' -> if !or () then !eq (x, p) else member (xs', p)
 } in
-let rec ded (fuel, (ps, p)) =
+let rec ded fuel ps p =
   if fuel == 0 then (!bottom () ; return ())
   else if !or () then member (ps, p)                             -- axiom
   else if !or () then                                            -- =>-introduction
     do q <- !free () in do r <- !free () in
     !eq (p, q => r) ;
-    ded (fuel - 1, (q :: ps, r))
+    ded (fuel - 1) (q :: ps) r
   else                                                           -- =>-elimination
     do q <- !free () in
-    ded (fuel - 1, (ps, q => p)) ;
-    ded (fuel - 1, (ps, q))
+    ded (fuel - 1) ps (q => p) ;
+    ded (fuel - 1) ps q
 in
 
 -- Q1:  |- p -> p
 do q1 <- solve (fun _ ->
   do p <- atom "p" in
   do goal <- p => p in
-  ded (3, ([], goal)) ; return (goal :: [])) in
+  ded 3 [] goal ; return (goal :: [])) in
 
 -- Q2:  p->q, q->r  |-  p->r     (transitivity of implication)
 do q2 <- solve (fun _ ->
   do p <- atom "p" in do q <- atom "q" in do r <- atom "r" in
   do goal <- p => r in
-  ded (6, ((p => q) :: (q => r) :: [], goal)) ; return (goal :: [])) in
+  ded 6 ((p => q) :: (q => r) :: []) goal ; return (goal :: [])) in
 
 -- Q3:  |- p -> q     (not a tautology: no proof within the depth bound)
 do q3 <- solve (fun _ ->
   do goal <- atom "p" => atom "q" in
-  ded (4, ([], goal)) ; return (goal :: [])) in
+  ded 4 [] goal ; return (goal :: [])) in
 
 -- Q4:  find a hypothesis  a  under which  a |- p->q     (first witness)
 do q4 <- solve (fun _ ->
   do goal <- atom "p" => atom "q" in
   do a <- !free () in
-  ded (4, (a :: [], goal)) ; return (a :: [])) in
+  ded 4 (a :: []) goal ; return (a :: [])) in
 
 -- Q5:  enumerate several such hypotheses (bounded, de-duplicated, first 6)
 do q5raw <- solveAll (fun _ ->
   do goal <- atom "p" => atom "q" in
   do a <- !free () in
-  ded (3, (a :: [], goal)) ; return (a :: [])) in
-let rec flat xs = case xs of {
-  []       -> return [],
-  x :: xs' -> do r <- flat xs' in append (x, r)
-} in
-do q5f <- flat q5raw in
-do q5d <- dedup ([], q5f) in
-do q5  <- take (6, q5d) in
+  ded 3 (a :: []) goal ; return (a :: [])) in
+do q5 <- take (6, dedup ([], flat q5raw)) in
 
 return (
   ("|- p->p",                q1) ::
