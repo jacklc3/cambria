@@ -7,7 +7,7 @@ import Control.Exception (ErrorCall(..), SomeException, throwIO, try)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef)
 import GHC.Wasm.Prim
 
-import Runtime (OpTable, runIO, inbuiltOps)
+import Runtime (OpTable, runIO, opHandlers)
 import Syntax
 
 foreign export javascript "runCambria"
@@ -40,4 +40,4 @@ playgroundOps :: IORef [String] -> OpTable
 playgroundOps ref =
   [ ("print", \(VString s) k -> modifyIORef' ref (s :) >> return (CApp k VUnit))
   , ("read",  \_           _ -> throwIO (ErrorCall "!read is not supported in the playground"))
-  ] ++ inbuiltOps
+  ] ++ opHandlers

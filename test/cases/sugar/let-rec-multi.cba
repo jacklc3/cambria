@@ -1,5 +1,3 @@
--- Mutual recursion: a let rec binding group desugars to a single recursive
--- function over a tagged sum (Bekic), with wrapper bindings for each name.
 -- @expect-type: (Bool * Bool)!{}
 -- @expect-value: Pure: (True, True)
 let rec even n = if n == 0 then return true  else odd (n - 1),

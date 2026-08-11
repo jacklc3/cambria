@@ -398,9 +398,10 @@ let rec even n = if n == 0 then return true  else odd (n - 1),
 in even 10
 \end{lstlisting}
 
-This desugars to a single recursive function over a tagged sum (one summand
-per definition), together with a wrapper binding for each name; the
-definitions must therefore agree on their result type.
+This desugars to a single recursive thunk returning the tuple of definitions,
+together with a wrapper binding for each name (Section~\ref{sec:desugaring});
+the definitions are separate components of the tuple, so they need not share
+a type.
 
 A \cba{let} may also bind an infix operator by carrying a fixity, which is
 the only way to introduce one (Section~\ref{sec:fixity}):
@@ -1543,23 +1544,23 @@ pair; the fixity is consumed while desugaring and never reaches the core.
 let rec f x = c1, g y = c2 in body
 \end{lstlisting}
 
-desugars to a single recursive function over a tagged sum, one summand per
-definition, plus a wrapper binding for each name that injects its arguments
-and calls it (Bekic's construction):
+desugars to a single recursive thunk returning the tuple of definitions, plus
+a wrapper binding for each name that fetches its component from the thunk and
+applies it (Bekic's construction):
 
 \begin{lstlisting}
-do h <- return (rec h a -> case a of {
-     inl x -> c1,
-     inr y -> c2
-   }) in
-do f <- return (fun x -> h (inl x)) in
-do g <- return (fun y -> h (inr y)) in
+do h <- return (rec h _ ->
+     return ( fun x -> do (f, g) <- h () in c1
+            , fun y -> do (f, g) <- h () in c2 )) in
+do f <- return (fun v -> do (f, g) <- h () in f v) in
+do g <- return (fun v -> do (f, g) <- h () in g v) in
 body
 \end{lstlisting}
 
-The wrappers are also in scope inside the body of \texttt{h}, which is what
-lets \texttt{c1} call \texttt{g} and \texttt{c2} call \texttt{f}.  Because the
-definitions share one function, they must agree on their result type.
+Each definition's body begins with the same fetch, which is what lets
+\texttt{c1} call \texttt{g} and \texttt{c2} call \texttt{f}.  Because the
+definitions are separate components of the tuple rather than branches of one
+function, they need not share a type.
 
 \subsection{Multi-Clause \texttt{case}}
 
