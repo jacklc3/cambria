@@ -130,10 +130,17 @@
 {\Huge\bfseries Cambria Language Reference\par}
 \vspace{1.5cm}
 {\Large A Functional Language with\\[4pt]
-Parameterized Algebraic Effects and Handlers\par}
+Parametrized Algebraic Effects and Handlers\par}
 \vspace{3cm}
 {\large\itshape A complete guide for programming in Cambria\par}
 \vfill
+\begin{minipage}{0.8\textwidth}
+\small\itshape
+Cambria is an experimental language under active development.
+This reference describes the implementation at the time of writing.
+The interpreter is the authority when the two disagree.
+\end{minipage}
+\vspace{1.5cm}
 \end{titlepage}
 
 % ── Table of contents ────────────────────────────────────────────────────────
@@ -1171,12 +1178,14 @@ These are available in every program without any declaration.
 \textbf{Function} & \textbf{Type} & \textbf{Description} \\
 \midrule
 \texttt{::}     & \texttt{a * List a -> List a}        & Prepend element \\
-\texttt{uncons} & \texttt{List a -> Unit + a * List a} & List destructor \\
 \texttt{null}   & \texttt{List a -> Bool}               & Is empty? \\
 \texttt{[]}     & \texttt{List a}                       & Empty list constant \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+Lists are taken apart by pattern matching on \cba{[]} and \cba{::}
+(Section~\ref{sec:patterns}); there is no destructor function in the surface.
 
 \subsection{Map Operations}
 
@@ -1314,12 +1323,10 @@ return ()
 Recursive functions are also polymorphic:
 
 \begin{lstlisting}
-do map <- return (rec map f xs ->
-  case uncons xs of {
-    inl _        -> return [],
-    inr (x, xs') -> f x :: map f xs'
-  }
-) in
+let rec map f xs = case xs of {
+  []       -> return [],
+  x :: xs' -> f x :: map f xs'
+} in
 -- map : forall a b. (a -> b!S) -> List a -> List b!S
 \end{lstlisting}
 
@@ -1576,13 +1583,14 @@ List patterns go through \cba{_uncons}, pair patterns through \cba{_fst} and
 \cba{_snd}, and literal patterns through \cba{_eq} followed by an \cba{if}.
 When every case fails the tree ends in \cba{_matchfail}, which aborts.
 
-These are internal aliases for the corresponding primitives, with
-\cba{_matchfail} existing only for this purpose.  Desugaring goes through them
-rather than through \cba{uncons}, \cba{fst}, \cba{snd} and \cba{==} so that
-shadowing a primitive cannot change what a pattern means.  A leading
-underscore is not a legal identifier in the surface, so no program can bind or
-even mention one, which is also why the generated \cba{_rest} and \cba{_tmp}
-above cannot collide with a variable of the user's.
+\cba{_fst}, \cba{_snd} and \cba{_eq} are internal aliases for \cba{fst},
+\cba{snd} and \cba{==}.  Desugaring goes through them rather than through the
+public names so that shadowing a primitive cannot change what a pattern means.
+\cba{_uncons} and \cba{_matchfail} have no public counterpart and exist only
+for desugaring.  A leading underscore is not a legal identifier in the
+surface, so no program can bind or even mention one, which is also why the
+generated \cba{_rest} and \cba{_tmp} above cannot collide with a variable of
+the user's.
 
 \subsection{Infix Operators}
 
@@ -1857,13 +1865,11 @@ effect !get : $loc ~> Int.
 effect !set : $loc * Int ~> Unit.
 
 -- Polymorphic map: forall a b. (a -> b!S) -> List a -> List b!S
-do map <- return (rec map f xs ->
-  case uncons xs of {
-    inl _        -> return [],
-    inr (x, xs') -> f x :: map f xs'
-  })
-in
-do vals <- return (10 :: 20 :: 30 :: []) in
+let rec map f xs = case xs of {
+  []       -> return [],
+  x :: xs' -> f x :: map f xs'
+} in
+do vals <- 10 :: 20 :: 30 :: [] in
 
 -- (1) map at (Int -> $loc): allocate a ref for each number
 do refs <- map (fun n -> !ref n) vals in

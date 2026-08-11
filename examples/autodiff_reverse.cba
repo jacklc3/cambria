@@ -9,51 +9,51 @@
 -- input vector, so a handled computation gives the value and its gradient.
 
 -- f (x, y) = 1 + x^3 + (- y^2)
-do f <- return (fun (x, y) ->
+let f (x, y) =
   do x3  <- !mult (!mult (x, x), x) in
   do y2  <- !mult (y, y) in
   do one <- !const 1 in
   !plus (!plus (one, x3), !neg y2)
-) in
+in
 
-do state <- return (handler {
+let state = handler {
   return x     -> return (fun _ -> return x),
   ref x k      -> do a <- !fresh () in
                   return (fun s -> k a (insert ((a, x), s))),
   get a k      -> return (fun s -> k (lookup (a, s)) s),
   set (a, x) k -> return (fun s -> k () (insert ((a, x), s))),
   finally st   -> st empty
-}) in
+} in
 
-do reverse <- return (handler {
+let reverse = handler {
   return (p, a) ->
-    do _ <- !set (a, !const 1) in
+    !set (a, !const 1) ;
     do z <- !const 0 in return (p, (z, z)),
   const c k ->
     do a <- !ref (!const 0) in k (!const c, a),
   neg (px, ax) k ->
     do a <- !ref (!const 0) in
     do r <- k (!neg px, a) in
-    do _ <- !set (ax, !plus (!get ax, !neg (!get a))) in
+    !set (ax, !plus (!get ax, !neg (!get a))) ;
     return r,
   plus ((px, ax), (py, ay)) k ->
     do a <- !ref (!const 0) in
     do r <- k (!plus (px, py), a) in
-    do _ <- !set (ax, !plus (!get ax, !get a)) in
-    do _ <- !set (ay, !plus (!get ay, !get a)) in
+    !set (ax, !plus (!get ax, !get a)) ;
+    !set (ay, !plus (!get ay, !get a)) ;
     return r,
   mult ((px, ax), (py, ay)) k ->
     do a <- !ref (!const 0) in
     do r <- k (!mult (px, py), a) in
-    do _ <- !set (ax, !plus (!get ax, !mult (!get a, py))) in
-    do _ <- !set (ay, !plus (!get ay, !mult (!get a, px))) in
+    !set (ax, !plus (!get ax, !mult (!get a, py))) ;
+    !set (ay, !plus (!get ay, !mult (!get a, px))) ;
     return r,
   lift (u, v) k  ->
     do au <- !ref (!const 0) in
     do av <- !ref (!const 0) in
     do (p, _) <- k ((u, au), (v, av)) in
     return (p, (!get au, !get av))
-}) in
+} in
 
 with [$r -> Int] handler {
   return v      -> return v,

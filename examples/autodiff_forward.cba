@@ -9,14 +9,14 @@
 -- with tangent 0 and !seed with tangent 1.
 
 -- f (x, y) = 1 + x^3 + (- y^2)
-do f <- return (fun (x, y) ->
+let f (x, y) =
   do x3  <- !mult (!mult (x, x), x) in
   do y2  <- !mult (y, y) in
   do one <- !const 1 in
   !plus (!plus (one, x3), !neg y2)
-) in
+in
 
-do forward <- return (handler {
+let forward = handler {
   return v      -> return v,
   const c k     -> k (!const c, !const 0),
   neg (p, t) k  -> k (!neg p, !neg t),
@@ -25,7 +25,7 @@ do forward <- return (handler {
     k (!mult (px, py), !plus (!mult (tx, py), !mult (px, ty))),
   lift v k      -> k (v, !const 0),
   seed v k      -> k (v, !const 1)
-}) in
+} in
 
 with [$r -> Int] handler {
   return v      -> return v,

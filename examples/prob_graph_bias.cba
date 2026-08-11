@@ -20,7 +20,7 @@ with [$graph -> $loc, $node -> Name] handler {
       k (lookup ((b,a), m))
     else
       do e <- !bernoulli p in
-      do _ <- !set (g, (p, insert (((a,b),e), m))) in
+      !set (g, (p, insert (((a,b),e), m))) ;
       k e
 } handle
 

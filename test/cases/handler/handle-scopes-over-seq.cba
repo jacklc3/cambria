@@ -5,4 +5,4 @@ with handler {
   print s k -> do (v, acc) <- k () in
     return (v, s ++ acc)
 } handle
-!print "A"; !print "B"; !print "C"
+!print "A" ; !print "B" ; !print "C"

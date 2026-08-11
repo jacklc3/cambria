@@ -45,7 +45,7 @@ primitives = Map.fromList
   , prim "::"     ["a"]     (TPair ta (TList ta)) (TList ta)
       $ \(VPair x (VList xs)) -> VList (x : xs)
   , prim "null"   ["a"]     (TList ta)          TBool   $ \(VList xs) -> VBool (null xs)
-  , prim "uncons" ["a"]     (TList ta) (TEither TUnit (TPair ta (TList ta)))
+  , prim "_uncons" ["a"]    (TList ta) (TEither TUnit (TPair ta (TList ta)))
       $ \(VList xs') -> case xs' of
           []     -> VEither L VUnit
           (x:xs) -> VEither R (VPair x (VList xs))
@@ -73,7 +73,6 @@ aliases :: Map.Map Ident Primitive
 aliases = Map.fromList
   [ ("_fst",    primitives Map.! "fst")
   , ("_snd",    primitives Map.! "snd")
-  , ("_uncons", primitives Map.! "uncons")
   , ("_eq",     primitives Map.! "==")
   ]
 
