@@ -42,6 +42,16 @@ primitives = Map.fromList
           Nothing -> error $ "Key not found in map: " ++ show k
   , prim "member" ["k","v"] (TPair tk (TMap tk tv)) TBool
       $ \(VPair k (VMap m)) -> VBool (any (\(k', _) -> k' == k) m)
+  , prim "winsert" ["v"]    (TPair (TPair TName tv) (TWeak tv)) (TWeak tv)
+      $ \(VPair (VPair (VName a) v) (VWeak m)) -> VWeak (Map.insert a v m)
+  , prim "wremove" ["v"]    (TPair TName (TWeak tv)) (TWeak tv)
+      $ \(VPair (VName a) (VWeak m)) -> VWeak (Map.delete a m)
+  , prim "wlookup" ["v"]    (TPair TName (TWeak tv)) tv
+      $ \(VPair (VName a) (VWeak m)) -> case Map.lookup a m of
+          Just v  -> v
+          Nothing -> error $ "Entry not found in weak map: " ++ show (VName a)
+  , prim "wmember" ["v"]    (TPair TName (TWeak tv)) TBool
+      $ \(VPair (VName a) (VWeak m)) -> VBool (Map.member a m)
   , prim "::"     ["a"]     (TPair ta (TList ta)) (TList ta)
       $ \(VPair x (VList xs)) -> VList (x : xs)
   , prim "null"   ["a"]     (TList ta)          TBool   $ \(VList xs) -> VBool (null xs)
@@ -55,6 +65,7 @@ primitives = Map.fromList
       $ \_ -> error "Pattern match failure: no case matched"
   , ("[]",    Primitive (Forall (Set.singleton "a") mempty (TList ta))        (VList []))
   , ("empty", Primitive (Forall (Set.fromList ["k","v"]) mempty (TMap tk tv)) (VMap []))
+  , ("wempty", Primitive (Forall (Set.singleton "v") mempty (TWeak tv))      (VWeak Map.empty))
   ]
   where
     ta = TVar "a"
@@ -79,6 +90,7 @@ aliases = Map.fromList
 inbuiltOps :: [(Op, Arity)]
 inbuiltOps =
   [ ("fresh",     Arity TUnit TName)
+  , ("gc",        Arity TUnit TUnit)
   , ("print",     Arity TString TUnit)
   , ("read",      Arity TUnit TString)
   , ("flip",      Arity TUnit TBool)

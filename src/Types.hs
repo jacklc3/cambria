@@ -22,6 +22,7 @@ data ValueType
   | TFun ValueType CompType
   | THandler CompType CompType
   | TMap ValueType ValueType
+  | TWeak ValueType
   | TList ValueType
   deriving (Eq)
 
@@ -62,6 +63,7 @@ showType p (TPair t1 t2) = parensIf (p > 3) $ showType 4 t1 ++ " * " ++ showType
 showType p (TEither t1 t2) = parensIf (p > 2) $ showType 3 t1 ++ " + " ++ showType 3 t2
 showType p (TFun t1 t2) = parensIf (p > 1) $ showType 2 t1 ++ " -> " ++ show t2
 showType _ (TMap k v) = "Map " ++ showType 5 k ++ " " ++ showType 5 v
+showType _ (TWeak t) = "Weak " ++ showType 5 t
 showType _ (TList t) = "List " ++ showType 5 t
 showType p (THandler t1 t2) = parensIf (p > 0) $ show t1 ++ " => " ++ show t2
 

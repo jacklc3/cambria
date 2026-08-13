@@ -51,6 +51,7 @@ import Control.Monad.Except
   Str                        { Token _ _ TokTString }
   Name                       { Token _ _ TokTName }
   Map                        { Token _ _ TokTMap }
+  Weak                       { Token _ _ TokTWeak }
   List                       { Token _ _ TokTList }
 
   '()'                       { Token _ _ TokUnit }
@@ -283,6 +284,7 @@ typeAtom :: { ValueType }
   | Str                                   { TString }
   | Name                                  { TName }
   | Map typeAtom typeAtom                 { TMap $2 $3 }
+  | Weak typeAtom                         { TWeak $2 }
   | List typeAtom                         { TList $2 }
   | typeparam                             { TParam $1 }
   | '(' type ')'                          { $2 }

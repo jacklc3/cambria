@@ -40,6 +40,7 @@ data TokenKind
   | TokTString
   | TokTName
   | TokTMap
+  | TokTWeak
   | TokTList
   -- Symbols
   | TokUnit

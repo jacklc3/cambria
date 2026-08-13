@@ -16,7 +16,7 @@ It is a tool for programming with computational effects that involve dynamically
 
 A handler for local state, where memory cells can be dynamically created and manipulated.
 The state is represented as a function from parameters (memory locations) to their stored values, and the location names are supplied by a separate fresh-name handler.
-From [examples/local_state.cba](examples/local_state.cba), which returns `3`:
+From [examples/local_state_fun.cba](examples/local_state_fun.cba), which returns `3`:
 
 ```
 -- Local state: a name allocator and a store over the names
@@ -55,7 +55,7 @@ From [examples/poly_map.cba](examples/poly_map.cba), which returns `[False, True
 
 ```
 -- Polymorphic map over abstract references
--- State handlers as in local_state.cba
+-- State handlers as in local_state_fun.cba
 with [$name -> Int] handler {
   return x   -> return (fun _ -> return x),
   fresh _ k  -> return (fun n -> k n (n+1)),
@@ -149,7 +149,7 @@ cabal run cambria -- <path_to_file>
 For example:
 
 ```bash
-cabal run cambria -- examples/local_state.cba
+cabal run cambria -- examples/local_state_fun.cba
 ```
 
 ### Testing

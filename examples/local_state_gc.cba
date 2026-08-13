@@ -1,0 +1,22 @@
+-- Local state over a weak map, returning the final store alongside the result
+-- Allocates 200 cells and drops each one; !gc prunes the store as it goes
+with [$loc -> Name] handler {
+  return x     -> return (fun s -> return (x, s)),
+  ref x k      -> do a <- !fresh () in
+                  return (fun s -> k a (winsert ((a, x), s))),
+  get a k      -> return (fun s -> k (wlookup (a, s)) s),
+  set (a, x) k -> return (fun s -> k () (winsert ((a, x), s))),
+  gc _ k       -> !gc () ; k (),
+  finally st   -> st wempty
+} handle
+
+effect !ref : Int ~> $loc.
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
+effect !gc  : Unit ~> Unit.
+let rec loop (n, acc) =
+  if n <= 0 then return acc
+  else do a <- !ref n in
+       do v <- !get a in
+       !gc () ; loop (n - 1, acc + v)
+in loop (200, 0)

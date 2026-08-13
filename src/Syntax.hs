@@ -21,6 +21,7 @@ data Value
   | VEither Side Value
   | VHandler Handler
   | VMap [(Value, Value)]
+  | VWeak (Map.Map Name Value)
   | VList [Value]
     -- Parsetime-only values
   | VVar Ident
@@ -29,7 +30,8 @@ data Value
   | VAnnot Value ValueType
     -- Runtime-only values
   | VPrimitive (Value -> Computation)
-  | VClosure Ident Computation Env
+  | VFunClosure Ident Computation Env
+  | VRecClosure Ident Ident Computation Env
   | VHandlerClosure Handler Env
 
 instance Show Value where
@@ -44,12 +46,14 @@ instance Show Value where
   show (VEither R v)    = "inr " ++ show v
   show (VHandler h)     = show h
   show (VMap entries)   = "{" ++ intercalate ", " (map (\(k,v) -> show k ++ ": " ++ show v) entries) ++ "}"
+  show (VWeak m)        = "<weak:" ++ show (Map.size m) ++ ">"
   show (VList vs)       = "[" ++ intercalate ", " (map show vs) ++ "]"
   show (VVar v)         = v
   show (VFun x c)       = "(fun " ++ x ++ " -> " ++ show c ++ ")"
   show (VRec f x c)     = "(rec " ++ f ++ " " ++ x ++ " -> " ++ show c ++ ")"
   show (VPrimitive _)   = "<primitive>"
-  show (VClosure _ _ _) = "<closure>"
+  show (VFunClosure _ _ _) = "<closure>"
+  show (VRecClosure _ _ _ _) = "<closure>"
   show (VHandlerClosure h _) = show h
   show (VAnnot v t)     = "(" ++ show v ++ " : " ++ show t ++ ")"
 

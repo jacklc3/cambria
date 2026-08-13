@@ -44,6 +44,7 @@ tokens :-
   Str                        { \p s -> Token p s TokTString }
   Name                       { \p s -> Token p s TokTName }
   Map                        { \p s -> Token p s TokTMap }
+  Weak                       { \p s -> Token p s TokTWeak }
   List                       { \p s -> Token p s TokTList }
 
   "()"                       { \p s -> Token p (quotes s) TokUnit }

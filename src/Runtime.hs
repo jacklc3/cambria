@@ -4,6 +4,7 @@ import Control.Exception (evaluate)
 import Data.Unique (newUnique)
 import System.Random (randomIO)
 
+import GC (collect)
 import Semantics (Result(..), eval)
 import Syntax
 
@@ -18,6 +19,7 @@ opHandlers :: OpTable
 opHandlers = [ (op, handler op) | (op, _) <- inbuiltOps ]
   where
     handler "fresh"     = \_           k -> CApp k . VName         <$> newUnique
+    handler "gc"        = \v           k -> return (CApp (collect v k) VUnit)
     handler "print"     = \(VString s) k -> CApp k . const VUnit   <$> putStrLn s
     handler "read"      = \_           k -> CApp k . VString       <$> getLine
     handler "flip"      = \_           k -> CApp k . VBool         <$> randomIO

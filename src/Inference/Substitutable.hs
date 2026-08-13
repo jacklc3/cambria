@@ -47,6 +47,7 @@ instance Substitutable ValueType where
   apply s (TFun t1 t2)         = TFun (apply s t1) (apply s t2)
   apply s (TList a)            = TList (apply s a)
   apply s (TMap k t)           = TMap (apply s k) (apply s t)
+  apply s (TWeak t)            = TWeak (apply s t)
   apply s (THandler t1 t2)     = THandler (apply s t1) (apply s t2)
   apply _ t                    = t
 
@@ -55,6 +56,7 @@ instance Substitutable ValueType where
   free k (TFun t1 t2)          = free k t1 <> free k t2
   free k (TList a)             = free k a
   free k (TMap k' t)           = free k k' <> free k t
+  free k (TWeak t)             = free k t
   free k (THandler t1 t2)      = free k t1 <> free k t2
   free TV  (TVar a)            = Set.singleton a
   free PV (TParam p)           = Set.singleton p

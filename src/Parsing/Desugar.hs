@@ -295,6 +295,9 @@ desugarValueType = \case
     k' <- desugarValueType k
     v' <- desugarValueType v
     return (TMap k' v')
+  TWeak t -> do
+    t' <- desugarValueType t
+    return (TWeak t')
   THandler i o -> do
     i' <- desugarCompType i
     o' <- desugarCompType o

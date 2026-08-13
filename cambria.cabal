@@ -21,6 +21,7 @@ common interpreter
     Syntax
     Primitives
     Semantics
+    GC
     Runtime
     Parsing.Token
     Parsing.Parser

@@ -202,7 +202,7 @@ inferValue = \case
         applySubst finOut
     applySubst (THandler (TComp hInVal eIn) finOut)
   VPrimitive _ -> throwError "Cannot typecheck runtime primitive"
-  VClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
+  VFunClosure _ _ _ -> throwError "Cannot typecheck runtime closure"
   VAnnot v t -> do
     t' <- inferValue v
     unify t' t
@@ -224,6 +224,7 @@ mentionsValue ps = \case
   TPair t1 t2    -> mentionsValue ps t1 <> mentionsValue ps t2
   TEither t1 t2  -> mentionsValue ps t1 <> mentionsValue ps t2
   TMap t1 t2     -> mentionsValue ps t1 <> mentionsValue ps t2
+  TWeak t        -> mentionsValue ps t
   TList t        -> mentionsValue ps t
   TFun t1 t2     -> mentionsValue ps t1 <> mentionsComp ps t2
   THandler t1 t2 -> mentionsComp ps t1 <> mentionsComp ps t2

@@ -1,0 +1,17 @@
+-- @expect-type: Int!{ fresh : Unit ~> Name }
+-- @expect-value: Impure: !fresh ()
+with [$loc -> Name] handler {
+  return x     -> return (fun _ -> return x),
+  ref x k      -> do a <- !fresh () in
+                  return (fun s -> k a (winsert ((a, x), s))),
+  get a k      -> return (fun s -> k (wlookup (a, s)) s),
+  set (a, x) k -> return (fun s -> k () (winsert ((a, x), s))),
+  finally st   -> st wempty
+} handle
+
+effect !ref : Int ~> $loc.
+effect !get : $loc ~> Int.
+effect !set : $loc * Int ~> Unit.
+do a <- !ref 2 in
+do b <- !ref 3 in
+!set (a, !get b) ; !get a

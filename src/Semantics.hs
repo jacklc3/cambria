@@ -28,8 +28,11 @@ eval env = \case
     Pure (evalValue env v)
   CApp f v ->
     case evalValue env f of
-      VClosure x c cEnv ->
+      VFunClosure x c cEnv ->
         let newEnv = def x (evalValue env v) cEnv
+        in  eval newEnv c
+      self@(VRecClosure g x c cEnv) ->
+        let newEnv = def x (evalValue env v) (def g self cEnv)
         in  eval newEnv c
       VPrimitive prim -> eval env (prim (evalValue env v))
       _            -> error $ "Non-function in application: " ++ show f
@@ -48,19 +51,19 @@ eval env = \case
       Pure v               -> eval (def x v env) c2
       Impure op v f        -> Impure op v (newCont f)
     where
-      newCont f@(VClosure y _ _) = VClosure y (CDo x (CApp f (VVar y)) c2) env
+      newCont f@(VFunClosure y _ _) = VFunClosure y (CDo x (CApp f (VVar y)) c2) env
       newCont v                  = error $ "Non-closure in impure continuation: " ++ show v
   CEffect _ _ c -> eval env c
   CAnnot c _ -> eval env c
   COp op v ->
-    Impure op (evalValue env v) (VClosure "_y" (CReturn (VVar "_y")) env)
+    Impure op (evalValue env v) (VFunClosure "_y" (CReturn (VVar "_y")) env)
   CHandle hv _ c ->
     case evalValue env hv of
       VHandlerClosure h henv -> case finClause h of
         -- Encode finally clause in a do action if it exists
         Just (FinClause x c') ->
           eval env (CDo x (CHandle (VHandlerClosure h{ finClause = Nothing } henv) [] c)
-                          (CApp (VClosure x c' henv) (VVar x)))
+                          (CApp (VFunClosure x c' henv) (VVar x)))
         Nothing ->
           case eval env c of
             Pure v ->
@@ -73,7 +76,7 @@ eval env = \case
                   in  eval newEnv cop
                 Nothing -> Impure op v (deepHandle f)
               where
-                deepHandle (VClosure y c' cenv) = VClosure y (CHandle (VHandlerClosure h henv) [] c') cenv
+                deepHandle (VFunClosure y c' cenv) = VFunClosure y (CHandle (VHandlerClosure h henv) [] c') cenv
                 deepHandle v                     = error $ "Non-closure in impure continuation: " ++ show v
       v -> error $ "Non-handler in handle statement: " ++ show v
 
@@ -82,8 +85,8 @@ evalValue env = \case
   VVar x      -> evalValue env (find x env)
   VPair v1 v2 -> VPair (evalValue env v1) (evalValue env v2)
   VEither s v -> VEither s (evalValue env v)
-  VFun x c    -> VClosure x c env
-  VRec f x c  -> let env' = def f (VClosure x c env') env in VClosure x c env'
+  VFun x c    -> VFunClosure x c env
+  VRec f x c  -> VRecClosure f x c env
   VHandler h  -> VHandlerClosure h env
   VAnnot v _  -> evalValue env v
   v           -> v
