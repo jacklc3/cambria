@@ -1,4 +1,5 @@
--- First-class labels and goto via multi-shot continuations
+-- First-class labels and goto via multi-shot continuations and sum types
+-- Equivalent to jumps_callback.cba
 -- cf. Substitution, jumps, and algebraic effects, LICS 2014
 with [$name -> Int] handler {
   return x  -> return (fun _ -> return x),
@@ -8,7 +9,7 @@ with [$name -> Int] handler {
 } handle
 
 effect !fresh : Unit ~> $name.
-with [$p -> $name] handler {
+with [$ptr -> $name] handler {
   return x  -> return (inl x),
   goto a _  -> return (inr a),
   label _ k -> do c <- !fresh () in
@@ -18,8 +19,8 @@ with [$p -> $name] handler {
     }
 } handle
 
-effect !label : Unit ~> $p + Unit.
-effect !goto  : $p   ~> Void.
+effect !label : Unit ~> $ptr + Unit.
+effect !goto  : $ptr   ~> Void.
 case !label () of {
   inl a -> case !label () of {
     inl b -> !goto a ; return 1,

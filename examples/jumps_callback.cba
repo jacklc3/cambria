@@ -1,0 +1,17 @@
+-- First-class labels and goto via callbacks
+-- Equivalent to jumps_sum.cba
+-- cf. Substitution, jumps, and algebraic effects, LICS 2014
+with [$ptr -> Unit -> Int!{...}] handler {
+  goto t _  -> t (),
+  label _ k -> let thunk _ = k (inr ()) in k (inl thunk)
+} handle
+
+effect !label : Unit ~> $ptr + Unit.
+effect !goto  : $ptr ~> Void.
+case !label () of {
+  inl a -> case !label () of {
+    inl b -> !goto a ; return 1,
+    inr _ -> return 2
+  },
+  inr _ -> return 3
+}
