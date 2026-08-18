@@ -11,14 +11,12 @@ import Syntax
 type Live  = Set.Set Name
 type Sweep a = (Any, a)
 
-collect :: Value -> Value -> Value
-collect v k = snd (sweepValue (saturate Set.empty) k)
-  where
-    saturate marked
-      | new == marked = new
-      | otherwise     = saturate new
-      where mark = markValue marked Set.empty (Env Map.empty)
-            new  = mark v <> mark k
+collect :: Value -> Value
+collect k =
+  let saturate live =
+        let live' = markValue live Set.empty (Env Map.empty) k
+        in if live' == live then live else saturate live'
+  in snd (sweepValue (saturate Set.empty) k)
 
 markValue :: Live -> Set.Set Ident -> Env -> Value -> Live
 markValue marked bound env@(Env m) = \case
@@ -35,7 +33,7 @@ markValue marked bound env@(Env m) = \case
   VMap es             -> foldMap (\(k, x) -> markValue marked bound env k <> markValue marked bound env x) es
   VList xs            -> foldMap (markValue marked bound env) xs
   VWeak w             -> foldMap (markValue marked bound env) (Map.restrictKeys w marked)
-  VFunClosure x c e      -> markComp marked (Set.singleton x) e c
+  VFunClosure x c e   -> markComp marked (Set.singleton x) e c
   VRecClosure g x c e -> markComp marked (Set.fromList [g, x]) e c
   VHandlerClosure h e -> markHandler marked Set.empty e h
   _                   -> mempty
