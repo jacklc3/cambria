@@ -1,5 +1,5 @@
--- Local state over a weak map, returning the final store alongside the result
--- Allocates 200 cells and drops each one; !gc prunes the store as it goes
+-- Local state with experimental garbage collection
+-- Allocates 200 cells over a weak map where !gc prunes dead cells as it goes
 with [$loc -> Name] handler {
   return x     -> return (fun s -> return (x, s)),
   ref x k      -> do a <- !fresh () in
