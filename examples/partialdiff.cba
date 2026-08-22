@@ -1,0 +1,111 @@
+-- Partial differentiation as a parametrized algebraic theory
+-- cf. A complete equational axiomatisation of partial differentiation, MFCS 2020
+--     Substitution, jumps, and algebraic effects, LICS 2014
+--
+-- Plotkin's second-order theory is the ring theory plus PDiff(x.e, u), the
+-- derivative of e with respect to x, evaluated at u.  A term is a suspended
+-- computation tree with leaves (!num, !var), branches (!plus, !mult), and
+-- binding branches (!sub, !deriv).
+--
+-- The handler is into unreduced polynomials over fresh variable Names. So
+-- plus is concatenation, and the derivative of a monomial is the product rule.
+--
+-- The code mirrors the autodiff examples but with dynamic differentiation.
+-- That is, the order of the derivative can be chosen at runtime (demo 2).
+
+-- ---- the effect operations, and terms as suspended trees ----
+
+effect !num   : Int  ~> Void.          -- constant leaf
+effect !var   : $var ~> Void.          -- variable leaf
+effect !neg   : Unit ~> Unit.
+effect !plus  : Unit ~> Bool.
+effect !mult  : Unit ~> Bool.
+effect !sub   : Unit ~> $var + Unit.   -- substitution         sub(0|1,0)
+effect !deriv : Unit ~> $var + Unit.   -- partial derivative   pdiff(0|1,0)
+
+let num n     = fun _ -> !num n in
+let var x     = fun _ -> !var x in
+let neg t     = fun _ -> !neg () ; t () in
+let plus t u  = fun _ -> if !plus () then t () else u () in
+let mult t u  = fun _ -> if !mult () then t () else u () in
+let sub h u   = fun _ -> case !sub ()   of { inl x -> h (var x) (), inr _ -> u () } in
+let deriv h u = fun _ -> case !deriv () of { inl x -> h (var x) (), inr _ -> u () } in
+
+-- ---- the free model: polynomials, as unreduced lists of monomials ----
+
+let rec append (xs, ys) = case xs of {
+  []       -> return ys,
+  x :: xs' -> x :: append (xs', ys)
+} in
+let rec pmul (p, q) = case p of {
+          []      -> return [],
+          t :: p' -> append (mulTerm (t, q), pmul (p', q))
+        },
+        mulTerm ((c, m), q) = case q of {
+          []             -> return [],
+          (c', m') :: q' -> (c * c', append (m, m')) :: mulTerm ((c, m), q')
+        }
+in
+-- substitute the polynomial q for the variable a throughout m
+let rec monSubst ((a, q), m) = case m of {
+  []      -> return ((1, []) :: []),
+  x :: m' -> if x == a then pmul (q, monSubst ((a, q), m'))
+             else pmul ((1, x :: []) :: [], monSubst ((a, q), m'))
+} in
+-- differentiate a monomial with respect to a via the product rule
+let rec monDeriv (a, m) = case m of {
+  []      -> return [],
+  x :: m' -> do rest <- pmul ((1, x :: []) :: [], monDeriv (a, m')) in
+             if x == a then (1, m') :: rest else return rest
+} in
+let rec psubst ((a, q), p) = case p of {
+  []           -> return [],
+  (c, m) :: p' -> append (pmul ((c, []) :: [], monSubst ((a, q), m)), psubst ((a, q), p'))
+} in
+let rec pderiv (a, p) = case p of {
+  []           -> return [],
+  (c, m) :: p' -> append (pmul ((c, []) :: [], monDeriv (a, m)), pderiv (a, p'))
+} in
+-- a closed result has only empty monomials so its value is the coefficient sum
+let rec total p = case p of {
+  []           -> return 0,
+  (c, _) :: p' -> c + total p'
+} in
+
+let pdiff_handler = handler {
+  return v  -> return [],
+  num   c _ -> return ((c, []) :: []),
+  var   a _ -> return ((1, a :: []) :: []),
+  neg   _ k -> pmul ((0 - 1, []) :: [], k ()),
+  plus  _ k -> append (k true, k false),
+  mult  _ k -> pmul (k true, k false),
+  sub   _ k -> do a <- !fresh () in
+               do body <- k (inl a) in
+               psubst ((a, k (inr ())), body),
+  deriv _ k -> do a <- !fresh () in
+               do body <- k (inl a) in
+               psubst ((a, k (inr ())), pderiv (a, body)),
+  finally p -> total p
+} in
+let run t = with [$var -> Name] pdiff_handler handle (t ()) in
+
+-- ---- demo 1: the running example of the autodiff examples ----
+-- f (x, y) = 1 + x^3 + (- y^2) at (2, 4)
+
+let f x y = plus (plus (num 1) (mult x (mult x x))) (neg (mult y y)) in
+
+do v   <- run (sub (fun x -> sub (fun y -> f x y) (num 4)) (num 2)) in
+do fx  <- run (deriv (fun x -> f x (num 4)) (num 2)) in
+do fy  <- run (deriv (fun y -> f (num 2) y) (num 4)) in
+do fxx <- run (deriv (fun x -> deriv (fun x' -> f x' (num 4)) x) (num 2)) in
+do fxy <- run (deriv (fun x -> deriv (fun y -> f x y) (num 4)) (num 2)) in
+
+-- ---- demo 2: runtime-chosen differentiation depth ----
+-- the fourth derivative of x^5 at 2 is 240
+
+let rec nthD (n, f) = if n == 0 then return f
+                      else nthD (n - 1, fun x -> deriv f x) in
+do g  <- nthD (4, fun x -> mult x (mult x (mult x (mult x x)))) in
+do d4 <- run (g (num 2)) in
+
+return (v :: fx :: fy :: fxx :: fxy :: d4 :: [])
