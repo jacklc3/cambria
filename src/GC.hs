@@ -74,13 +74,13 @@ sweepValue lv = share $ \case
   VAnnot a t            -> flip VAnnot t <$> sweepValue lv a
   VFun x c              -> VFun x <$> sweepComp lv c
   VRec g x c            -> VRec g x <$> sweepComp lv c
-  VFunClosure x c e        -> VFunClosure x <$> sweepComp lv c <*> sweepEnv lv e
+  VFunClosure x c e     -> VFunClosure x <$> sweepComp lv c <*> sweepEnv lv e
   VRecClosure g x c e   -> VRecClosure g x <$> sweepComp lv c <*> sweepEnv lv e
   VHandlerClosure h e   -> VHandlerClosure <$> sweepHandler lv h <*> sweepEnv lv e
   VWeak m               -> (Any (Map.size survivors < Map.size m), VWeak)
                              <*> traverse (sweepValue lv) survivors
                              where survivors = Map.restrictKeys m lv
-  v                     -> pure v
+  v                     -> return v
 
 sweepComp :: Live -> Computation -> Sweep Computation
 sweepComp lv = share $ \case
