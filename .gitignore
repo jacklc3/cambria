@@ -16,6 +16,7 @@
 *Lexer.hs
 artefact/*
 artefact.zip
+cambria-popl27-artefact.zip
 .claude/*
 !.claude/hooks/
 !.claude/settings.json

@@ -1,6 +1,6 @@
-# Cambria: A Language for Parameterized Handlers
+# Cambria: A Language for Parametrized Handlers
 
-Cambria is a functional programming language combining **algebraic effects and handlers** and **parameterized algebraic theories (PATs)**.
+Cambria is a functional programming language combining **algebraic effects and handlers** and **parametrized algebraic theories (PATs)**.
 It is a tool for programming with computational effects that involve dynamically allocated resources, such as memory cells, code pointers, or threads.
 
 ## Key Features
@@ -90,7 +90,7 @@ return checks
 ### Code Jumps
 
 A handler for a theory of code jumps, with labels and goto commands.
-From [examples/jumps.cba](examples/jumps.cba), which returns `inl 3`:
+From [examples/jumps_sum.cba](examples/jumps_sum.cba), which returns `inl 3`:
 
 ```
 -- First-class labels and goto via multi-shot continuations
@@ -128,8 +128,10 @@ case !label () of {
 
 ### Prerequisites
 
-* [GHC (Glasgow Haskell Compiler)](https://www.haskell.org/ghc/)
-* [Cabal](https://www.haskell.org/cabal/)
+* [GHC (Glasgow Haskell Compiler)](https://www.haskell.org/ghc/) (tested with 9.10.1)
+* [Cabal](https://www.haskell.org/cabal/) (tested with 3.16.1.0)
+* Alex (tested with 3.5.4.0)
+* Happy (tested with 2.2)
 
 ### Building
 

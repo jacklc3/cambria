@@ -2,9 +2,9 @@ cabal-version:      2.4
 name:               cambria
 version:            0.1.0.0
 
-synopsis:           A simple interpreter for a parameterized effect and handler based language.
+synopsis:           A simple interpreter for a parametrized effect and handler based language.
 description:        Cambria is a project demonstrating type inference and evaluation for a
-                    functional programming language with parameterized algebraic effects and handlers.
+                    functional programming language with parametrized algebraic effects and handlers.
 license:            MIT
 author:             Jack Liell-Cock
 maintainer:         jackliellcock@gmail.com
